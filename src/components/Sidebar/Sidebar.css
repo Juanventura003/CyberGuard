@@ -1,0 +1,176 @@
+.sidebar {
+  width: 270px;
+  height: 100vh;
+  background-color: #070b14;
+  border-right: 1px solid #182033;
+  color: white;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* =========================
+   Logo / CyberGuard Title
+   ========================= */
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 14px 12px;
+
+  border-bottom: 1px solid #151d2e;
+}
+
+.sidebar-header h2 {
+  margin: 0;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  color: white;
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+
+  border-radius: 8px;
+
+  flex-shrink: 0;
+}
+
+.logo img {
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+}
+
+
+/* =========================
+   Login + Sign Up
+   ========================= */
+
+.auth-buttons {
+  display: flex;
+  gap: 8px;
+
+  padding: 16px 10px;
+}
+
+.auth-buttons button {
+  flex: 1;
+
+  height: 40px;
+
+  border-radius: 6px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.login-button {
+  background-color: transparent;
+
+  color: #4da3ff;
+
+  border: 1px solid #22518a;
+}
+
+.login-button:hover {
+  background-color: #0d1b2d;
+}
+
+.signup-button {
+  background-color: #1685ff;
+
+  color: white;
+
+  border: 1px solid #1685ff;
+}
+
+.signup-button:hover {
+  background-color: #0f70db;
+}
+
+
+/* =========================
+   Navigation
+   ========================= */
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  padding: 0 8px;
+
+  flex: 1;
+}
+
+.nav-item {
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 0 14px;
+
+  color: #7488a8;
+
+  text-decoration: none;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  border-radius: 7px;
+
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.nav-item svg {
+  flex-shrink: 0;
+}
+
+.nav-item span {
+  white-space: nowrap;
+}
+
+
+/* Hover */
+
+.nav-item:hover {
+  background-color: #0d1727;
+
+  color: white;
+}
+
+
+/* Current Page */
+
+.nav-item.active {
+  background-color: #14233c;
+
+  color: #58a6ff;
+}
