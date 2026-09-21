@@ -67,10 +67,6 @@ export default function EmailScanner() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const loadGmailList = async (session: string) => {
-    // Yield one microtask before touching any state. An async function's
-    // body runs synchronously up to its first `await`, so without this a
-    // caller in a useEffect (like below) would still trigger setGmailLoading
-    // synchronously within that effect's own call stack.
     await Promise.resolve();
 
     setGmailLoading(true);
@@ -85,10 +81,6 @@ export default function EmailScanner() {
     }
   };
 
-  // The only things left to do after mount: strip the OAuth params back out
-  // of the URL, and — if we arrived with a session — kick off the async
-  // inbox fetch. loadGmailList defers past a microtask before it sets any
-  // state, so nothing here runs synchronously within this effect.
   useEffect(() => {
     if (initialGmail.session || initialGmail.error) {
       setSearchParams({}, { replace: true });
