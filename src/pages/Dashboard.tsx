@@ -1,9 +1,7 @@
+import LoggedInDashboard from "../components/dashboard/LoggedInDashboard";
+
 function Dashboard() {
-  return (
-    <div>
-      <h1>Security Dashboard</h1>
-    </div>
-  );
+  return <LoggedInDashboard />;
 }
 
 export default Dashboard;
