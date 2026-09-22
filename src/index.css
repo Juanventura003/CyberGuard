@@ -15,7 +15,8 @@ body {
   background-color: #050810;
 }
 
-/* dashboard  layout*/
+/* dashboard layout */
+
 .dashboard {
   width: 100%;
   min-height: 100vh;
@@ -74,6 +75,7 @@ body {
 }
 
 /* 4 summary cards */
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -143,7 +145,8 @@ body {
   margin: 5px 0 0;
 }
 
-/* todays activity */
+/* today's activity */
+
 .section-title {
   font-size: 17px;
   margin: 0 0 18px;
@@ -202,7 +205,8 @@ body {
   font-size: 12px;
 }
 
-/* list of threats */
+/* lists */
+
 .panel-list {
   margin-bottom: 14px;
 }
@@ -267,6 +271,7 @@ body {
 }
 
 /* security checker */
+
 .security-tools {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -282,11 +287,8 @@ body {
   font-size: 12px;
 }
 
-.security-tools div::first-letter {
-  color: #3e9dff;
-}
+/* cyber assistant */
 
-/* cyber ai assistant */
 .assistant-question {
   background: #08182c;
   color: #a7d6ff;
@@ -296,7 +298,8 @@ body {
   font-size: 14px;
 }
 
-/* recent activity  */
+/* recent activity */
+
 .recent-title {
   margin-top: 34px;
 }
@@ -370,10 +373,114 @@ body {
   margin-top: 30px;
 }
 
-/* size of cards */
+/*guest dashboard*/
+
+/* login section */
+
+.guest-login-card {
+  background: linear-gradient(135deg, #102039, #0c1a2e);
+  border: 1px solid #294d75;
+  border-radius: 12px;
+  padding: 22px 24px;
+  margin-bottom: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+}
+
+.guest-login-content {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+
+.guest-shield-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #0b3157;
+  color: #4cc9ff;
+
+  flex-shrink: 0;
+}
+
+.guest-login-content h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.guest-login-content p {
+  margin: 0;
+  color: #7fa7d8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.guest-login-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.guest-login-button,
+.guest-signup-button {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 7px;
+  cursor: pointer;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+
+  transition: 0.2s ease;
+}
+
+.guest-login-button {
+  background: transparent;
+  color: #4da3ff;
+  border: 1px solid #285c91;
+}
+
+.guest-login-button:hover {
+  background: #132a49;
+}
+
+.guest-signup-button {
+  background: #1677ff;
+  color: #ffffff;
+  border: 1px solid #1677ff;
+}
+
+.guest-signup-button:hover {
+  background: #0f68e4;
+}
+
+/* smaller screens */
+
 @media (max-width: 1100px) {
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .guest-login-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -394,6 +501,18 @@ body {
 
   .recent-right {
     gap: 10px;
+  }
+}
+
+@media (max-width: 700px) {
+
+  .guest-login-buttons {
+    width: 100%;
+  }
+
+  .guest-login-button,
+  .guest-signup-button {
+    flex: 1;
   }
 }
 

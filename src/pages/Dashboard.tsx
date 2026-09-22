@@ -1,7 +1,14 @@
 import LoggedInDashboard from "../components/dashboard/LoggedInDashboard";
+import GuestDashboard from "../components/dashboard/GuestDashboard";
+
 
 function Dashboard() {
-  return <LoggedInDashboard />;
+  // Temporary
+  const isLoggedIn = false;
+
+
+  return isLoggedIn ? <LoggedInDashboard /> : <GuestDashboard />;
 }
+
 
 export default Dashboard;
