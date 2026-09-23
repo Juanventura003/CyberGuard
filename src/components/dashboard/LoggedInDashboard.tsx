@@ -1,316 +1,250 @@
 import {
   Globe,
   Mail,
-  Search,
-  TriangleAlert,
+  ShieldCheck,
   Bot,
-  Link,
+  AlertTriangle,
 } from "lucide-react";
 
 function LoggedInDashboard() {
-  const websites = [
-    { name: "github.com", status: "Safe" },
-    { name: "gmail.com", status: "Safe" },
-    { name: "paypal-secure.net", status: "High Risk" },
-  ];
-
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-});
+  });
 
-  const emails = [
-    {
-      name: "security@paypal-accou...",
-      status: "Likely Phishing",
-    },
-    {
-      name: "hello@notion.so",
-      status: "Safe",
-    },
-    {
-      name: "offers@amazn-deals.net",
-      status: "Suspicious",
-    },
-  ];
+  const currentHour = new Date().getHours();
 
-  const recentActivity = [
-    {
-      icon: <Globe size={18} />,
-      name: "paypal-secure.net",
-      description: "Website flagged as phishing",
-      status: "High Risk",
-      time: "1:58 PM",
-    },
-    {
-      icon: <Mail size={18} />,
-      name: "security@paypal-accounts.com",
-      description: "Phishing email detected",
-      status: "High Risk",
-      time: "2:44 PM",
-    },
-    {
-      icon: <Link size={18} />,
-      name: "http://bit.ly/3xR2free",
-      description: "Shortened URL with redirect",
-      status: "Suspicious",
-      time: "3:01 PM",
-    },
-    {
-      icon: <Globe size={18} />,
-      name: "free-gift-cards24.com",
-      description: "Suspicious website detected",
-      status: "Suspicious",
-      time: "1:22 PM",
-    },
-    {
-      icon: <Mail size={18} />,
-      name: "offers@amazn-deals.net",
-      description: "Suspicious email detected",
-      status: "Suspicious",
-      time: "10:15 AM",
-    },
-    {
-      icon: <Globe size={18} />,
-      name: "github.com",
-      description: "Website checked",
-      status: "Safe",
-      time: "9:47 AM",
-    },
-  ];
+  let greeting = "Good evening";
 
-  const getStatusClass = (status: string) => {
-    if (status === "Safe") return "status safe";
-    if (status === "Suspicious") return "status suspicious";
-    return "status danger";
-  };
+  if (currentHour < 12) {
+    greeting = "Good morning";
+  } else if (currentHour < 18) {
+    greeting = "Good afternoon";
+  }
 
   return (
     <div className="dashboard">
-      {/* main header */}
+      {/* page heading */}
       <div className="dashboard-header">
         <div>
           <p className="dashboard-date">{currentDate}</p>
-
-          <h1>
-            Good afternoon, Daniel
-          </h1>
-
+          <h1>{greeting}</h1>
           <p className="dashboard-subtitle">
-            Here's your security summary for today.
+            Here is your CyberGuard activity for today.
           </p>
         </div>
 
         <div className="monitoring-status">
           <span className="monitoring-dot"></span>
-          Monitoring active
+          CyberGuard Active
         </div>
       </div>
 
-      {/* 4 summary cards */}
+      {/* summary */}
       <div className="summary-grid">
         <div className="summary-card">
-          <div className="summary-icon blue">
-            <Globe size={21} />
-          </div>
+          <Globe size={25} />
 
           <div>
+            <h3>Websites Tracked</h3>
             <h2>8</h2>
-            <h3>Websites Monitored</h3>
-            <p>Today</p>
+            <p>5 safe websites</p>
           </div>
         </div>
 
         <div className="summary-card">
-          <div className="summary-icon purple">
-            <Mail size={21} />
-          </div>
+          <Mail size={25} />
 
           <div>
-            <h2>4</h2>
             <h3>Emails Scanned</h3>
-            <p>Today</p>
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <div className="summary-icon cyan">
-            <Search size={21} />
-          </div>
-
-          <div>
-            <h2>4</h2>
-            <h3>Security Checks</h3>
-            <p>Today</p>
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <div className="summary-icon red">
-            <TriangleAlert size={21} />
-          </div>
-
-          <div>
             <h2>6</h2>
-            <h3>Potential Risks</h3>
-            <p>Detected today</p>
+            <p>1 suspicious email</p>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <ShieldCheck size={25} />
+
+          <div>
+            <h3>Security Checks</h3>
+            <h2>4</h2>
+            <p>Completed today</p>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <AlertTriangle size={25} />
+
+          <div>
+            <h3>Threats Found</h3>
+            <h2>2</h2>
+            <p>Review recommended</p>
           </div>
         </div>
       </div>
 
-      {/* Todays activity header*/}
       <h2 className="section-title">Today's Activity</h2>
 
       <div className="activity-grid">
-        {/* Website tracker tab */}
+        {/* websites */}
         <div className="dashboard-panel">
-          <div className="panel-header">
-            <div className="panel-title">
-              <div className="panel-icon">
-                <Globe size={19} />
-              </div>
+          <div className="panel-title">
+            <Globe size={22} />
 
-              <div>
-                <h3>Website Tracker</h3>
-                <p>8 sites monitored</p>
-              </div>
+            <div>
+              <h3>Website Activity</h3>
+              <p>Recently tracked websites</p>
             </div>
-
-            <span className="active-badge">Active</span>
           </div>
 
           <div className="panel-list">
-            {websites.map((website) => (
-              <div className="panel-row" key={website.name}>
-                <span>{website.name}</span>
+            <div className="panel-row">
+              <span>github.com</span>
+              <span className="status safe">Safe</span>
+            </div>
 
-                <span className={getStatusClass(website.status)}>
-                  <span className="status-dot">●</span>
-                  {website.status}
-                </span>
-              </div>
-            ))}
+            <div className="panel-row">
+              <span>gmail.com</span>
+              <span className="status safe">Safe</span>
+            </div>
+
+            <div className="panel-row">
+              <span>paypal-secure.net</span>
+              <span className="status danger">High Risk</span>
+            </div>
           </div>
 
           <button className="dashboard-button">
-            View All Websites →
+            View Website History
           </button>
         </div>
 
-        {/* email scanner tab */}
+        {/* emails */}
         <div className="dashboard-panel">
-          <div className="panel-header">
-            <div className="panel-title">
-              <div className="panel-icon purple">
-                <Mail size={19} />
-              </div>
+          <div className="panel-title">
+            <Mail size={22} />
 
-              <div>
-                <h3>Email Scanner</h3>
-                <p>4 emails scanned</p>
-              </div>
+            <div>
+              <h3>Email Scanner</h3>
+              <p>Recent email scans</p>
             </div>
-
-            <span className="threat-badge">1 Threat</span>
           </div>
 
           <div className="panel-list">
-            {emails.map((email) => (
-              <div className="panel-row" key={email.name}>
-                <span>{email.name}</span>
+            <div className="panel-row">
+              <span>Amazon Order Confirmation</span>
+              <span className="status safe">Safe</span>
+            </div>
 
-                <span className={getStatusClass(email.status)}>
-                  <span className="status-dot">●</span>
-                  {email.status}
-                </span>
-              </div>
-            ))}
+            <div className="panel-row">
+              <span>Account Verification</span>
+              <span className="status suspicious">Suspicious</span>
+            </div>
+
+            <div className="panel-row">
+              <span>School Notification</span>
+              <span className="status safe">Safe</span>
+            </div>
           </div>
 
           <button className="dashboard-button">
-            Scan Emails →
+            Open Email Scanner
           </button>
         </div>
 
-        {/* security checker tab */}
+        {/* security checker */}
         <div className="dashboard-panel">
-          <div className="panel-header">
-            <div className="panel-title">
-              <div className="panel-icon">
-                <Search size={19} />
-              </div>
+          <div className="panel-title">
+            <ShieldCheck size={22} />
 
-              <div>
-                <h3>Security Checker</h3>
-                <p>4 checks performed</p>
-              </div>
+            <div>
+              <h3>Security Checker</h3>
+              <p>Run a security check</p>
             </div>
           </div>
 
           <div className="security-tools">
-            <div>● Link Checker</div>
-            <div>● File Checker</div>
-            <div>● Password Checker</div>
-            <div>● Domain Checker</div>
+            <div>Password Check</div>
+            <div>Link Check</div>
+            <div>Domain Check</div>
+            <div>File Check</div>
           </div>
 
           <button className="dashboard-button">
-            Open Tools →
+            Open Security Checker
           </button>
         </div>
 
-        {/* cyber ai assistant tab */}
+        {/* assistant */}
         <div className="dashboard-panel">
-          <div className="panel-header">
-            <div className="panel-title">
-              <div className="panel-icon green">
-                <Bot size={19} />
-              </div>
+          <div className="panel-title">
+            <Bot size={22} />
 
-              <div>
-                <h3>Cyber Assistant</h3>
-                <p>Ask me anything</p>
-              </div>
+            <div>
+              <h3>Cyber Assistant</h3>
+              <p>Ask a cybersecurity question</p>
             </div>
           </div>
 
           <div className="assistant-question">
-            "How can I tell if an email is a phishing attempt?"
+            How can I tell if an email is phishing?
           </div>
 
           <button className="dashboard-button">
-            Ask a Question →
+            Ask Cyber Assistant
           </button>
         </div>
       </div>
 
-      {/* recent activity header */}
-      <h2 className="section-title recent-title">Recent Activity</h2>
+      <h2 className="section-title recent-title">
+        Recent Activity
+      </h2>
 
       <div className="recent-activity">
-        {recentActivity.map((activity, index) => (
-          <div className="recent-row" key={index}>
-            <div className="recent-info">
-              <div className="recent-icon">{activity.icon}</div>
+        <div className="recent-row">
+          <div className="recent-info">
+            <Globe size={18} />
 
-              <div>
-                <h4>{activity.name}</h4>
-                <p>{activity.description}</p>
-              </div>
-            </div>
-
-            <div className="recent-right">
-              <span className={getStatusClass(activity.status)}>
-                <span className="status-dot">●</span>
-                {activity.status}
-              </span>
-
-              <span className="activity-time">{activity.time}</span>
+            <div>
+              <h4>Website checked</h4>
+              <p>github.com</p>
             </div>
           </div>
-        ))}
+
+          <span className="status safe">Safe</span>
+        </div>
+
+        <div className="recent-row">
+          <div className="recent-info">
+            <Mail size={18} />
+
+            <div>
+              <h4>Email scanned</h4>
+              <p>Account Verification</p>
+            </div>
+          </div>
+
+          <span className="status suspicious">
+            Suspicious
+          </span>
+        </div>
+
+        <div className="recent-row">
+          <div className="recent-info">
+            <AlertTriangle size={18} />
+
+            <div>
+              <h4>Threat detected</h4>
+              <p>paypal-secure.net</p>
+            </div>
+          </div>
+
+          <span className="status danger">
+            High Risk
+          </span>
+        </div>
       </div>
     </div>
   );
