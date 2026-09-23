@@ -1,9 +1,7 @@
 .main-content {
-  margin-left: 270px;
+  margin-left: 250px;
   min-height: 100vh;
-
-  padding: 30px;
-
-  background-color: #050810;
-  color: white;
+  padding: 0;
+  background-color: #dbeaf8;
+  color: #1f2d3d;
 }
