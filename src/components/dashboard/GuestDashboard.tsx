@@ -1,8 +1,6 @@
 import {
   Globe,
   Mail,
-  Search,
-  Bot,
   LogIn,
   UserPlus,
   ShieldCheck,
@@ -75,6 +73,71 @@ function GuestDashboard() {
           <button className="guest-signup-button">
             <UserPlus size={17} />
             Sign Up
+          </button>
+        </div>
+      </div>
+
+        {/* quick tools heading */}
+      <div className="guest-section-header">
+        <h2>Quick Security Tools</h2>
+
+        <p>
+          You can still use CyberGuard without an account. Your activity
+          will not be saved.
+        </p>
+      </div>
+
+      {/* security tools layout */}
+      <div className="guest-tools-grid">
+
+        {/* website tracker */}
+        <div className="guest-tool-card">
+          <div className="guest-tool-top">
+            <div className="guest-tool-icon blue">
+              <Globe size={22} />
+            </div>
+            <div>
+              <h3>Website Tracker</h3>
+              <span>Website Security</span>
+            </div>
+          </div>
+
+
+          <p className="guest-tool-description">
+            Monitor websites you visit and check domains for potential
+            security risks.
+          </p>
+
+
+          <button className="guest-tool-button">
+            Open Website Tracker →
+          </button>
+        </div>
+
+
+        {/* email scanner */}
+        <div className="guest-tool-card">
+          <div className="guest-tool-top">
+            <div className="guest-tool-icon purple">
+              <Mail size={22} />
+            </div>
+
+
+            <div>
+              <h3>Email Scanner</h3>
+              <span>Phishing Detection</span>
+            </div>
+          </div>
+
+
+          <p className="guest-tool-description">
+            Scan email content and sender information for signs of phishing
+            or suspicious activity.
+          </p>
+
+
+          <button className="guest-tool-button">
+            Scan an Email →
           </button>
         </div>
       </div>
