@@ -1,9 +1,12 @@
+/* sidebar */
+
 .sidebar {
-  width: 270px;
+  width: 250px;
   height: 100vh;
-  background-color: #070b14;
-  border-right: 1px solid #182033;
-  color: white;
+
+  background-color: #0c0e15;
+  border-right: 1px solid #252a35;
+  color: #ffffff;
 
   position: fixed;
   top: 0;
@@ -13,32 +16,30 @@
   flex-direction: column;
 }
 
-/* =========================
-   Logo / CyberGuard Title
-   ========================= */
+
+/* logo and title */
 
 .sidebar-header {
   display: flex;
   align-items: center;
   gap: 12px;
 
-  padding: 14px 12px;
+  padding: 16px 14px;
 
-  border-bottom: 1px solid #151d2e;
+  border-bottom: 1px solid #252a35;
 }
 
 .sidebar-header h2 {
   margin: 0;
 
+  color: #ffffff;
   font-size: 18px;
   font-weight: 700;
-
-  color: white;
 }
 
 .logo {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
 
   display: flex;
   align-items: center;
@@ -46,7 +47,8 @@
 
   overflow: hidden;
 
-  border-radius: 8px;
+  background-color: #ffffff;
+  border-radius: 50%;
 
   flex-shrink: 0;
 }
@@ -59,94 +61,77 @@
 }
 
 
-/* =========================
-   Login + Sign Up
-   ========================= */
+/* login and sign up */
 
 .auth-buttons {
   display: flex;
   gap: 8px;
 
-  padding: 16px 10px;
+  padding: 15px 12px;
 }
 
 .auth-buttons button {
   flex: 1;
+  height: 36px;
 
-  height: 40px;
+  border-radius: 4px;
 
-  border-radius: 6px;
-
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 600;
 
   cursor: pointer;
-
-  transition: 0.2s;
 }
 
 .login-button {
-  background-color: transparent;
-
-  color: #4da3ff;
-
-  border: 1px solid #22518a;
+  background-color: #ffffff;
+  color: #1f2d3d;
+  border: 1px solid #8c96a3;
 }
 
 .login-button:hover {
-  background-color: #0d1b2d;
+  background-color: #f1f3f5;
 }
 
 .signup-button {
-  background-color: #1685ff;
+  background-color: #4169e1;
+  color: #ffffff;
 
-  color: white;
-
-  border: 1px solid #1685ff;
+  border: 1px solid #4169e1;
 }
 
 .signup-button:hover {
-  background-color: #0f70db;
+  background-color: #3457c5;
 }
 
 
-/* =========================
-   Navigation
-   ========================= */
+/* navigation */
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
+  gap: 5px;
 
-  gap: 4px;
-
-  padding: 0 8px;
+  padding: 8px 10px;
 
   flex: 1;
 }
 
 .nav-item {
-  height: 52px;
+  height: 44px;
+  padding: 0 13px;
 
   display: flex;
   align-items: center;
+  gap: 12px;
 
-  gap: 14px;
-
-  padding: 0 14px;
-
-  color: #7488a8;
-
+  color: #c7cbd3;
   text-decoration: none;
 
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 
-  border-radius: 7px;
-
-  transition:
-    background-color 0.2s,
-    color 0.2s;
+  border-radius: 4px;
 }
 
 .nav-item svg {
@@ -158,19 +143,17 @@
 }
 
 
-/* Hover */
+/* navigation hover */
 
 .nav-item:hover {
-  background-color: #0d1727;
-
-  color: white;
+  background-color: #1d212b;
+  color: #ffffff;
 }
 
 
-/* Current Page */
+/* current page */
 
 .nav-item.active {
-  background-color: #14233c;
-
-  color: #58a6ff;
+  background-color: #4169e1;
+  color: #ffffff;
 }
