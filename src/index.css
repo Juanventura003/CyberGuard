@@ -470,8 +470,6 @@ body {
 }
 
 /* quick security tools */
-
-
 .guest-section-header {
   margin-bottom: 18px;
 }
@@ -530,13 +528,9 @@ body {
 .guest-tool-icon {
   width: 43px;
   height: 43px;
-
-
   display: flex;
   align-items: center;
   justify-content: center;
-
-
   border-radius: 8px;
   flex-shrink: 0;
 }
@@ -549,6 +543,16 @@ body {
 .guest-tool-icon.purple {
   background: #27234f;
   color: #b7a8ff;
+}
+
+.guest-tool-icon.cyan {
+  background: #07364c;
+  color: #6de5ff;
+}
+
+.guest-tool-icon.green {
+  background: #103b38;
+  color: #5ee6b5;
 }
 
 .guest-tool-description {
@@ -577,8 +581,78 @@ body {
   border-color: #337fc5;
 }
 
-/* smaller screens */
+/* account benefits */
+.guest-benefits-card {
+  margin-top: 22px;
+  background: #0d1b30;
+  border: 1px solid #23466c;
+  border-radius: 11px;
+  padding: 21px 23px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+}
 
+.guest-benefits-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.guest-benefits-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #0b3157;
+  color: #4cc9ff;
+}
+
+.guest-benefits-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.guest-benefits-card p {
+  margin: 0;
+  color: #6e9bd0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.guest-benefits-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 25px;
+  color: #8fb5df;
+  font-size: 12px;
+}
+
+.guest-benefits-list span {
+  white-space: nowrap;
+}
+
+.guest-benefits-list span::first-letter {
+  color: #22e68b;
+}
+
+/* bottom guest message */
+.guest-bottom-message {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: #527da9;
+  font-size: 12px;
+}
+
+
+/* smaller screens */
 @media (max-width: 1100px) {
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -587,6 +661,11 @@ body {
 
 @media (max-width: 900px) {
   .guest-login-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .guest-benefits-card {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -613,6 +692,10 @@ body {
 }
 
 @media (max-width: 700px) {
+
+  .guest-benefits-list {
+    grid-template-columns: 1fr;
+  }
 
   .guest-tools-grid {
     grid-template-columns: 1fr;

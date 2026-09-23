@@ -1,6 +1,8 @@
 import {
   Globe,
   Mail,
+  Bot,
+  Search,
   LogIn,
   UserPlus,
   ShieldCheck,
@@ -102,18 +104,15 @@ function GuestDashboard() {
             </div>
           </div>
 
-
           <p className="guest-tool-description">
             Monitor websites you visit and check domains for potential
             security risks.
           </p>
 
-
           <button className="guest-tool-button">
             Open Website Tracker →
           </button>
         </div>
-
 
         {/* email scanner */}
         <div className="guest-tool-card">
@@ -122,23 +121,93 @@ function GuestDashboard() {
               <Mail size={22} />
             </div>
 
-
             <div>
               <h3>Email Scanner</h3>
               <span>Phishing Detection</span>
             </div>
           </div>
 
-
           <p className="guest-tool-description">
             Scan email content and sender information for signs of phishing
             or suspicious activity.
           </p>
 
-
           <button className="guest-tool-button">
             Scan an Email →
           </button>
+        </div>
+        
+        {/* security checker */}
+        <div className="guest-tool-card">
+          <div className="guest-tool-top">
+            <div className="guest-tool-icon cyan">
+              <Search size={22} />
+            </div>
+
+            <div>
+              <h3>Security Checker</h3>
+              <span>Security Tools</span>
+            </div>
+          </div>
+
+
+          <p className="guest-tool-description">
+            Check links, passwords, files, and domains using CyberGuard's
+            security tools.
+          </p>
+
+          <button className="guest-tool-button">
+            Open Security Tools →
+          </button>
+        </div>
+
+        {/* cyber ai assistant */}
+        <div className="guest-tool-card">
+          <div className="guest-tool-top">
+            <div className="guest-tool-icon green">
+              <Bot size={22} />
+            </div>
+
+            <div>
+              <h3>Cyber Assistant</h3>
+              <span>Security Help</span>
+            </div>
+          </div>
+
+
+          <p className="guest-tool-description">
+            Ask cybersecurity questions and get help understanding online
+            threats and security concepts.
+          </p>
+
+          <button className="guest-tool-button">
+            Ask Cyber Assistant →
+          </button>
+        </div>
+      </div>
+
+      {/* bottom message benefits to make account */}
+      <div className="guest-benefits-card">
+        <div className="guest-benefits-info">
+          <div className="guest-benefits-icon">
+            <ShieldCheck size={22} />
+          </div>
+
+          <div>
+            <h3>Want to keep track of your security?</h3>
+
+            <p>
+              Create an account to save activity and view personalized
+              security reports.
+            </p>
+          </div>
+        </div>
+
+        <div className="guest-benefits-list">
+          <span>✓ Save website activity</span>
+          <span>✓ Save email scans</span>
+          <span>✓ View security history</span>
+          <span>✓ Generate daily reports</span>
         </div>
       </div>
     </div>
