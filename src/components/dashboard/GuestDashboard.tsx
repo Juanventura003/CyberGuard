@@ -8,7 +8,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { useNavigate } from "react-router-dom";
+
 function GuestDashboard() {
+  const navigate = useNavigate();
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -88,7 +91,8 @@ function GuestDashboard() {
             security risks.
           </p>
 
-          <button className="guest-tool-button">
+          <button className="guest-tool-button"
+          onClick={() => navigate("/website-tracker")}>
             Open Website Tracker
           </button>
         </div>
@@ -138,11 +142,6 @@ function GuestDashboard() {
           </button>
         </div>
       </div>
-
-      <p className="guest-note">
-        Guest activity is not saved. Create an account to keep your
-        security history.
-      </p>
     </div>
   );
 }
