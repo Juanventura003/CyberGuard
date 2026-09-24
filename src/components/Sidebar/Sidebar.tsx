@@ -8,12 +8,21 @@ import {
   Settings,
 } from "lucide-react";
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 import cyberGuardLogo from "../../assets/logo.png";
 import "./Sidebar.css";
 
 function Sidebar() {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
   return (
     <aside className="sidebar">
       {/* Logo / Title */}
@@ -25,14 +34,10 @@ function Sidebar() {
         <h2>CyberGuard</h2>
       </div>
 
-      {/* Login / Sign Up */}
+      {/* Sign Out */}
       <div className="auth-buttons">
-        <button className="login-button">
-          Login
-        </button>
-
-        <button className="signup-button">
-          Sign Up
+        <button className="signout-button" onClick={handleSignOut}>
+          Sign Out
         </button>
       </div>
 
