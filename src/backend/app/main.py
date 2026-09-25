@@ -88,7 +88,7 @@ async def gmail_analyze(payload: GmailAnalyzeRequest):
     if len(payload.message_ids) > MAX_EMAILS_PER_BATCH:
         raise HTTPException(status_code=400, detail=f"Select at most {MAX_EMAILS_PER_BATCH} emails at a time.")
 
-    semaphore = asyncio.Semaphore(8)  #don't hit Gmail's API quotas and limits
+    semaphore = asyncio.Semaphore(8)
 
     async def fetch_and_score(message_id: str) -> EmailResult:
         async with semaphore:

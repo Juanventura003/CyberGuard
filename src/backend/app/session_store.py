@@ -1,6 +1,5 @@
 """
 In-memory session store.
-
 Maps a random session id -> that person's Gmail OAuth credentials (as JSON)
 plus a created-at timestamp. """
 import time
