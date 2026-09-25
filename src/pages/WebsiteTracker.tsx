@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Search, Globe2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 type Website = {
   domain: string;
@@ -63,6 +64,7 @@ const websites: Website[] = [
 
 function WebsiteTracker() {
   const [search, setSearch] = useState("");
+    const { session } = useAuth();
 
   const filteredWebsites = websites.filter((website) =>
     website.domain.toLowerCase().includes(search.toLowerCase())
@@ -111,6 +113,7 @@ function WebsiteTracker() {
       </div>
 
       {/* guest notice - later only show this when user is logged out */}
+      {!session && (
       <div className="tracker-guest-message">
         <Globe2 size={18} />
 
@@ -122,6 +125,7 @@ function WebsiteTracker() {
           </p>
         </div>
       </div>
+      )}
 
       {/* totals */}
       <div className="tracker-stats">
