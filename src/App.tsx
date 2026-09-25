@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar/Sidebar";
+import AuthModal from "./components/auth/AuthModal";
 
 import Dashboard from "./pages/Dashboard";
 import WebsiteTracker from "./pages/WebsiteTracker";
@@ -13,9 +15,25 @@ import Settings from "./pages/Settings";
 import "./App.css";
 
 function App() {
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  const openLogin = () => {
+    setAuthMode("login");
+    setAuthModalOpen(true);
+  };
+
+  const openSignUp = () => {
+    setAuthMode("signup");
+    setAuthModalOpen(true);
+  };
+
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar
+        onLogin={openLogin}
+        onSignUp={openSignUp}
+      />
 
       <main className="main-content">
         <Routes>
@@ -59,6 +77,14 @@ function App() {
           />
         </Routes>
       </main>
+
+      {/* Authentication popup */}
+      <AuthModal
+        key={authMode}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        startingMode={authMode}
+      />
     </div>
   );
 }

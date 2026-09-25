@@ -792,14 +792,271 @@ body {
 
 
 /* no search results */
-
 .tracker-empty {
   padding: 30px;
-
   text-align: center;
-
   color: #667085;
   font-size: 13px;
+}
+
+/* authentication modal */
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(12, 14, 21, 0.55);
+}
+
+.auth-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  padding: 30px;
+  background-color: #ffffff;
+  border: 1px solid #b8c0cc;
+  border-radius: 8px;
+}
+
+.auth-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: #667085;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.auth-modal-close:hover {
+  background-color: #f1f3f5;
+  color: #1f2d3d;
+}
+
+/* modal heading */
+.auth-modal-header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+.auth-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.auth-modal-icon img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.auth-modal-header h2 {
+  margin: 0 0 7px;
+  color: #1f2d3d;
+  font-size: 22px;
+}
+
+.auth-modal-header p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+/* form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #1f2d3d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-form input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  background-color: #ffffff;
+  color: #1f2d3d;
+  border: 1px solid #b8c0cc;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.auth-form input:focus {
+  border-color: #4169e1;
+}
+
+.auth-form input::placeholder {
+  color: #8a94a3;
+}
+
+/* submit */
+.auth-submit-button {
+  width: 100%;
+  height: 40px;
+  background-color: #4169e1;
+  color: #ffffff;
+  border: 1px solid #4169e1;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-submit-button:hover {
+  background-color: #3457c5;
+  border-color: #3457c5;
+}
+
+.auth-submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* errors */
+.auth-error {
+  padding: 10px 12px;
+  background-color: #fdebec;
+  color: #dc3545;
+  border: 1px solid #e79aa2;
+  border-radius: 5px;
+
+  font-size: 12px;
+}
+
+/* switch login / signup */
+.auth-switch {
+  margin: 0;
+  text-align: center;
+  color: #667085;
+  font-size: 12px;
+}
+
+.auth-switch button {
+  margin-left: 5px;
+  padding: 0;
+  background: none;
+  color: #4169e1;
+  border: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-switch button:hover {
+  text-decoration: underline;
+}
+
+/* signup success */
+.auth-success {
+  text-align: center;
+}
+
+.auth-success h3 {
+  margin: 0 0 10px;
+  color: #1f2d3d;
+}
+
+.auth-success p {
+  margin: 0 0 20px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Logged in user */
+.sidebar-user {
+  width: 100%;
+}
+
+.sidebar-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sidebar-profile-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #4169e1;
+  color: #ffffff;
+  border-radius: 50%;
+}
+
+.sidebar-user-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-user-label {
+  color: #8c96a3;
+  font-size: 11px;
+}
+
+.sidebar-user-email {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-button {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background-color: #ffffff;
+  color: #1f2d3d;
+  border: 1px solid #8c96a3;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background-color: #f1f3f5;
 }
 
 /* responsive */
