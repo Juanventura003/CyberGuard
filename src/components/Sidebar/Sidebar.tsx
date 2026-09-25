@@ -6,14 +6,26 @@ import {
   Bot,
   FileText,
   Settings,
+  LogOut,
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 import cyberGuardLogo from "../../assets/logo.png";
 import "./Sidebar.css";
 
-function Sidebar() {
+type SidebarProps = {
+  onLogin: () => void;
+  onSignUp: () => void;
+};
+
+function Sidebar({ onLogin, onSignUp }: SidebarProps) {
+  const { session, user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
   return (
     <aside className="sidebar">
       {/* Logo / Title */}
@@ -25,21 +37,54 @@ function Sidebar() {
         <h2>CyberGuard</h2>
       </div>
 
-      {/* Login / Sign Up */}
+      {/* User / Authentication */}
       <div className="auth-buttons">
-        <button className="login-button">
-          Login
-        </button>
+        {session ? (
+          <div className="sidebar-user">
+            <div className="sidebar-user-info">
+              <div className="sidebar-profile-icon">
+              </div>
 
-        <button className="signup-button">
-          Sign Up
-        </button>
-      </div>
+              <div className="sidebar-user-text">
+                <span className="sidebar-user-label">
+                  Signed in as
+                </span>
+
+                <span className="sidebar-user-email">
+                  {user?.email}
+                </span>
+              </div>
+            </div>
+
+            <button
+              className="logout-button"
+              onClick={handleLogout}
+            >
+              <LogOut size={16} />
+              Log Out
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              className="login-button"
+              onClick={onLogin}
+            >
+              Login
+            </button>
+
+            <button
+              className="signup-button"
+              onClick={onSignUp}
+            >
+              Sign Up
+            </button>
+          </>
+        )}
+    </div>
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-
-        {/* Dashboard */}
         <NavLink
           to="/dashboard"
           className={({ isActive }) =>
@@ -50,7 +95,6 @@ function Sidebar() {
           <span>Dashboard</span>
         </NavLink>
 
-        {/* Website Tracker */}
         <NavLink
           to="/website-tracker"
           className={({ isActive }) =>
@@ -61,7 +105,6 @@ function Sidebar() {
           <span>Website Tracker</span>
         </NavLink>
 
-        {/* Email Scanner */}
         <NavLink
           to="/email-scanner"
           className={({ isActive }) =>
@@ -72,7 +115,6 @@ function Sidebar() {
           <span>Email Scanner</span>
         </NavLink>
 
-        {/* Security Checker */}
         <NavLink
           to="/security-checker"
           className={({ isActive }) =>
@@ -83,7 +125,6 @@ function Sidebar() {
           <span>Security Checker</span>
         </NavLink>
 
-        {/* Cyber Assistant */}
         <NavLink
           to="/cyber-assistant"
           className={({ isActive }) =>
@@ -94,7 +135,6 @@ function Sidebar() {
           <span>Cyber Assistant</span>
         </NavLink>
 
-        {/* Reports */}
         <NavLink
           to="/reports"
           className={({ isActive }) =>
@@ -105,7 +145,6 @@ function Sidebar() {
           <span>Reports</span>
         </NavLink>
 
-        {/* Settings */}
         <NavLink
           to="/settings"
           className={({ isActive }) =>
@@ -115,7 +154,6 @@ function Sidebar() {
           <Settings size={18} />
           <span>Settings</span>
         </NavLink>
-
       </nav>
     </aside>
   );
