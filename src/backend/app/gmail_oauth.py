@@ -50,8 +50,6 @@ def _build_flow() -> Flow:
 def start_login(return_to: str) -> str:
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise RuntimeError(
-            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set. "
-            "Copy backend/.env.example to backend/.env and fill them in -- see backend/README.md."
         )
 
     flow = _build_flow()
