@@ -140,7 +140,7 @@ function GuestDashboard() {
             Scan emails and sender information for signs of phishing.
           </p>
 
-          <button className="guest-tool-button">
+          <button className="guest-tool-button" onClick={() => navigate("/email-scanner")}>
             Scan an Email
           </button>
         </div>

@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+
 import {
   Globe,
   Mail,
@@ -7,6 +9,7 @@ import {
 } from "lucide-react";
 
 function LoggedInDashboard() {
+  const navigate = useNavigate();
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -149,7 +152,7 @@ function LoggedInDashboard() {
             </div>
           </div>
 
-          <button className="dashboard-button">
+          <button className="dashboard-button" onClick={() => navigate("/email-scanner")}>
             Open Email Scanner
           </button>
         </div>
