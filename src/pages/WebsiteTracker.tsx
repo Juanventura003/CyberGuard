@@ -10,6 +10,9 @@ type Website = {
   timeVisited: string;
 };
 
+type SortField = "domain" | "riskScore" | "riskLevel" | "timeVisited";
+type SortDirection = "asc" | "desc";
+
 const websites: Website[] = [
   {
     domain: "github.com",
@@ -64,11 +67,64 @@ const websites: Website[] = [
 
 function WebsiteTracker() {
   const [search, setSearch] = useState("");
-    const { session } = useAuth();
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] =
+  useState<SortDirection>("asc");
+  const { session } = useAuth();
 
-  const filteredWebsites = websites.filter((website) =>
-    website.domain.toLowerCase().includes(search.toLowerCase())
-  );
+
+  const handleSort = (field: SortField) => {
+  if (sortField !== field) {
+    // ascending sort
+    setSortField(field);
+    setSortDirection("asc");
+  } else if (sortDirection === "asc") {
+    //decsending sort
+    setSortDirection("desc");
+  } else {
+    //orginal sort
+    setSortField(null);
+    setSortDirection("asc");
+  }
+};
+
+  const filteredWebsites = websites
+    .filter((website) =>
+      website.domain.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortField) {
+        return 0;
+      }
+
+      let comparison = 0;
+      if (sortField === "domain") {
+        comparison = a.domain.localeCompare(b.domain);
+      }
+
+      if (sortField === "riskScore") {
+        comparison = a.riskScore - b.riskScore;
+      }
+
+      if (sortField === "riskLevel") {
+        const riskOrder = {
+          Safe: 1,
+          Suspicious: 2,
+          "High Risk": 3,
+        };
+
+        comparison =
+          riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+      }
+
+      if (sortField === "timeVisited") {
+        comparison =
+          new Date(`1/1/2026 ${a.timeVisited}`).getTime() -
+          new Date(`1/1/2026 ${b.timeVisited}`).getTime();
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
 
   const safeCount = websites.filter(
     (website) => website.riskLevel === "Safe"
@@ -168,11 +224,26 @@ function WebsiteTracker() {
       <div className="tracker-table">
 
         <div className="tracker-table-header">
-          <span>Domain</span>
-          <span>Risk Score</span>
-          <span>Risk Level</span>
-          <span>Time Visited</span>
-        </div>
+          <button onClick={() => handleSort("domain")}>
+            Domain
+            {sortField === "domain" && (sortDirection === "asc" ? " ↑" : " ↓")}
+          </button>
+
+          <button onClick={() => handleSort("riskScore")}>
+            Risk Score
+            {sortField === "riskScore" && (sortDirection === "asc" ? " ↑" : " ↓")}
+          </button>
+
+          <button onClick={() => handleSort("riskLevel")}>
+            Risk Level
+            {sortField === "riskLevel" && (sortDirection === "asc" ? " ↑" : " ↓")}
+          </button>
+
+          <button onClick={() => handleSort("timeVisited")}>
+            Time Visited
+            {sortField === "timeVisited" && (sortDirection === "asc" ? " ↑" : " ↓")}
+          </button>
+      </div>
 
         {filteredWebsites.map((website) => {
           const riskClass = getRiskClass(website.riskLevel);

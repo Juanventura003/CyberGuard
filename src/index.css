@@ -463,15 +463,28 @@ body {
 }
 
 /* website tracker */
-
 .website-tracker {
   width: 100%;
   min-height: 100vh;
-
   padding: 32px 38px 60px;
-
   background-color: #eef1f5;
   color: #1f2d3d;
+}
+
+.tracker-table-header button {
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.tracker-table-header button:hover {
+  color: #4169e1;
 }
 
 
@@ -1077,13 +1090,11 @@ body {
   .dashboard {
     padding: 24px 20px 50px;
   }
-
   .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 18px;
   }
-
   .activity-grid {
     grid-template-columns: 1fr;
   }
@@ -1093,11 +1104,9 @@ body {
   .guest-tools-grid {
     grid-template-columns: 1fr;
   }
-
   .guest-login-buttons {
     width: 100%;
   }
-
   .guest-login-button,
   .guest-signup-button {
     flex: 1;
@@ -1108,21 +1117,17 @@ body {
   .summary-grid {
     grid-template-columns: 1fr;
   }
-
   .dashboard-header h1 {
     font-size: 25px;
   }
-
   .security-tools {
     grid-template-columns: 1fr;
   }
-
   .recent-row {
     padding: 12px 14px;
   }
 
   /* website tracker responsive */
-
 @media (max-width: 1000px) {
   .tracker-stats {
     grid-template-columns: repeat(2, 1fr);
