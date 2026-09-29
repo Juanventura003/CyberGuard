@@ -80,6 +80,11 @@ Backend settings are read from environment variables or from `src/backend/.env`.
 
 To point the frontend at a backend on a different address, set `VITE_API_BASE_URL` (default `http://localhost:8000`) in a `.env` file in the project root.
 
+### Cyber Assistant
+The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
+
+Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like “Where is the Email Scanner?” or “How do I spot phishing?” — answers include clickable links to the right CyberGuard page.
+
 ## Troubleshooting
 
 - **`ModuleNotFoundError` when starting the backend**: the virtual environment isn't activated, or `pip install -r requirements.txt` wasn't run.

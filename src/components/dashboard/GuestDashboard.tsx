@@ -1,5 +1,5 @@
 import { useState } from "react";
-
+import { useNavigate } from "react-router-dom";
 import {
   Globe,
   Mail,
@@ -10,7 +10,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
 import AuthModal from "../auth/AuthModal";
 
 function GuestDashboard() {
@@ -172,7 +171,11 @@ function GuestDashboard() {
             Ask cybersecurity questions and get help understanding threats.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            type="button"
+            onClick={() => navigate("/cyber-assistant")}
+          >
             Open Cyber Assistant
           </button>
         </div>
