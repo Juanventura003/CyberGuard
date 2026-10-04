@@ -18,6 +18,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setLoading(false)
@@ -30,7 +34,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const publishSession = () => {
+      if (loading) return
+
+      const accessToken = session?.access_token ?? null
+      window.postMessage({ type: 'CYBERGUARD_AUTH', accessToken }, window.location.origin)
+      window.postMessage({ type: 'CYBERGUARD_HISTORY', enabled: Boolean(session) }, window.location.origin)
+    }
+
+    window.addEventListener('cyberguard-auth-request', publishSession)
+    publishSession()
+
+    return () => window.removeEventListener('cyberguard-auth-request', publishSession)
+  }, [loading, session])
+
    const signUp = async (email: string, password: string, metadata: { username: string; firstName: string; lastName: string }) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -40,11 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signIn = async (email: string, password: string) => {
+    if (!supabase) return { error: new Error('Supabase is not configured.') }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error }
   }
 
   const signOut = async () => {
+    if (!supabase) return
+
     await supabase.auth.signOut()
   }
 

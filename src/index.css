@@ -589,6 +589,10 @@ body {
   color: #dc3545;
 }
 
+.tracker-stat .unable-text {
+  color: #667085;
+}
+
 
 /* search */
 
@@ -625,6 +629,26 @@ body {
   color: #8a94a3;
 }
 
+.tracker-clear-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #667085;
+  cursor: pointer;
+}
+
+.tracker-clear-search:hover {
+  background: #eef1f5;
+  color: #1f2d3d;
+}
+
 
 /* website table */
 
@@ -639,7 +663,7 @@ body {
 .tracker-table-header,
 .tracker-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
   align-items: center;
 }
 
@@ -656,6 +680,33 @@ body {
   font-weight: 700;
 
   text-transform: uppercase;
+}
+.tracker-date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tracker-date-filter select {
+  min-height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid #b8c0cc;
+  border-radius: 5px;
+  background-color: #ffffff;
+  color: #1f2d3d;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tracker-result-count {
+  padding: 9px 18px;
+  border-bottom: 1px solid #d5dae1;
+  color: #667085;
+  font-size: 11px;
 }
 
 .tracker-row {
@@ -723,6 +774,10 @@ body {
   background-color: #dc3545;
 }
 
+.tracker-dot.unable {
+  background-color: #667085;
+}
+
 
 /* risk score */
 
@@ -768,8 +823,9 @@ body {
 
 .tracker-risk {
   display: inline-block;
+	justify-self: start;
 
-  padding: 4px 9px;
+  padding: 4px 7px;
 
   border-radius: 4px;
 
@@ -795,12 +851,42 @@ body {
   border: 1px solid #e79aa2;
 }
 
+.tracker-risk.unable {
+  color: #667085;
+  background-color: #f2f4f7;
+  border: 1px solid #c5cbd3;
+}
+
 
 /* time */
 
 .tracker-time {
   color: #667085;
   font-size: 12px;
+}
+
+.tracker-delete {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #667085;
+  cursor: pointer;
+}
+
+.tracker-delete:hover:not(:disabled) {
+  border-color: #e79aa2;
+  background: #fdebec;
+  color: #b42318;
+}
+
+.tracker-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 
