@@ -75,10 +75,30 @@ Backend settings are read from environment variables or from `src/backend/.env`.
 | `GOOGLE_CLIENT_ID` | *(empty)* | Google OAuth client ID (Gmail mode) |
 | `GOOGLE_CLIENT_SECRET` | *(empty)* | Google OAuth client secret (Gmail mode) |
 | `GOOGLE_REDIRECT_URI` | `http://localhost:8000/api/email/oauth/callback` | Must exactly match a redirect URI registered in Google Cloud |
+| `GOOGLE_WEB_RISK_API_KEY` | *(empty)* | Google Web Risk API key used by Website Tracker and the browser extension |
 | `FRONTEND_ORIGIN` | `http://localhost:5173` | Allowed frontend origin (CORS and OAuth return check) |
 | `SESSION_TTL_MINUTES` | `30` | How long a Gmail session lasts |
+| `SUPABASE_URL` | *(empty)* | Supabase project URL used for authentication and website history |
+| `SUPABASE_ANON_KEY` | *(empty)* | Public Supabase key used by the frontend and backend token validation |
+| `SUPABASE_SERVICE_ROLE_KEY` | *(empty)* | Server-only Supabase key used by the backend to write website history |
 
-To point the frontend at a backend on a different address, set `VITE_API_BASE_URL` (default `http://localhost:8000`) in a `.env` file in the project root.
+To point the frontend at a backend on a different address, set `VITE_API_BASE_URL` (default `http://localhost:8000`) in a `.env` file in the project root. The frontend Supabase client reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from that same file.
+
+Keep all backend credentials in `src/backend/.env`; never copy them into the frontend or extension files. The service-role key is especially sensitive and must never be exposed to the browser. The root `.env` is only for frontend-safe values such as `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`.
+
+### Browser extension and Website Tracker
+
+The extension monitors completed HTTP(S) tabs, analyzes URLs through the local backend, caches successful analyses locally for 24 hours, and keeps a local activity list. Signed-in website analyses are also written to the Supabase `website_history` table by the backend.
+
+Build the extension from the project root:
+
+```bash
+npm run build:extension
+```
+
+In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. After source changes, run the build again and click **Reload** for the extension. Keep both the frontend and backend running. Open the Website Tracker while signed in once so the extension can receive the current Supabase access token. The extension itself does not contain API keys; it sends the token to the local backend over the configured development connection.
+
+The Supabase project must contain a `website_history` table matching the fields used by the backend. The backend uses `SUPABASE_SERVICE_ROLE_KEY` for server-side writes and validates the user's access token through Supabase before associating a row with that user.
 
 ### Cyber Assistant
 The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
