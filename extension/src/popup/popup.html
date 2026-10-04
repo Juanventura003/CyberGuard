@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>CyberGuard Website Monitor</title>
+		<link rel="stylesheet" href="./popup.css" />
+	</head>
+	<body>
+		<main>
+			<header>
+				<div>
+					<div class="brand-lockup">
+						<img src="../icon.png" alt="" class="brand-mark" />
+						<p class="eyebrow">CYBERGUARD</p>
+					</div>
+					<h1>Website Monitor</h1>
+					<p class="subtitle">Live protection for every tab.</p>
+				</div>
+				<div class="header-actions">
+					<button id="refresh-button" class="icon-button" type="button" aria-label="Refresh activity" title="Refresh activity">&#x21bb;</button>
+					<label class="toggle-label" for="monitoring-toggle">
+						<span>Monitor</span>
+						<input id="monitoring-toggle" type="checkbox" />
+					</label>
+				</div>
+			</header>
+
+			<p id="status" class="status">Loading activity...</p>
+			<section id="latest" class="latest" aria-live="polite"></section>
+			<button id="history-button" class="history-button" type="button">Start saving history to CyberGuard dashboard</button>
+		</main>
+		<script src="../popup.js"></script>
+	</body>
+</html>
