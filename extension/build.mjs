@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
-const extensionRoot = new URL(".", import.meta.url).pathname;
+const extensionRoot = path.dirname(fileURLToPath(import.meta.url));
 const sourceRoot = path.join(extensionRoot, "src");
 const outputRoot = path.join(extensionRoot, "dist");
 
@@ -12,7 +13,7 @@ await fs.mkdir(path.join(outputRoot, "popup"), { recursive: true });
 for (const [source, output] of [
   ["background.ts", "background.js"],
   ["content.ts", "content.js"],
-  [path.join("popup", "popup.ts"), path.join("popup.js")],
+  [path.join("popup", "popup.ts"), path.join("popup", "popup.js")]
 ]) {
   const sourcePath = path.join(sourceRoot, source);
   const sourceText = await fs.readFile(sourcePath, "utf8");
