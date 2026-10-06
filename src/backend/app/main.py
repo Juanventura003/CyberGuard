@@ -6,7 +6,7 @@ from fastapi import FastAPI, Header, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from . import gmail_oauth, phishing_detector
+from . import gmail_oauth, phishing_detector, link_checker
 from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
@@ -19,6 +19,7 @@ from .schemas import (
 )
 from .web_risk import WebRiskLookupError, lookup_url
 from . import supabase_store
+from .schemas import BatchManualRequest, GmailAnalyzeRequest, EmailResult, GmailHeaderItem, LinkCheckRequest
 
 app = FastAPI(title="CyberGuard Email Scanner", version="1.0.0")
 
@@ -35,6 +36,12 @@ app.add_middleware(
 def health():
     return {"status": "healthy"}
 
+# Link Checker
+@app.post("/api/security/link-check")
+def check_link(payload: LinkCheckRequest):
+    try:
+        result = link_checker.check_url(payload.url)
+        return result
 
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
@@ -177,6 +184,14 @@ def analyze_website(
     return response
 
 
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not check URL: {exc}"
+        )
 # ---------------------------------------------------------------------------
 # Manual paste-in (no Gmail account needed)
 # ---------------------------------------------------------------------------
