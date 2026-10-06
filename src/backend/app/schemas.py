@@ -65,3 +65,5 @@ class WebsiteHistoryEntry(BaseModel):
     threat_types: list[str]
     explanation: list[str]
     visited_at: str
+class LinkCheckRequest(BaseModel):
+    url: str

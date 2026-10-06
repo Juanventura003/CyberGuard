@@ -6,7 +6,7 @@ from fastapi import FastAPI, Header, HTTPException, Path, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from . import gmail_oauth, phishing_detector
+from . import gmail_oauth, phishing_detector, link_checker
 from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
@@ -16,6 +16,7 @@ from .schemas import (
     WebsiteAnalyzeRequest,
     WebsiteAnalyzeResponse,
     WebsiteHistoryEntry,
+    LinkCheckRequest,
 )
 from .web_risk import WebRiskLookupError, lookup_url
 from . import supabase_store
@@ -35,6 +36,16 @@ app.add_middleware(
 def health():
     return {"status": "healthy"}
 
+# Link Checker
+@app.post("/api/security/link-check")
+def check_link(payload: LinkCheckRequest):
+    try:
+        result = link_checker.check_url(payload.url)
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not check URL: {exc}")
 
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
@@ -175,8 +186,6 @@ def analyze_website(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return response
-
-
 # ---------------------------------------------------------------------------
 # Manual paste-in (no Gmail account needed)
 # ---------------------------------------------------------------------------

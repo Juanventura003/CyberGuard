@@ -173,11 +173,12 @@ function LoggedInDashboard() {
           <div className="security-tools">
             <div>Password Check</div>
             <div>Link Check</div>
-            <div>Domain Check</div>
+            <div>Phone Number Check</div>
             <div>File Check</div>
           </div>
 
-          <button className="dashboard-button">
+          <button className="dashboard-button"
+          onClick={() => navigate("/security-checker")}>
             Open Security Checker
           </button>
         </div>
