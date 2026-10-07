@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 
 import {
   startGmailConnect,
@@ -107,6 +108,29 @@ export default function EmailScanner() {
     setBanner(null);
   };
 
+  // ---- save results for logged-in users ----
+
+  const saveResults = async (data: EmailResult[], source: "manual" | "gmail") => {
+    if (!session) return;
+
+    const rows = data
+      .filter((r) => r.classification !== "ERROR")
+      .map((r) => ({
+        sender: r.sender,
+        subject: r.subject,
+        classification: r.classification,
+        risk_score: r.risk_score,
+        confidence: r.confidence,
+        explanation: r.explanation,
+        source,
+      }));
+
+    if (rows.length === 0) return;
+
+    const { error } = await supabase.from("email_scans").insert(rows);
+    if (error) console.error("Could not save scans:", error.message);
+  };
+
   // ---- manual paste-in ----
 
   const addToQueue = () => {
@@ -138,6 +162,7 @@ export default function EmailScanner() {
       }));
       const data = await analyzeManualEmails(payload);
       setResults(data);
+      void saveResults(data, "manual");
       setMode("results");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Analysis failed.");
@@ -167,6 +192,7 @@ export default function EmailScanner() {
     try {
       const data = await analyzeGmailMessages(gmailSession, Array.from(selectedIds));
       setResults(data);
+      void saveResults(data, "gmail");
       setMode("results");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Analysis failed.");
@@ -377,4 +403,3 @@ export default function EmailScanner() {
     </div>
   );
 }
-
