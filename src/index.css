@@ -489,7 +489,6 @@ body {
 
 
 /* heading */
-
 .tracker-header {
   display: flex;
   justify-content: space-between;
@@ -514,7 +513,6 @@ body {
 
 
 /* guest message */
-
 .tracker-guest-message {
   margin-bottom: 22px;
   padding: 14px 16px;
@@ -544,6 +542,38 @@ body {
   font-size: 12px;
 }
 
+/* Locked Device Scanner */
+.locked-tool-card {
+  position: relative;
+}
+
+.login-required-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background-color: #eef1f5;
+  color: #667085;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.locked-tool-card .guest-tool-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Center Cyber Assistant when it is the last card */
+.guest-tools-grid .guest-tool-card:last-child {
+  grid-column: 1 / -1;
+  width: calc(50% - 11px);
+  justify-self: center;
+}
 
 /* stats */
 

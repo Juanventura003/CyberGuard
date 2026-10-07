@@ -175,6 +175,8 @@ function LoggedInDashboard() {
             <div>Link Check</div>
             <div>Phone Number Check</div>
             <div>File Check</div>
+            <div>Email Address Check</div>
+            <div>Data Breach Check</div>
           </div>
 
           <button className="dashboard-button"

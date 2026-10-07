@@ -3,8 +3,10 @@ import {
   Globe2,
   Mail,
   ShieldCheck,
+  Monitor,
   Bot,
   FileText,
+  Newspaper,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -125,6 +127,17 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
           <span>Security Checker</span>
         </NavLink>
 
+
+        <NavLink
+          to="/device-scanner"
+          className={({ isActive }) =>
+            `nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Monitor size={18} />
+          <span>Device Scanner</span>
+        </NavLink>
+
         <NavLink
           to="/cyber-assistant"
           className={({ isActive }) =>
@@ -133,6 +146,17 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
         >
           <Bot size={18} />
           <span>Cyber Assistant</span>
+        </NavLink>
+
+
+        <NavLink
+          to="/news"
+          className={({ isActive }) =>
+            `nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Newspaper size={18} />
+          <span>News</span>
         </NavLink>
 
         <NavLink
