@@ -16,8 +16,12 @@ function AuthModal({
   startingMode = "login",
 }: AuthModalProps) {
   const [mode, setMode] = useState<"login" | "signup">(startingMode);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -31,8 +35,12 @@ function AuthModal({
 
   const switchMode = (newMode: "login" | "signup") => {
     setMode(newMode);
+    setFirstName("");
+    setLastName("");
     setEmail("");
+    setUsername("");
     setPassword("");
+    setConfirmPassword("");
     setError(null);
     setSuccess(false);
   };
@@ -41,6 +49,12 @@ function AuthModal({
     event.preventDefault();
 
     setError(null);
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Passwords don't match");
+      return;
+    }
+
     setSubmitting(true);
 
     if (mode === "login") {
@@ -58,7 +72,7 @@ function AuthModal({
     return;
     }
 
-    const { error } = await signUp(email, password);
+    const { error } = await signUp(email, password, { username, firstName, lastName });
 
     setSubmitting(false);
 
@@ -122,6 +136,43 @@ function AuthModal({
               </div>
             )}
 
+            {mode === "signup" && (
+              <>
+                <label>
+                  First Name
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    placeholder="Enter your first name"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Last Name
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    placeholder="Enter your last name"
+                    required
+                  />
+                </label>
+
+                <label>
+                  Username
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="Choose a username"
+                    required
+                  />
+                </label>
+              </>
+            )}
+
             <label>
               Email
               <input
@@ -144,6 +195,20 @@ function AuthModal({
                 required
               />
             </label>
+
+            {mode === "signup" && (
+              <label>
+                Confirm Password
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  placeholder="Confirm your password"
+                  minLength={6}
+                  required
+                />
+              </label>
+            )}
 
             <button
               className="auth-submit-button"

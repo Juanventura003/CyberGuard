@@ -27,6 +27,18 @@ export interface EmailResult {
   error?: string | null;
 }
 
+export interface WebsiteHistoryEntry {
+  id: string;
+  url: string;
+  domain: string;
+  risk_score: number;
+  risk_level: "HIGH_RISK" | "SUSPICIOUS" | "NO_KNOWN_THREAT" | "UNABLE_TO_VERIFY";
+  source: "GOOGLE_WEB_RISK" | "UNABLE_TO_VERIFY";
+  threat_types: string[];
+  explanation: string[];
+  visited_at: string;
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let detail = res.statusText;
@@ -67,4 +79,24 @@ export function analyzeManualEmails(emails: ManualEmailInput[]): Promise<EmailRe
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ emails }),
   }).then((r) => asJson<EmailResult[]>(r));
+}
+
+export function listWebsiteHistory(limit = 20, accessToken?: string, since?: string): Promise<WebsiteHistoryEntry[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (since) params.set("since", since);
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+  return fetch(`${API_BASE}/api/websites/history?${params}`, { headers })
+    .then((r) => asJson<WebsiteHistoryEntry[]>(r));
+}
+
+export function deleteWebsiteHistory(historyId: string, accessToken: string, url?: string): Promise<void> {
+  const query = url ? `?url=${encodeURIComponent(url)}` : "";
+  return fetch(`${API_BASE}/api/websites/history/${encodeURIComponent(historyId)}${query}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }).then(async (r) => {
+    if (!r.ok) {
+      await asJson<void>(r);
+    }
+  });
 }

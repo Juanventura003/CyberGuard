@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-
 import {
   Globe,
   Mail,
@@ -7,6 +6,9 @@ import {
   Bot,
   AlertTriangle,
 } from "lucide-react";
+
+const SAMPLE_ASSISTANT_QUESTION =
+  "How can I tell if an email is phishing?";
 
 function LoggedInDashboard() {
   const navigate = useNavigate();
@@ -171,11 +173,12 @@ function LoggedInDashboard() {
           <div className="security-tools">
             <div>Password Check</div>
             <div>Link Check</div>
-            <div>Domain Check</div>
+            <div>Phone Number Check</div>
             <div>File Check</div>
           </div>
 
-          <button className="dashboard-button">
+          <button className="dashboard-button"
+          onClick={() => navigate("/security-checker")}>
             Open Security Checker
           </button>
         </div>
@@ -192,10 +195,18 @@ function LoggedInDashboard() {
           </div>
 
           <div className="assistant-question">
-            How can I tell if an email is phishing?
+            {SAMPLE_ASSISTANT_QUESTION}
           </div>
 
-          <button className="dashboard-button">
+          <button
+            className="dashboard-button"
+            type="button"
+            onClick={() =>
+              navigate(
+                `/cyber-assistant?q=${encodeURIComponent(SAMPLE_ASSISTANT_QUESTION)}`,
+              )
+            }
+          >
             Ask Cyber Assistant
           </button>
         </div>
