@@ -185,23 +185,6 @@
   font-size: 13px;
 }
 
-/* Future checkers */
-.coming-soon-panel {
-  text-align: center;
-  padding: 55px 24px;
-}
-
-.coming-soon-panel h2 {
-  margin: 0 0 8px;
-  color: #1f2d3d;
-  font-size: 20px;
-}
-
-.coming-soon-panel p {
-  margin: 0;
-  color: #667085;
-}
-
 .link-error-message {
   margin: 8px 0 0;
   color: #dc3545;
@@ -240,6 +223,14 @@
 .result-status h2 {
   margin: 0;
   font-size: 22px;
+}
+
+.email-checker-option {
+  grid-column: 2;
+}
+
+.breach-checker-option {
+  grid-column: 3;
 }
 
 /* Safe */

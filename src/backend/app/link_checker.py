@@ -1,8 +1,6 @@
 import re
 from urllib.parse import urlparse
-
 import requests
-
 from .config import settings
 
 
@@ -49,10 +47,7 @@ def check_url(url: str):
     data = response.json()
     matches = data.get("matches", [])
 
-    # ---------------------------------------------------------
-    # CyberGuard Risk Score
-    # ---------------------------------------------------------
-
+    # Risk score guidelines
     risk_score = 5
     reasons = []
 
@@ -99,20 +94,16 @@ def check_url(url: str):
             "URL contains words commonly used in phishing links."
         )
 
-    # Very long URL
     if len(url) > 100:
         risk_score += 10
         reasons.append("URL is unusually long.")
 
-    # Large number of subdomains
     if hostname.count(".") >= 3:
         risk_score += 10
         reasons.append("URL contains multiple subdomains.")
 
-    # ---------------------------------------------------------
-    # Google Safe Browsing Result
-    # ---------------------------------------------------------
 
+    # Result from Google Safe Browsing
     threat_types = []
 
     if matches:
@@ -121,21 +112,15 @@ def check_url(url: str):
 
             if threat_type and threat_type not in threat_types:
                 threat_types.append(threat_type)
-
-        # A Google threat match should always be considered high risk.
         risk_score = max(risk_score, 90)
 
         reasons.append(
             "Google Safe Browsing identified this URL as a known threat."
         )
 
-    # Never allow score above 100
     risk_score = min(risk_score, 100)
 
-    # ---------------------------------------------------------
-    # Classification
-    # ---------------------------------------------------------
-
+   #what considers a safe,suspicious or high risk
     if risk_score <= 30:
         classification = "SAFE"
 

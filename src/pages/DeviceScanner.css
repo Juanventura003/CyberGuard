@@ -1,0 +1,135 @@
+.device-scanner-page {
+  padding: 32px;
+}
+
+.device-scanner-header {
+  margin-bottom: 28px;
+}
+
+.device-scanner-header h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  color: #1f2d3d;
+}
+
+.device-scanner-header p {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+/* Device card */
+.device-card {
+  background: #ffffff;
+  border: 1px solid #b8c0cc;
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.device-card-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.device-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: #eef1f5;
+  color: #4169e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-card-top h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #1f2d3d;
+}
+
+.device-card-top p {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.device-ready {
+  margin-left: auto;
+  background: #e8f5ee;
+  color: #198754;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scan-device-button {
+  margin-top: 24px;
+  border: none;
+  background: #4169e1;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 7px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scan-device-button:hover {
+  opacity: 0.9;
+}
+
+/* Security status */
+.device-section-title {
+  margin: 30px 0 14px;
+  font-size: 18px;
+  color: #1f2d3d;
+}
+
+.device-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.device-status-card {
+  background: #ffffff;
+  border: 1px solid #b8c0cc;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #4169e1;
+}
+
+.device-status-card h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+  color: #1f2d3d;
+}
+
+.device-status-card p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+@media (max-width: 850px) {
+  .device-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .device-card-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .device-ready {
+    margin-left: 0;
+  }
+}
