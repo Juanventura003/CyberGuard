@@ -4,13 +4,15 @@ import {
   FileText,
   KeyRound,
   Phone,
+  Mail,
+  Database,
   CheckCircle,
   AlertTriangle,
   XCircle,
 } from "lucide-react";
 import "./SecurityChecker.css";
 
-type CheckerType = "link" | "file" | "password" | "phone";
+type CheckerType = "link" | "file" | "password" | "phone" | "email" | "breach";
 
 type LinkScanResult = {
   url: string;
@@ -187,6 +189,40 @@ function SecurityChecker() {
             <p>Check an unfamiliar phone number.</p>
           </div>
         </button>
+
+        {/* Email Address Checker */}
+        <button
+          className={`checker-option email-checker-option ${
+            activeChecker === "email" ? "active" : ""
+          }`}
+          onClick={() => setActiveChecker("email")}
+        >
+          <div className="checker-option-icon">
+            <Mail size={24} />
+          </div>
+
+          <div>
+            <h3>Email Address Checker</h3>
+            <p>Check an unfamiliar email address.</p>
+          </div>
+        </button>
+
+        {/* Data Breach Checker */}
+        <button
+          className={`checker-option breach-checker-option ${
+            activeChecker === "breach" ? "active" : ""
+          }`}
+          onClick={() => setActiveChecker("breach")}
+        >
+          <div className="checker-option-icon">
+            <Database size={24} />
+          </div>
+
+          <div>
+            <h3>Data Breach Checker</h3>
+            <p>Check if your email appears in known data breaches.</p>
+          </div>
+        </button>
       </div>
 
       {/* Link Checker */}
@@ -203,7 +239,6 @@ function SecurityChecker() {
             </div>
           </div>
 
-          {/* Show input before scan */}
           {!scanResult && (
             <div className="link-checker-form">
               <label htmlFor="link-url">URL</label>

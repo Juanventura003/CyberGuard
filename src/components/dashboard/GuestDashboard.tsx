@@ -8,6 +8,8 @@ import {
   LogIn,
   UserPlus,
   ShieldCheck,
+  Monitor,
+  Lock,
 } from "lucide-react";
 
 import AuthModal from "../auth/AuthModal";
@@ -139,7 +141,10 @@ function GuestDashboard() {
             Scan emails and sender information for signs of phishing.
           </p>
 
-          <button className="guest-tool-button" onClick={() => navigate("/email-scanner")}>
+          <button
+            className="guest-tool-button"
+            onClick={() => navigate("/email-scanner")}
+          >
             Scan an Email
           </button>
         </div>
@@ -152,11 +157,40 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Check links, passwords, files, and domains for security risks.
+            Check links, files, passwords, phone numbers, email
+            addresses, and data breaches.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            onClick={() => navigate("/security-checker")}
+          >
             Open Security Checker
+          </button>
+        </div>
+
+        {/* device scanner - login required */}
+        <div className="guest-tool-card locked-tool-card">
+          <div className="guest-tool-top">
+            <Monitor size={24} />
+            <h3>Device Scanner</h3>
+
+            <span className="login-required-badge">
+              <Lock size={12} />
+              Login Required
+            </span>
+          </div>
+
+          <p>
+            Scan your Windows device for potential security threats.
+          </p>
+
+          <button
+            className="guest-tool-button"
+            onClick={openLogin}
+          >
+            <Lock size={15} />
+            Log In to Use
           </button>
         </div>
 
@@ -168,7 +202,7 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Ask cybersecurity questions and get help understanding threats.
+            Ask cybersecurity questions and get help understandingthreats.
           </p>
 
           <button
