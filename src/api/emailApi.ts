@@ -81,7 +81,7 @@ export function analyzeManualEmails(emails: ManualEmailInput[]): Promise<EmailRe
   }).then((r) => asJson<EmailResult[]>(r));
 }
 
-export function listWebsiteHistory(limit = 20, accessToken?: string, since?: string): Promise<WebsiteHistoryEntry[]> {
+export function listWebsiteHistory(limit = 1000, accessToken?: string, since?: string): Promise<WebsiteHistoryEntry[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (since) params.set("since", since);
   const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
@@ -92,6 +92,17 @@ export function listWebsiteHistory(limit = 20, accessToken?: string, since?: str
 export function deleteWebsiteHistory(historyId: string, accessToken: string, url?: string): Promise<void> {
   const query = url ? `?url=${encodeURIComponent(url)}` : "";
   return fetch(`${API_BASE}/api/websites/history/${encodeURIComponent(historyId)}${query}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }).then(async (r) => {
+    if (!r.ok) {
+      await asJson<void>(r);
+    }
+  });
+}
+
+export function deleteAllWebsiteHistory(accessToken: string): Promise<void> {
+  return fetch(`${API_BASE}/api/websites/history`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
   }).then(async (r) => {

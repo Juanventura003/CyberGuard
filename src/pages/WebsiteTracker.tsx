@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, Globe2, X, Trash2 } from "lucide-react";
-import { deleteWebsiteHistory, listWebsiteHistory } from "../api/emailApi";
+import { deleteAllWebsiteHistory, deleteWebsiteHistory, listWebsiteHistory } from "../api/emailApi";
 import { useAuth } from "../context/AuthContext";
 
 type Website = {
@@ -43,6 +43,7 @@ function WebsiteTracker() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingAll, setDeletingAll] = useState(false);
   const { session } = useAuth();
 
   useEffect(() => {
@@ -50,7 +51,7 @@ function WebsiteTracker() {
 
     const loadWebsites = async () => {
       try {
-        const history = await listWebsiteHistory(20, session?.access_token, getSinceDate(dateFilter));
+        const history = await listWebsiteHistory(1000, session?.access_token, getSinceDate(dateFilter));
         if (ignore) return;
 
         const mapped = history.map((entry) => ({
@@ -168,6 +169,26 @@ function WebsiteTracker() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!session?.access_token || !websites.length || deletingAll) return;
+    if (!window.confirm("Delete all saved website history? This cannot be undone.")) return;
+
+    setDeletingAll(true);
+    try {
+      window.postMessage(
+        { type: "CYBERGUARD_HISTORY_DELETE_ALL" },
+        window.location.origin,
+      );
+      await deleteAllWebsiteHistory(session.access_token);
+      setWebsites([]);
+      setSearch("");
+    } catch (error) {
+      console.error("Could not delete all website history", error);
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <div className="website-tracker">
       <div className="tracker-header">
@@ -244,19 +265,31 @@ function WebsiteTracker() {
         )}
       </div>
 
-      <label className="tracker-date-filter">
-        <span>Date range</span>
-        <select
-          aria-label="Filter website history by date"
-          value={dateFilter}
-          onChange={(event) => setDateFilter(event.target.value as DateFilter)}
+      <div className="tracker-controls">
+        <label className="tracker-date-filter">
+          <span>Date range</span>
+          <select
+            aria-label="Filter website history by date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value as DateFilter)}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="tracker-delete-all"
+          disabled={!session || !websites.length || deletingAll}
+          onClick={() => void handleDeleteAll()}
         >
-          <option value="all">All time</option>
-          <option value="today">Today</option>
-          <option value="7days">Last 7 days</option>
-          <option value="30days">Last 30 days</option>
-        </select>
-      </label>
+          <Trash2 size={15} />
+          {deletingAll ? "Deleting..." : "Delete all history"}
+        </button>
+      </div>
 
       <div className="tracker-table">
         <div className="tracker-table-header">

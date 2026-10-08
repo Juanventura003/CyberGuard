@@ -35,11 +35,16 @@ const statusElement = document.querySelector<HTMLElement>("#status");
 const latestElement = document.querySelector<HTMLElement>("#latest");
 
 monitoringToggle?.addEventListener("change", async () => {
-	const response = await chrome.runtime.sendMessage({
-		type: "setMonitoring",
-		enabled: monitoringToggle.checked,
-	});
-	setStatus(response?.monitoringEnabled ? "Monitoring is active." : "Monitoring is paused.");
+	try {
+		const response = await chrome.runtime.sendMessage({
+			type: "setMonitoring",
+			enabled: monitoringToggle.checked,
+		});
+		setStatus(response?.monitoringEnabled ? "Monitoring is active." : "Monitoring is paused.");
+	} catch (error) {
+		console.error("Could not save monitoring state", error);
+		setStatus("Could not save monitoring state. Try again.");
+	}
 });
 
 historyButton?.addEventListener("click", async () => {
@@ -66,18 +71,24 @@ refreshButton?.addEventListener("click", () => {
 void loadState();
 
 async function loadState() {
-	const state = await chrome.runtime.sendMessage({ type: "getState" });
-	monitoringToggle!.checked = state.monitoringEnabled;
-	if (state.historyEnabled) {
-		historyButton!.textContent = "History saving is active";
-		historyButton!.disabled = true;
-	}
-	if (state.activity.length) {
-		renderActivity(state.activity);
-		return;
-	}
+	try {
+		const state = await chrome.runtime.sendMessage({ type: "getState" });
+		monitoringToggle!.checked = state.monitoringEnabled;
+		if (state.historyEnabled) {
+			historyButton!.textContent = "History saving is active";
+			historyButton!.disabled = true;
+		}
+		if (state.activity.length) {
+			renderActivity(state.activity);
+			return;
+		}
 
-	await refreshActivity();
+		await refreshActivity();
+	} catch (error) {
+		console.error("Could not load extension state", error);
+		setStatus("Could not connect to the monitor. Reload the extension and try again.");
+		latestElement!.textContent = "The extension background worker did not respond.";
+	}
 }
 
 async function refreshActivity() {

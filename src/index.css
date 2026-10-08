@@ -511,6 +511,30 @@ body {
   font-size: 14px;
 }
 
+.tracker-delete-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid #dc3545;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #dc3545;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tracker-delete-all:hover:not(:disabled) {
+  background: #fff1f2;
+}
+
+.tracker-delete-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 
 /* guest message */
 .tracker-guest-message {
@@ -719,6 +743,18 @@ body {
   color: #667085;
   font-size: 12px;
   font-weight: 600;
+}
+
+.tracker-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.tracker-controls .tracker-date-filter {
+  margin-bottom: 0;
 }
 
 .tracker-date-filter select {
