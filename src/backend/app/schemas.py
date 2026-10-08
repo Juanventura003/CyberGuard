@@ -20,6 +20,23 @@ class GmailAnalyzeRequest(BaseModel):
     message_ids: list[str] = Field(..., min_length=1, max_length=MAX_EMAILS_PER_BATCH)
 
 
+class GmailTrashRequest(BaseModel):
+   session: str
+   message_ids: list[str] = Field(..., min_length=1, max_length=MAX_EMAILS_PER_BATCH)
+
+
+
+
+class GmailTrashFailure(BaseModel):
+   id: str
+   error: str
+
+
+class GmailTrashResponse(BaseModel):
+   trashed: list[str]
+   failed: list[GmailTrashFailure]
+
+
 class EmailResult(BaseModel):
     source: str  # "manual" | "gmail"
     id: str | None = None

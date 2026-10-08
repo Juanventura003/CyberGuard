@@ -11,6 +11,8 @@ from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
     GmailAnalyzeRequest,
+    GmailTrashRequest,
+    GmailTrashResponse,
     EmailResult,
     GmailHeaderItem,
     WebsiteAnalyzeRequest,
@@ -268,6 +270,31 @@ async def gmail_analyze(payload: GmailAnalyzeRequest):
             return EmailResult(source="gmail", id=message_id, sender=full["sender"], subject=full["subject"], **scored)
 
     return await asyncio.gather(*(fetch_and_score(mid) for mid in payload.message_ids))
+
+@app.post("/api/email/gmail/trash", response_model=GmailTrashResponse)
+async def gmail_trash(payload: GmailTrashRequest):
+   semaphore = asyncio.Semaphore(8)
+
+
+   async def trash(message_id: str) -> str | None:
+       async with semaphore:
+           try:
+               await asyncio.to_thread(gmail_oauth.trash_message, payload.session, message_id)
+           except LookupError as exc:
+               raise HTTPException(status_code=401, detail=str(exc))
+           except PermissionError as exc:
+               raise HTTPException(status_code=403, detail=str(exc))
+           except Exception as exc:
+               return f"Could not move this message to Trash: {exc}"
+           return None
+
+
+   errors = await asyncio.gather(*(trash(mid) for mid in payload.message_ids))
+   return GmailTrashResponse(
+       trashed=[mid for mid, err in zip(payload.message_ids, errors) if err is None],
+       failed=[{"id": mid, "error": err} for mid, err in zip(payload.message_ids, errors) if err is not None],
+   )
+
 
 
 if __name__ == "__main__":

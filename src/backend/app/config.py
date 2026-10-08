@@ -22,5 +22,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+# gmail.modify covers reading plus moving messages to Trash (not permanent deletion).
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 MAX_EMAILS_PER_BATCH = 50

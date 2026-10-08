@@ -73,6 +73,21 @@ export function analyzeGmailMessages(session: string, messageIds: string[]): Pro
   }).then((r) => asJson<EmailResult[]>(r));
 }
 
+export interface GmailTrashResponse {
+  trashed: string[];
+  failed: { id: string; error: string }[];
+}
+
+/** Moves messages to Gmail's Trash (recoverable there for 30 days). */
+export function trashGmailMessages(session: string, messageIds: string[]): Promise<GmailTrashResponse> {
+  return fetch(`${API_BASE}/api/email/gmail/trash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session, message_ids: messageIds }),
+  }).then((r) => asJson<GmailTrashResponse>(r));
+}
+
+
 export function analyzeManualEmails(emails: ManualEmailInput[]): Promise<EmailResult[]> {
   return fetch(`${API_BASE}/api/email/batch-analyze`, {
     method: "POST",

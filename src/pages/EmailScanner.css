@@ -225,6 +225,26 @@
   border-color: #8c96a3;
 }
 
+.es-btn.danger {
+ background-color: #dc3545;
+ border-color: #dc3545;
+}
+
+
+.es-btn.danger:hover:not(:disabled) {
+ background-color: #bb2d3b;
+ border-color: #bb2d3b;
+}
+
+
+.es-btn.small {
+ padding: 6px 12px;
+
+
+ font-size: 12px;
+}
+
+
 
 /* EMAIL LISTS*/
 
@@ -535,6 +555,34 @@
 .es-result-explanation li {
   margin-bottom: 3px;
 }
+
+.es-result-actions {
+ display: flex;
+ align-items: center;
+ flex-wrap: wrap;
+ gap: 10px;
+
+
+ margin-top: 10px;
+}
+
+
+.es-trashed {
+ color: #667085;
+
+
+ font-size: 12px;
+ font-weight: 600;
+}
+
+
+.es-trash-error {
+ color: #dc3545;
+
+
+ font-size: 12px;
+}
+
 
 .es-choice-card.disabled {
   background-color: #f5f6f8;
