@@ -49,7 +49,7 @@ def check_link(payload: LinkCheckRequest):
 
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1000, ge=1, le=1000),
     since: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ):
@@ -75,6 +75,20 @@ def delete_website_history(
 
     try:
         supabase_store.delete_history(user_id, history_id, url)
+    except supabase_store.SupabaseStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.delete("/api/websites/history", status_code=204)
+def delete_all_website_history(
+    authorization: str | None = Header(default=None),
+):
+    user_id = _authenticated_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Sign in before deleting website history.")
+
+    try:
+        supabase_store.delete_all_history(user_id)
     except supabase_store.SupabaseStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -76,6 +76,17 @@ def delete_history(user_id: str, history_id: str, url: str | None = None) -> Non
         raise SupabaseStoreError(f"Supabase history delete failed with status {response.status_code}.")
 
 
+def delete_all_history(user_id: str) -> None:
+    response = httpx.delete(
+        f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/website_history",
+        params={"user_id": f"eq.{user_id}"},
+        headers=_service_headers(),
+        timeout=10,
+    )
+    if not response.is_success:
+        raise SupabaseStoreError(f"Supabase history delete failed with status {response.status_code}.")
+
+
 def insert_history(user_id: str, entry: dict[str, Any]) -> dict[str, Any]:
     history_row = {
         **entry,

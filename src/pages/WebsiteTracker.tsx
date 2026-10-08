@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, Globe2, X, Trash2 } from "lucide-react";
-import { deleteWebsiteHistory, listWebsiteHistory } from "../api/emailApi";
+import { deleteAllWebsiteHistory, deleteWebsiteHistory, listWebsiteHistory } from "../api/emailApi";
 import { useAuth } from "../context/AuthContext";
 
 type Website = {
@@ -16,6 +16,7 @@ type Website = {
 type SortField = "domain" | "riskScore" | "riskLevel" | "timeVisited";
 type SortDirection = "asc" | "desc";
 type DateFilter = "all" | "today" | "7days" | "30days";
+type UrlTooltip = { url: string; x: number; y: number } | null;
 
 const toRiskLevel = (riskLevel: string): Website["riskLevel"] => {
   if (riskLevel === "HIGH_RISK") return "High Risk";
@@ -43,6 +44,8 @@ function WebsiteTracker() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [urlTooltip, setUrlTooltip] = useState<UrlTooltip>(null);
   const { session } = useAuth();
 
   useEffect(() => {
@@ -50,7 +53,7 @@ function WebsiteTracker() {
 
     const loadWebsites = async () => {
       try {
-        const history = await listWebsiteHistory(20, session?.access_token, getSinceDate(dateFilter));
+        const history = await listWebsiteHistory(1000, session?.access_token, getSinceDate(dateFilter));
         if (ignore) return;
 
         const mapped = history.map((entry) => ({
@@ -65,8 +68,11 @@ function WebsiteTracker() {
             minute: "2-digit",
           }),
         }));
+        const uniqueWebsites = Array.from(
+          new Map(mapped.slice().reverse().map((website) => [website.url, website])).values(),
+        );
 
-        setWebsites(mapped);
+        setWebsites(uniqueWebsites);
       } catch (error) {
         console.error("Could not load website history", error);
         setWebsites([]);
@@ -168,6 +174,26 @@ function WebsiteTracker() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!session?.access_token || !websites.length || deletingAll) return;
+    if (!window.confirm("Delete all saved website history? This cannot be undone.")) return;
+
+    setDeletingAll(true);
+    try {
+      window.postMessage(
+        { type: "CYBERGUARD_HISTORY_DELETE_ALL" },
+        window.location.origin,
+      );
+      await deleteAllWebsiteHistory(session.access_token);
+      setWebsites([]);
+      setSearch("");
+    } catch (error) {
+      console.error("Could not delete all website history", error);
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <div className="website-tracker">
       <div className="tracker-header">
@@ -244,19 +270,31 @@ function WebsiteTracker() {
         )}
       </div>
 
-      <label className="tracker-date-filter">
-        <span>Date range</span>
-        <select
-          aria-label="Filter website history by date"
-          value={dateFilter}
-          onChange={(event) => setDateFilter(event.target.value as DateFilter)}
+      <div className="tracker-controls">
+        <label className="tracker-date-filter">
+          <span>Date range</span>
+          <select
+            aria-label="Filter website history by date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value as DateFilter)}
+          >
+            <option value="all">All time</option>
+            <option value="today">Today</option>
+            <option value="7days">Last 7 days</option>
+            <option value="30days">Last 30 days</option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className="tracker-delete-all"
+          disabled={!session || !websites.length || deletingAll}
+          onClick={() => void handleDeleteAll()}
         >
-          <option value="all">All time</option>
-          <option value="today">Today</option>
-          <option value="7days">Last 7 days</option>
-          <option value="30days">Last 30 days</option>
-        </select>
-      </label>
+          <Trash2 size={15} />
+          {deletingAll ? "Deleting..." : "Delete all history"}
+        </button>
+      </div>
 
       <div className="tracker-table">
         <div className="tracker-table-header">
@@ -306,7 +344,20 @@ function WebsiteTracker() {
 
                   <div>
                     <strong>{website.domain}</strong>
-                    <p>{website.url}</p>
+                    <p
+                      tabIndex={0}
+                      aria-label={`Full URL: ${website.url}`}
+                      onMouseEnter={(event) => setUrlTooltip({ url: website.url, x: event.clientX, y: event.clientY })}
+                      onMouseMove={(event) => setUrlTooltip({ url: website.url, x: event.clientX, y: event.clientY })}
+                      onMouseLeave={() => setUrlTooltip(null)}
+                      onFocus={(event) => {
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        setUrlTooltip({ url: website.url, x: bounds.left, y: bounds.bottom });
+                      }}
+                      onBlur={() => setUrlTooltip(null)}
+                    >
+                      {website.url}
+                    </p>
                   </div>
                 </div>
 
@@ -333,6 +384,16 @@ function WebsiteTracker() {
           })
         )}
       </div>
+
+      {urlTooltip && (
+        <div
+          className="tracker-url-tooltip"
+          style={{ left: `${urlTooltip.x}px`, top: `${urlTooltip.y + 8}px` }}
+          role="tooltip"
+        >
+          {urlTooltip.url}
+        </div>
+      )}
     </div>
   );
 }
