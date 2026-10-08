@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent, type DragEvent } from "react";
 import {
   Link,
   FileText,
@@ -9,10 +9,18 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  UploadCloud,
 } from "lucide-react";
+
 import "./SecurityChecker.css";
 
-type CheckerType = "link" | "file" | "password" | "phone" | "email" | "breach";
+type CheckerType =
+  | "link"
+  | "file"
+  | "password"
+  | "phone"
+  | "email"
+  | "breach";
 
 type LinkScanResult = {
   url: string;
@@ -22,6 +30,17 @@ type LinkScanResult = {
   threat_types: string[];
   reasons: string[];
 };
+
+type FileScanResult = {
+  filename: string;
+  file_size: number;
+  sha256: string;
+  risk_score: number;
+  classification: "SAFE" | "SUSPICIOUS" | "HIGH RISK" | "UNKNOWN";
+  reasons: string[];
+};
+
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 function SecurityChecker() {
   const [activeChecker, setActiveChecker] =
@@ -33,16 +52,22 @@ function SecurityChecker() {
   const [scanResult, setScanResult] =
     useState<LinkScanResult | null>(null);
 
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
+  const [fileError, setFileError] = useState("");
+  const [isFileScanning, setIsFileScanning] = useState(false);
+  const [fileScanResult, setFileScanResult] =
+    useState<FileScanResult | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleCheckLink = async () => {
     const trimmedUrl = url.trim();
 
-    // make sure a url was entered
     if (!trimmedUrl) {
       setUrlError("Please enter a URL.");
       return;
     }
 
-    // see if url is true
     try {
       const parsedUrl = new URL(trimmedUrl);
 
@@ -81,7 +106,6 @@ function SecurityChecker() {
       }
 
       const data: LinkScanResult = await response.json();
-
       setScanResult(data);
     } catch (error) {
       console.error("Link scan error:", error);
@@ -114,13 +138,188 @@ function SecurityChecker() {
     return <XCircle size={30} />;
   };
 
+
+  const validateFile = (file: File) => {
+    if (file.size > MAX_FILE_SIZE) {
+      setSelectedFile(null);
+      setFileError("File must be 25 MB or smaller.");
+      setFileScanResult(null);
+      return;
+    }
+
+    setSelectedFile(file);
+    setFileError("");
+    setFileScanResult(null);
+  };
+
+  // Choose file using file picker
+  const handleFileSelect = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    validateFile(file);
+
+    // Allows selecting the same file again
+    event.target.value = "";
+  };
+
+  // Dragging a file over the upload area
+  const handleDragOver = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+
+    if (isFileScanning) {
+      event.dataTransfer.dropEffect = "none";
+      return;
+    }
+
+    event.dataTransfer.dropEffect = "copy";
+    setIsDragging(true);
+  };
+
+  // Leaving the upload area
+  const handleDragLeave = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+
+    if (
+      !event.currentTarget.contains(
+        event.relatedTarget as Node | null
+      )
+    ) {
+      setIsDragging(false);
+    }
+  };
+
+  // Dropping a file into the upload area
+  const handleFileDrop = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
+    event.preventDefault();
+    setIsDragging(false);
+
+    if (isFileScanning) return;
+
+    const files = event.dataTransfer.files;
+
+    if (files.length === 0) {
+      setFileError(
+        "Please drop a file from your device."
+      );
+      return;
+    }
+
+    if (files.length > 1) {
+      setFileError("Please drop only one file at a time.");
+      return;
+    }
+
+    validateFile(files[0]);
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleCheckFile = async () => {
+    if (!selectedFile) {
+      setFileError("Please select a file.");
+      return;
+    }
+
+    setFileError("");
+    setIsFileScanning(true);
+    setFileScanResult(null);
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/security/file-check",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        let errorMessage = "Unable to scan file.";
+
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch {
+          // Use the default error message
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data: FileScanResult = await response.json();
+      setFileScanResult(data);
+    } catch (error) {
+      console.error("File scan error:", error);
+
+      if (error instanceof Error) {
+        setFileError(error.message);
+      } else {
+        setFileError("Unable to scan this file.");
+      }
+    } finally {
+      setIsFileScanning(false);
+    }
+  };
+
+  const handleScanAnotherFile = () => {
+    setSelectedFile(null);
+    setFileError("");
+    setFileScanResult(null);
+    setIsDragging(false);
+  };
+
+  const getFileResultIcon = () => {
+    if (!fileScanResult) return null;
+
+    if (fileScanResult.classification === "SAFE") {
+      return <CheckCircle size={30} />;
+    }
+
+    if (
+      fileScanResult.classification === "SUSPICIOUS" ||
+      fileScanResult.classification === "UNKNOWN"
+    ) {
+      return <AlertTriangle size={30} />;
+    }
+
+    return <XCircle size={30} />;
+  };
+
+
   return (
     <div className="security-checker-page">
+      {/* Header */}
       <div className="security-checker-header">
         <h1>Security Checker</h1>
-        <p>Check suspicious content before interacting with it.</p>
+        <p>
+          Check suspicious content before interacting with it.
+        </p>
       </div>
 
+      {/* Checker Options */}
       <div className="checker-options">
         {/* Link Checker */}
         <button
@@ -173,7 +372,7 @@ function SecurityChecker() {
           </div>
         </button>
 
-        {/* Phone Checker */}
+        {/* Phone Number Checker */}
         <button
           className={`checker-option ${
             activeChecker === "phone" ? "active" : ""
@@ -220,12 +419,15 @@ function SecurityChecker() {
 
           <div>
             <h3>Data Breach Checker</h3>
-            <p>Check if your email appears in known data breaches.</p>
+            <p>
+              Check if your email appears in known data breaches.
+            </p>
           </div>
         </button>
       </div>
 
-      {/* Link Checker */}
+      {/* LINK CHECKER*/}
+
       {activeChecker === "link" && (
         <div className="checker-panel">
           <div className="checker-panel-title">
@@ -284,7 +486,7 @@ function SecurityChecker() {
             </div>
           )}
 
-          {/* Scan Result */}
+          {/* Link Scan Result */}
           {scanResult && (
             <div
               className={`link-scan-result ${scanResult.classification
@@ -298,7 +500,6 @@ function SecurityChecker() {
 
                 <div>
                   <p className="result-label">Scan Result</p>
-
                   <h2>{scanResult.classification}</h2>
                 </div>
               </div>
@@ -331,9 +532,11 @@ function SecurityChecker() {
                 <h3>Analysis</h3>
 
                 <ul>
-                  {scanResult.reasons.map((reason, index) => (
-                    <li key={index}>{reason}</li>
-                  ))}
+                  {scanResult.reasons.map(
+                    (reason, index) => (
+                      <li key={index}>{reason}</li>
+                    )
+                  )}
                 </ul>
               </div>
 
@@ -342,6 +545,193 @@ function SecurityChecker() {
                 onClick={handleScanAnother}
               >
                 Scan Another Link
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* FILE CHECKER*/}
+
+      {activeChecker === "file" && (
+        <div className="checker-panel">
+          <div className="checker-panel-title">
+            <div className="checker-panel-icon">
+              <FileText size={22} />
+            </div>
+
+            <div>
+              <h2>File Checker</h2>
+              <p>
+                Analyze a file for potential security threats.
+              </p>
+            </div>
+          </div>
+
+          {!fileScanResult && (
+            <div className="file-checker-form">
+              <label htmlFor="file-upload">
+                FILE
+              </label>
+
+              <div className="file-upload-section">
+                {/* Drag-and-Drop Area */}
+                <div
+                  className={`file-drop-zone ${
+                    isDragging ? "dragging" : ""
+                  } ${
+                    selectedFile ? "has-file" : ""
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleFileDrop}
+                >
+                  <UploadCloud
+                    size={42}
+                    className="file-upload-icon"
+                  />
+
+                  <h3>
+                    {selectedFile
+                      ? "File Ready to Scan"
+                      : "Drag & Drop Your File Here"}
+                  </h3>
+
+                  <p>
+                    {selectedFile
+                      ? selectedFile.name
+                      : "Drop a file here or choose one from your device."}
+                  </p>
+
+                  <input
+                    id="file-upload"
+                    type="file"
+                    onChange={handleFileSelect}
+                    disabled={isFileScanning}
+                    style={{ display: "none" }}
+                  />
+
+                  <label
+                    htmlFor="file-upload"
+                    className="choose-file-button"
+                    style={
+                      isFileScanning
+                        ? {
+                            opacity: 0.5,
+                            pointerEvents: "none",
+                          }
+                        : undefined
+                    }
+                  >
+                    Choose File
+                  </label>
+
+                  {selectedFile && (
+                    <p className="file-details">
+                      {formatFileSize(selectedFile.size)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Scan Button */}
+                <button
+                  className="check-file-button"
+                  onClick={handleCheckFile}
+                  disabled={!selectedFile || isFileScanning}
+                >
+                  {isFileScanning
+                    ? "Scanning..."
+                    : "Check File"}
+                </button>
+              </div>
+
+              {fileError && (
+                <p className="file-error-message">
+                  {fileError}
+                </p>
+              )}
+
+              <p className="file-size-note">
+                Maximum file size: 25 MB
+              </p>
+            </div>
+          )}
+
+          {/* File Scan Result */}
+          {fileScanResult && (
+            <div
+              className={`link-scan-result ${fileScanResult.classification
+                .toLowerCase()
+                .replace(" ", "-")}`}
+            >
+              <div className="result-status">
+                <div className="result-icon">
+                  {getFileResultIcon()}
+                </div>
+
+                <div>
+                  <p className="result-label">Scan Result</p>
+                  <h2>{fileScanResult.classification}</h2>
+                </div>
+              </div>
+
+              <div className="result-url">
+                <span>Scanned File</span>
+                <p>{fileScanResult.filename}</p>
+              </div>
+
+              <div className="risk-score-section">
+                <div className="risk-score-heading">
+                  <span>Risk Score</span>
+
+                  <strong>
+                    {fileScanResult.risk_score} / 100
+                  </strong>
+                </div>
+
+                <div className="risk-score-track">
+                  <div
+                    className="risk-score-fill"
+                    style={{
+                      width: `${fileScanResult.risk_score}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="result-reasons">
+                <h3>File Information</h3>
+
+                <ul>
+                  <li>
+                    Size:{" "}
+                    {formatFileSize(
+                      fileScanResult.file_size
+                    )}
+                  </li>
+                  <li>
+                    SHA-256: {fileScanResult.sha256}
+                  </li>
+                </ul>
+              </div>
+
+              <div className="result-reasons">
+                <h3>Analysis</h3>
+
+                <ul>
+                  {fileScanResult.reasons.map(
+                    (reason, index) => (
+                      <li key={index}>{reason}</li>
+                    )
+                  )}
+                </ul>
+              </div>
+
+              <button
+                className="scan-another-button"
+                onClick={handleScanAnotherFile}
+              >
+                Scan Another File
               </button>
             </div>
           )}
