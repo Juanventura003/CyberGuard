@@ -61,6 +61,7 @@ const MAX_ACTIVITY_ITEMS = 100;
 const DUPLICATE_WINDOW_MS = 10_000;
 const ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const ANALYSIS_TIMEOUT_MS = 12_000;
+const inFlightRecords = new Map<string, Promise<void>>();
 
 type WebsiteActivity = {
 	url: string;
@@ -205,6 +206,24 @@ async function ensureStorageDefaults() {
 }
 
 async function recordWebsite(url: string, force = false) {
+	const existingRequest = inFlightRecords.get(url);
+	if (existingRequest) {
+		await existingRequest;
+		return;
+	}
+
+	const request = recordWebsiteInternal(url, force);
+	inFlightRecords.set(url, request);
+	try {
+		await request;
+	} finally {
+		if (inFlightRecords.get(url) === request) {
+			inFlightRecords.delete(url);
+		}
+	}
+}
+
+async function recordWebsiteInternal(url: string, force = false) {
 	const parsedUrl = parseWebsiteUrl(url);
 	if (!parsedUrl) return;
 
@@ -296,10 +315,11 @@ async function recordWebsite(url: string, force = false) {
 		console.error("CyberGuard website analysis failed", error);
 	}
 
-	await chrome.storage.local.set({
-		[ACTIVITY_KEY]: [result, ...activity].slice(0, MAX_ACTIVITY_ITEMS),
-	});
-	if (stored[HISTORY_ENABLED_KEY] === true && typeof stored[AUTH_TOKEN_KEY] === "string" && result.riskScore !== null) {
+	const nextActivity = hasFreshCache
+		? activity.map((entry) => entry.url === url ? result : entry)
+		: [result, ...activity].slice(0, MAX_ACTIVITY_ITEMS);
+	await chrome.storage.local.set({ [ACTIVITY_KEY]: nextActivity });
+	if (!hasFreshCache && stored[HISTORY_ENABLED_KEY] === true && typeof stored[AUTH_TOKEN_KEY] === "string" && result.riskScore !== null) {
 		await saveWebsiteHistory(result, stored[AUTH_TOKEN_KEY]);
 	}
 	await updateBadge(result.riskLevel);

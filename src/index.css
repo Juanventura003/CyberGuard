@@ -814,6 +814,28 @@ body {
   color: #667085;
 
   font-size: 11px;
+  cursor: help;
+}
+
+.tracker-domain p:focus-visible {
+  outline: 2px solid #4169e1;
+  outline-offset: 2px;
+}
+
+.tracker-url-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 9px 11px;
+  border: 1px solid #53617b;
+  border-radius: 6px;
+  background: #1f2d3d;
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(31, 45, 61, 0.24);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
 }
 
 

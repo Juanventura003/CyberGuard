@@ -16,6 +16,7 @@ type Website = {
 type SortField = "domain" | "riskScore" | "riskLevel" | "timeVisited";
 type SortDirection = "asc" | "desc";
 type DateFilter = "all" | "today" | "7days" | "30days";
+type UrlTooltip = { url: string; x: number; y: number } | null;
 
 const toRiskLevel = (riskLevel: string): Website["riskLevel"] => {
   if (riskLevel === "HIGH_RISK") return "High Risk";
@@ -44,6 +45,7 @@ function WebsiteTracker() {
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [urlTooltip, setUrlTooltip] = useState<UrlTooltip>(null);
   const { session } = useAuth();
 
   useEffect(() => {
@@ -66,8 +68,11 @@ function WebsiteTracker() {
             minute: "2-digit",
           }),
         }));
+        const uniqueWebsites = Array.from(
+          new Map(mapped.slice().reverse().map((website) => [website.url, website])).values(),
+        );
 
-        setWebsites(mapped);
+        setWebsites(uniqueWebsites);
       } catch (error) {
         console.error("Could not load website history", error);
         setWebsites([]);
@@ -339,7 +344,20 @@ function WebsiteTracker() {
 
                   <div>
                     <strong>{website.domain}</strong>
-                    <p>{website.url}</p>
+                    <p
+                      tabIndex={0}
+                      aria-label={`Full URL: ${website.url}`}
+                      onMouseEnter={(event) => setUrlTooltip({ url: website.url, x: event.clientX, y: event.clientY })}
+                      onMouseMove={(event) => setUrlTooltip({ url: website.url, x: event.clientX, y: event.clientY })}
+                      onMouseLeave={() => setUrlTooltip(null)}
+                      onFocus={(event) => {
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        setUrlTooltip({ url: website.url, x: bounds.left, y: bounds.bottom });
+                      }}
+                      onBlur={() => setUrlTooltip(null)}
+                    >
+                      {website.url}
+                    </p>
                   </div>
                 </div>
 
@@ -366,6 +384,16 @@ function WebsiteTracker() {
           })
         )}
       </div>
+
+      {urlTooltip && (
+        <div
+          className="tracker-url-tooltip"
+          style={{ left: `${urlTooltip.x}px`, top: `${urlTooltip.y + 8}px` }}
+          role="tooltip"
+        >
+          {urlTooltip.url}
+        </div>
+      )}
     </div>
   );
 }
