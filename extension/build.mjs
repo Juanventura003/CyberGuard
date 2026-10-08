@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import ts from "typescript";
+import { fileURLToPath } from "node:url";
 
-const extensionRoot = new URL(".", import.meta.url).pathname;
+const extensionRoot = fileURLToPath(new URL(".", import.meta.url));
 const sourceRoot = path.join(extensionRoot, "src");
 const outputRoot = path.join(extensionRoot, "dist");
 
