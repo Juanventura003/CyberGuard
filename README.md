@@ -98,12 +98,17 @@ npm run build:extension
 
 In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. After source changes, run the build again and click **Reload** for the extension. Keep both the frontend and backend running. Open the Website Tracker while signed in once so the extension can receive the current Supabase access token. The extension itself does not contain API keys; it sends the token to the local backend over the configured development connection.
 
-The Supabase project must contain a `website_history` table matching the fields used by the backend. The backend uses `SUPABASE_SERVICE_ROLE_KEY` for server-side writes and validates the user's access token through Supabase before associating a row with that user.
 
 ### Cyber Assistant
 The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
 
 Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like “Where is the Email Scanner?” or “How do I spot phishing?” — answers include clickable links to the right CyberGuard page.
+
+### CyberTech News
+
+Open **News** (`/news`) to search and filter BleepingComputer articles, read summaries, and open full stories. The backend updates the feed every five minutes while running; no news API key is needed. Recent news covers available articles from the past seven days, while Saved includes any date. The feed may cover less than a full week.
+
+Sign in to save articles and track what you’ve read. Your saved articles and read status are private to your account.
 
 ## Troubleshooting
 
