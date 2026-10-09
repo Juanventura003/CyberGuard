@@ -4,6 +4,7 @@ const extensionChrome = (globalThis as unknown as { chrome: {
 			| { type: "setAuthToken"; accessToken: string | null }
 			| { type: "setHistoryEnabled"; enabled: boolean }
 			| { type: "suppressUrl"; url: string }
+			| { type: "clearHistory" }
 		): Promise<void>;
 	};
 	storage: {
@@ -19,6 +20,7 @@ function sendToExtension(message:
 	| { type: "setAuthToken"; accessToken: string | null }
 	| { type: "setHistoryEnabled"; enabled: boolean }
 	| { type: "suppressUrl"; url: string }
+	| { type: "clearHistory" }
 ) {
 	pendingMessage = pendingMessage
 		.catch(() => undefined)
@@ -62,6 +64,10 @@ window.addEventListener("message", (event) => {
 			type: "suppressUrl",
 		url: event.data.url,
 	});
+	}
+
+	if (event.data.type === "CYBERGUARD_HISTORY_DELETE_ALL") {
+		sendToExtension({ type: "clearHistory" });
 	}
 });
 

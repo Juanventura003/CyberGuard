@@ -6,6 +6,7 @@ type RuntimeMessage =
 	| { type: "setAuthToken"; accessToken: string | null }
 	| { type: "setHistoryEnabled"; enabled: boolean }
 	| { type: "suppressUrl"; url: string }
+	| { type: "clearHistory" }
 	| { type: "openDashboard" }
 	| { type: "refresh" };
 
@@ -48,7 +49,7 @@ declare const chrome: {
 	};
 };
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://127.0.0.1:8000";
 const MONITORING_KEY = "monitoringEnabled";
 const ACTIVITY_KEY = "websiteActivity";
 const ANALYSIS_CACHE_KEY = "websiteAnalysisCache";
@@ -60,6 +61,7 @@ const MAX_ACTIVITY_ITEMS = 100;
 const DUPLICATE_WINDOW_MS = 10_000;
 const ANALYSIS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const ANALYSIS_TIMEOUT_MS = 12_000;
+const inFlightRecords = new Map<string, Promise<void>>();
 
 type WebsiteActivity = {
 	url: string;
@@ -75,18 +77,11 @@ type WebsiteActivity = {
 type CachedAnalysis = WebsiteActivity & { cachedAt: string };
 
 chrome.runtime.onInstalled.addListener(async () => {
-	const stored = await chrome.storage.local.get([MONITORING_KEY, ACTIVITY_KEY, HISTORY_ENABLED_KEY]);
-	if (typeof stored[MONITORING_KEY] !== "boolean") {
-		await chrome.storage.local.set({ [MONITORING_KEY]: true });
-	}
-	if (!Array.isArray(stored[ACTIVITY_KEY])) {
-		await chrome.storage.local.set({ [ACTIVITY_KEY]: [] });
-	}
-	if (typeof stored[HISTORY_ENABLED_KEY] !== "boolean") {
-		await chrome.storage.local.set({ [HISTORY_ENABLED_KEY]: false });
-	}
+	await ensureStorageDefaults();
 	await refreshActiveTab();
 });
+
+void ensureStorageDefaults();
 
 chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
 	if (changeInfo.status !== "complete" || typeof tab.url !== "string") return;
@@ -104,6 +99,7 @@ chrome.windows.onFocusChanged.addListener(async () => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	(async () => {
 		if (message.type === "getState") {
+			await ensureStorageDefaults();
 			const stored = await chrome.storage.local.get([MONITORING_KEY, ACTIVITY_KEY, HISTORY_ENABLED_KEY, AUTH_TOKEN_KEY]);
 			sendResponse({
 				monitoringEnabled: stored[MONITORING_KEY] !== false,
@@ -174,6 +170,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				[ANALYSIS_CACHE_KEY]: cache,
 			});
 			sendResponse({ ok: true });
+			return;
+		}
+
+		if (message.type === "clearHistory") {
+			await chrome.storage.local.set({
+				[ACTIVITY_KEY]: [],
+				[ANALYSIS_CACHE_KEY]: {},
+			});
+			await chrome.storage.local.remove([SUPPRESSED_URL_KEY, SUPPRESSED_AT_KEY]);
+			sendResponse({ ok: true });
 		}
 	})().catch((error) => {
 		console.error("CyberGuard extension message failed", error);
@@ -190,7 +196,34 @@ async function refreshActiveTab(force = false) {
 	}
 }
 
+async function ensureStorageDefaults() {
+	const stored = await chrome.storage.local.get([MONITORING_KEY, ACTIVITY_KEY, HISTORY_ENABLED_KEY]);
+	const defaults: StorageValues = {};
+	if (typeof stored[MONITORING_KEY] !== "boolean") defaults[MONITORING_KEY] = true;
+	if (!Array.isArray(stored[ACTIVITY_KEY])) defaults[ACTIVITY_KEY] = [];
+	if (typeof stored[HISTORY_ENABLED_KEY] !== "boolean") defaults[HISTORY_ENABLED_KEY] = false;
+	if (Object.keys(defaults).length) await chrome.storage.local.set(defaults);
+}
+
 async function recordWebsite(url: string, force = false) {
+	const existingRequest = inFlightRecords.get(url);
+	if (existingRequest) {
+		await existingRequest;
+		return;
+	}
+
+	const request = recordWebsiteInternal(url, force);
+	inFlightRecords.set(url, request);
+	try {
+		await request;
+	} finally {
+		if (inFlightRecords.get(url) === request) {
+			inFlightRecords.delete(url);
+		}
+	}
+}
+
+async function recordWebsiteInternal(url: string, force = false) {
 	const parsedUrl = parseWebsiteUrl(url);
 	if (!parsedUrl) return;
 
@@ -282,10 +315,43 @@ async function recordWebsite(url: string, force = false) {
 		console.error("CyberGuard website analysis failed", error);
 	}
 
-	await chrome.storage.local.set({
-		[ACTIVITY_KEY]: [result, ...activity].slice(0, MAX_ACTIVITY_ITEMS),
-	});
+	const nextActivity = hasFreshCache
+		? activity.map((entry) => entry.url === url ? result : entry)
+		: [result, ...activity].slice(0, MAX_ACTIVITY_ITEMS);
+	await chrome.storage.local.set({ [ACTIVITY_KEY]: nextActivity });
+	if (!hasFreshCache && stored[HISTORY_ENABLED_KEY] === true && typeof stored[AUTH_TOKEN_KEY] === "string" && result.riskScore !== null) {
+		await saveWebsiteHistory(result, stored[AUTH_TOKEN_KEY]);
+	}
 	await updateBadge(result.riskLevel);
+}
+
+async function saveWebsiteHistory(result: WebsiteActivity, accessToken: string) {
+	try {
+		const response = await fetch(`${API_BASE_URL}/api/websites/history`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			body: JSON.stringify({
+				url: result.url,
+				domain: result.domain,
+				risk_score: result.riskScore,
+				risk_level: result.riskLevel,
+				source: result.source,
+				threat_types: result.threatTypes,
+				explanation: result.explanation,
+			}),
+		});
+		if (response.status === 401) {
+			await chrome.storage.local.remove([AUTH_TOKEN_KEY]);
+		}
+		if (!response.ok) {
+			throw new Error(`History save returned ${response.status}`);
+		}
+	} catch (error) {
+		console.error("CyberGuard website history save failed", error);
+	}
 }
 
 function isAnalysisCache(value: unknown): value is Record<string, CachedAnalysis> {

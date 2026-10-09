@@ -2,11 +2,11 @@ import asyncio
 from datetime import datetime, timezone
 from urllib.parse import urlencode, urlparse
 
-from fastapi import FastAPI, Header, HTTPException, Path, Query
+from fastapi import FastAPI, Header, HTTPException, Path, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from . import gmail_oauth, phishing_detector, link_checker
+from . import gmail_oauth, phishing_detector, link_checker, file_checker
 from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
@@ -49,9 +49,39 @@ def check_link(payload: LinkCheckRequest):
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Could not check URL: {exc}")
 
+# File Checker
+@app.post("/api/security/file-check")
+async def check_uploaded_file(file: UploadFile = File(...)):
+    max_file_size = 25 * 1024 * 1024
+
+    contents = await file.read()
+
+    if len(contents) > max_file_size:
+        raise HTTPException(
+            status_code=400,
+            detail="File must be 25 MB or smaller."
+        )
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="File must have a valid filename."
+        )
+
+    try:
+        return file_checker.check_file(
+            file.filename,
+            contents
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not check file: {exc}"
+        )
+        
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(1000, ge=1, le=1000),
     since: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ):
@@ -77,6 +107,20 @@ def delete_website_history(
 
     try:
         supabase_store.delete_history(user_id, history_id, url)
+    except supabase_store.SupabaseStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.delete("/api/websites/history", status_code=204)
+def delete_all_website_history(
+    authorization: str | None = Header(default=None),
+):
+    user_id = _authenticated_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Sign in before deleting website history.")
+
+    try:
+        supabase_store.delete_all_history(user_id)
     except supabase_store.SupabaseStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
