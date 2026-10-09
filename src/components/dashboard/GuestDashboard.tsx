@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Globe,
   Mail,
@@ -6,9 +8,30 @@ import {
   LogIn,
   UserPlus,
   ShieldCheck,
+  Monitor,
+  Lock,
 } from "lucide-react";
 
+import AuthModal from "../auth/AuthModal";
+
 function GuestDashboard() {
+  const navigate = useNavigate();
+
+  // Authentication popup
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  const openLogin = () => {
+    setAuthMode("login");
+    setAuthModalOpen(true);
+  };
+
+  const openSignUp = () => {
+    setAuthMode("signup");
+    setAuthModalOpen(true);
+  };
+
+  // Date
   const currentDate = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -16,6 +39,7 @@ function GuestDashboard() {
     year: "numeric",
   });
 
+  // Greeting
   const currentHour = new Date().getHours();
 
   let greeting = "Good evening";
@@ -32,7 +56,9 @@ function GuestDashboard() {
       <div className="dashboard-header">
         <div>
           <p className="dashboard-date">{currentDate}</p>
+
           <h1>{greeting}</h1>
+
           <p className="dashboard-subtitle">
             Welcome to your CyberGuard security dashboard.
           </p>
@@ -53,6 +79,7 @@ function GuestDashboard() {
 
           <div>
             <h2>Sign in to save your activity</h2>
+
             <p>
               Log in or create an account to save scans and view your
               security history.
@@ -61,12 +88,18 @@ function GuestDashboard() {
         </div>
 
         <div className="guest-login-buttons">
-          <button className="guest-login-button">
+          <button
+            className="guest-login-button"
+            onClick={openLogin}
+          >
             <LogIn size={16} />
             Log In
           </button>
 
-          <button className="guest-signup-button">
+          <button
+            className="guest-signup-button"
+            onClick={openSignUp}
+          >
             <UserPlus size={16} />
             Sign Up
           </button>
@@ -77,6 +110,7 @@ function GuestDashboard() {
       <h2 className="section-title">Quick Security Tools</h2>
 
       <div className="guest-tools-grid">
+        {/* website tracker */}
         <div className="guest-tool-card">
           <div className="guest-tool-top">
             <Globe size={24} />
@@ -88,11 +122,15 @@ function GuestDashboard() {
             security risks.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            onClick={() => navigate("/website-tracker")}
+          >
             Open Website Tracker
           </button>
         </div>
 
+        {/* email scanner */}
         <div className="guest-tool-card">
           <div className="guest-tool-top">
             <Mail size={24} />
@@ -103,11 +141,15 @@ function GuestDashboard() {
             Scan emails and sender information for signs of phishing.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            onClick={() => navigate("/email-scanner")}
+          >
             Scan an Email
           </button>
         </div>
 
+        {/* security checker */}
         <div className="guest-tool-card">
           <div className="guest-tool-top">
             <Search size={24} />
@@ -115,14 +157,44 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Check links, passwords, files, and domains for security risks.
+            Check links, files, passwords, phone numbers, email
+            addresses, and data breaches.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            onClick={() => navigate("/security-checker")}
+          >
             Open Security Checker
           </button>
         </div>
 
+        {/* device scanner - login required */}
+        <div className="guest-tool-card locked-tool-card">
+          <div className="guest-tool-top">
+            <Monitor size={24} />
+            <h3>Device Scanner</h3>
+
+            <span className="login-required-badge">
+              <Lock size={12} />
+              Login Required
+            </span>
+          </div>
+
+          <p>
+            Scan your Windows device for potential security threats.
+          </p>
+
+          <button
+            className="guest-tool-button"
+            onClick={openLogin}
+          >
+            <Lock size={15} />
+            Log In to Use
+          </button>
+        </div>
+
+        {/* cyber assistant */}
         <div className="guest-tool-card">
           <div className="guest-tool-top">
             <Bot size={24} />
@@ -130,19 +202,26 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Ask cybersecurity questions and get help understanding threats.
+            Ask cybersecurity questions and get help understandingthreats.
           </p>
 
-          <button className="guest-tool-button">
+          <button
+            className="guest-tool-button"
+            type="button"
+            onClick={() => navigate("/cyber-assistant")}
+          >
             Open Cyber Assistant
           </button>
         </div>
       </div>
 
-      <p className="guest-note">
-        Guest activity is not saved. Create an account to keep your
-        security history.
-      </p>
+      {/* authentication popup */}
+      <AuthModal
+        key={authMode}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        startingMode={authMode}
+      />
     </div>
   );
 }

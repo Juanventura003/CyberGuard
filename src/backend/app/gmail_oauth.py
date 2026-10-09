@@ -11,6 +11,7 @@ Flow:
 """
 import base64
 import json
+import os
 import re
 import time
 from email.utils import parseaddr
@@ -20,9 +21,14 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from .config import settings, GMAIL_SCOPES
 from . import session_store
+
+# Google returns previously granted scopes too (include_granted_scopes), which
+# oauthlib otherwise treats as a fatal "Scope has changed" error.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 URL_RE = re.compile(r"https?://[^\s\"'<>)]+")
 
@@ -34,7 +40,7 @@ _state_lock = Lock()
 _STATE_TTL_SECONDS = 600
 
 
-def _build_flow() -> Flow:
+def _build_flow(code_verifier: str | None = None) -> Flow:
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -44,14 +50,15 @@ def _build_flow() -> Flow:
             "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
         }
     }
-    return Flow.from_client_config(client_config, scopes=GMAIL_SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI)
+    return Flow.from_client_config(
+        client_config, scopes=GMAIL_SCOPES, redirect_uri=settings.GOOGLE_REDIRECT_URI, code_verifier=code_verifier
+    )
 
 
 def start_login(return_to: str) -> str:
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise RuntimeError(
-            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not set. "
-            "Copy backend/.env.example to backend/.env and fill them in -- see backend/README.md."
+            "Gmail OAuth is not configured: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in src/backend/.env."
         )
 
     flow = _build_flow()
@@ -61,7 +68,11 @@ def start_login(return_to: str) -> str:
 
     _cleanup_expired_state()
     with _state_lock:
-        _pending_state[state] = {"return_to": return_to, "created_at": time.time()}
+        _pending_state[state] = {
+            "return_to": return_to,
+            "code_verifier": flow.code_verifier,  # PKCE: the callback must send the same verifier
+            "created_at": time.time(),
+        }
 
     return auth_url
 
@@ -76,8 +87,11 @@ def handle_callback(code: str, state: str) -> tuple[str, str]:
     if pending is None:
         raise RuntimeError("This login link expired or was already used. Please click Connect Gmail again.")
 
-    flow = _build_flow()
-    flow.fetch_token(code=code)
+    flow = _build_flow(code_verifier=pending.get("code_verifier"))
+    try:
+        flow.fetch_token(code=code)
+    except Exception as exc:
+        raise RuntimeError(f"Google sign-in failed: {exc}") from exc
     session_id = session_store.create_session(flow.credentials.to_json())
     return session_id, pending["return_to"]
 
@@ -168,3 +182,15 @@ def get_full_email(session_id: str, message_id: str) -> dict:
         "body": body,
         "urls": urls,
     }
+
+def trash_message(session_id: str, message_id: str) -> None:
+   service = _get_gmail_service(session_id)
+   try:
+       service.users().messages().trash(userId="me", id=message_id).execute()
+   except HttpError as exc:
+       if exc.resp.status == 403:
+           raise PermissionError(
+               "Gmail did not grant permission to move messages to Trash. Please reconnect your Gmail account."
+           ) from exc
+       raise
+

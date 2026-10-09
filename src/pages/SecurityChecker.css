@@ -1,0 +1,610 @@
+.security-checker-page {
+  padding: 32px;
+  min-height: 100vh;
+  background-color: #eef1f5;
+  color: #1f2d3d;
+}
+
+.security-checker-header {
+  margin-bottom: 28px;
+}
+
+.security-checker-header h1 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.security-checker-header p {
+  margin: 0;
+  color: #667085;
+  font-size: 15px;
+}
+
+/* Checker selection cards */
+.checker-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.checker-option {
+  min-height: 135px;
+  padding: 20px;
+  background-color: #ffffff;
+  border: 1px solid #b8c0cc;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  color: #1f2d3d;
+}
+
+.checker-option:hover {
+  border-color: #4169e1;
+}
+
+.checker-option.active {
+  border: 2px solid #4169e1;
+  padding: 19px;
+}
+
+.checker-option-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background-color: #eef2ff;
+  color: #4169e1;
+}
+
+.checker-option h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.checker-option p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Main checker */
+.checker-panel {
+  background-color: #ffffff;
+  border: 1px solid #b8c0cc;
+  border-radius: 10px;
+  padding: 24px;
+}
+
+.checker-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid #e1e5eb;
+}
+
+.checker-panel-icon {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #eef2ff;
+  color: #4169e1;
+  border-radius: 8px;
+}
+
+.checker-panel-title h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: #1f2d3d;
+}
+
+.checker-panel-title p {
+  margin: 0;
+  font-size: 14px;
+  color: #667085;
+}
+
+/* Link checker */
+.link-checker-form {
+  max-width: 900px;
+}
+
+.link-checker-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.link-input-row {
+  display: flex;
+  gap: 12px;
+}
+
+.link-input-row input {
+  flex: 1;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid #b8c0cc;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #1f2d3d;
+  font-size: 14px;
+  outline: none;
+}
+
+.link-input-row input:focus {
+  border-color: #4169e1;
+}
+
+.link-input-row input::placeholder {
+  color: #98a2b3;
+}
+
+.check-link-button {
+  height: 46px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  background-color: #4169e1;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-link-button:hover:not(:disabled) {
+  background-color: #3659c9;
+}
+
+.check-link-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.link-helper-text {
+  margin: 10px 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.link-error-message {
+  margin: 8px 0 0;
+  color: #dc3545;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Link Scan Results */
+.link-scan-result {
+  max-width: 900px;
+}
+
+.result-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.result-status .result-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.result-label {
+  margin: 0 0 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #667085;
+  text-transform: uppercase;
+}
+
+.result-status h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.email-checker-option {
+  grid-column: 2;
+}
+
+.breach-checker-option {
+  grid-column: 3;
+}
+
+/* Safe */
+.link-scan-result.safe .result-status {
+  background-color: #edf8f1;
+  border: 1px solid #198754;
+  color: #198754;
+}
+
+/* Suspicious */
+.link-scan-result.suspicious .result-status {
+  background-color: #fff8e6;
+  border: 1px solid #d99a00;
+  color: #d99a00;
+}
+
+/* High Risk */
+.link-scan-result.high-risk .result-status {
+  background-color: #fcedef;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+}
+
+/* URL */
+.result-url {
+  margin-bottom: 22px;
+}
+
+.result-url span {
+  display: block;
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.result-url p {
+  margin: 0;
+  padding: 12px 14px;
+  background-color: #f7f8fa;
+  border: 1px solid #e1e5eb;
+  border-radius: 7px;
+  color: #1f2d3d;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+/* Risk Score */
+.risk-score-section {
+  margin-bottom: 24px;
+}
+
+.risk-score-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #1f2d3d;
+  font-size: 14px;
+}
+
+.risk-score-heading strong {
+  font-size: 15px;
+}
+
+.risk-score-track {
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  background-color: #e1e5eb;
+  border-radius: 20px;
+}
+
+.risk-score-fill {
+  height: 100%;
+  border-radius: 20px;
+}
+
+.link-scan-result.safe .risk-score-fill {
+  background-color: #198754;
+}
+
+.link-scan-result.suspicious .risk-score-fill {
+  background-color: #d99a00;
+}
+
+.link-scan-result.high-risk .risk-score-fill {
+  background-color: #dc3545;
+}
+
+/* Analysis */
+.result-reasons {
+  padding: 18px;
+  margin-bottom: 22px;
+  background-color: #f7f8fa;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+}
+
+.result-reasons h3 {
+  margin: 0 0 12px;
+  color: #1f2d3d;
+  font-size: 15px;
+}
+
+.result-reasons ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.result-reasons li {
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.result-reasons li:last-child {
+  margin-bottom: 0;
+}
+
+/* Scan Another */
+.scan-another-button {
+  padding: 11px 18px;
+  border: 1px solid #4169e1;
+  border-radius: 7px;
+  background-color: #ffffff;
+  color: #4169e1;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.scan-another-button:hover {
+  background-color: #f2f5ff;
+}
+
+/* FILE CHECKER */
+
+.file-checker-form {
+  padding-top: 24px;
+  border-top: 1px solid #d7dce3;
+}
+
+.file-checker-form > label {
+  display: block;
+  margin-bottom: 10px;
+  color: #1f2d3d;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.file-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.file-input-container {
+  flex: 1;
+  min-height: 54px;
+  border: 1px solid #b8c0cc;
+  border-radius: 8px;
+  background-color: #ffffff;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.file-input-container input[type="file"] {
+  display: none;
+}
+
+.choose-file-button {
+  height: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+  border-right: 1px solid #b8c0cc;
+  background-color: #eef1f5;
+  color: #1f2d3d;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.choose-file-button:hover {
+  background-color: #e4e8ee;
+}
+
+.selected-file-name {
+  padding: 0 16px;
+  color: #667085;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-file-button {
+  min-width: 145px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 8px;
+  background-color: #4169e1;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.check-file-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.check-file-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.file-details {
+  margin: 10px 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.file-size-note {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.file-error-message {
+  margin: 10px 0 0;
+  color: #dc3545;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (max-width: 750px) {
+  .file-input-row {
+    flex-direction: column;
+  }
+
+  .check-file-button {
+    min-height: 48px;
+    width: 100%;
+  }
+}
+
+/*FILE CHECKER - DRAG AND DROP*/
+
+.file-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.file-drop-zone {
+  border: 2px dashed #444b5a;
+  border-radius: 12px;
+  padding: 40px 24px;
+  text-align: center;
+  background: #171b24;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.file-drop-zone:hover {
+  border-color: #5b8def;
+  background: #1d2533;
+}
+
+.file-drop-zone.dragging {
+  border-color: #5b8def;
+  background: #243249;
+  transform: scale(1.01);
+}
+
+.file-drop-zone.has-file {
+  border-color: #22c55e;
+}
+
+.file-upload-icon {
+  color: #5b8def;
+  margin-bottom: 8px;
+}
+
+.file-drop-zone h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #f4f6fb;
+}
+
+.file-drop-zone p {
+  margin: 0;
+  font-size: 13px;
+  color: #9ca3af;
+  overflow-wrap: anywhere;
+}
+
+.file-drop-zone .choose-file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #293244;
+  color: white;
+  border: 1px solid #414b60;
+  border-radius: 8px;
+  padding: 11px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.file-drop-zone .choose-file-button:hover {
+  background: #37445c;
+}
+
+.file-upload-section .check-file-button {
+  width: 100%;
+}
+
+.file-drop-zone .file-details {
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.file-upload-section .check-file-button {
+  width: 100%;
+  min-height: 48px;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-upload-section .check-file-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .checker-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 650px) {
+  .security-checker-page {
+    padding: 20px;
+  }
+
+  .checker-options {
+    grid-template-columns: 1fr;
+  }
+
+  .link-input-row {
+    flex-direction: column;
+  }
+
+  .check-link-button {
+    width: 100%;
+  }
+}

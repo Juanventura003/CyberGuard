@@ -1,21 +1,45 @@
+import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import Sidebar from "./components/Sidebar/Sidebar";
+import AuthModal from "./components/auth/AuthModal";
 
 import Dashboard from "./pages/Dashboard";
 import WebsiteTracker from "./pages/WebsiteTracker";
 import EmailScanner from "./pages/EmailScanner";
 import SecurityChecker from "./pages/SecurityChecker";
+import DeviceScanner from "./pages/DeviceScanner";
 import CyberAssistant from "./pages/CyberAssistant";
+import News from "./pages/News";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+
+import { useAuth } from "./context/AuthContext";
 
 import "./App.css";
 
 function App() {
+  const { session, loading } = useAuth();
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  const openLogin = () => {
+    setAuthMode("login");
+    setAuthModalOpen(true);
+  };
+
+  const openSignUp = () => {
+    setAuthMode("signup");
+    setAuthModalOpen(true);
+  };
+
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar
+        onLogin={openLogin}
+        onSignUp={openSignUp}
+      />
 
       <main className="main-content">
         <Routes>
@@ -43,10 +67,28 @@ function App() {
             element={<SecurityChecker />}
           />
 
+          {/* Login Required */}
+          <Route
+            path="/device-scanner"
+            element={
+              loading ? (
+                <div style={{ padding: "32px" }}>
+                  <p>Loading...</p>
+                </div>
+              ) : session ? (
+                <DeviceScanner />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+
           <Route
             path="/cyber-assistant"
             element={<CyberAssistant />}
           />
+
+          <Route path="/news" element={<News />} />
 
           <Route path="/reports" element={<Reports />} />
 
@@ -59,6 +101,14 @@ function App() {
           />
         </Routes>
       </main>
+
+      {/* Authentication popup */}
+      <AuthModal
+        key={authMode}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        startingMode={authMode}
+      />
     </div>
   );
 }

@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+.env.local
 # Python / secrets
 .venv/
 __pycache__/

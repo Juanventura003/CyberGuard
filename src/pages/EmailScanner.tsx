@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 import {
   startGmailConnect,
   listGmailMessages,
   analyzeGmailMessages,
   analyzeManualEmails,
+  trashGmailMessages,
   type GmailHeaderItem,
   type EmailResult,
   type ManualEmailInput,
@@ -34,6 +36,7 @@ function readGmailReturnParams(): { session: string | null; error: string | null
 }
 
 export default function EmailScanner() {
+  const { session } = useAuth();
   const [, setSearchParams] = useSearchParams();
 
   // Read the OAuth-return params exactly once, during the component's first
@@ -65,6 +68,12 @@ export default function EmailScanner() {
   const [results, setResults] = useState<EmailResult[] | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // gmail trash state
+const [trashedIds, setTrashedIds] = useState<Set<string>>(new Set());
+const [trashingIds, setTrashingIds] = useState<Set<string>>(new Set());
+const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
+
 
   const loadGmailList = async (session: string) => {
     await Promise.resolve();
@@ -103,6 +112,10 @@ export default function EmailScanner() {
     setResults(null);
     setErrorMsg(null);
     setBanner(null);
+    setTrashedIds(new Set());
+    setTrashingIds(new Set());
+    setTrashErrors({});
+
   };
 
   // ---- manual paste-in ----
@@ -173,6 +186,45 @@ export default function EmailScanner() {
     }
   };
 
+  const canTrash = (r: EmailResult): r is EmailResult & { id: string } =>
+ r.source === "gmail" && r.id !== null && (r.classification === "PHISHING" || r.classification === "SUSPICIOUS");
+
+
+const trashableIds = (classification: EmailResult["classification"]) =>
+ (results ?? [])
+   .filter((r) => canTrash(r) && r.classification === classification && !trashedIds.has(r.id))
+   .map((r) => r.id as string);
+
+
+const moveToTrash = async (ids: string[]) => {
+ if (!gmailSession || ids.length === 0) return;
+ const noun = ids.length === 1 ? "this email" : `these ${ids.length} emails`;
+ if (!window.confirm(`Move ${noun} to your Gmail Trash? You can restore them from Trash within 30 days.`)) return;
+
+
+ setTrashingIds((prev) => new Set([...prev, ...ids]));
+ setErrorMsg(null);
+ try {
+   const { trashed, failed } = await trashGmailMessages(gmailSession, ids);
+   setTrashedIds((prev) => new Set([...prev, ...trashed]));
+   setTrashErrors((prev) => {
+     const next = { ...prev };
+     for (const id of trashed) delete next[id];
+     for (const f of failed) next[f.id] = f.error;
+     return next;
+   });
+ } catch (err) {
+   setErrorMsg(err instanceof Error ? err.message : "Could not move emails to Trash.");
+ } finally {
+   setTrashingIds((prev) => {
+     const next = new Set(prev);
+     for (const id of ids) next.delete(id);
+     return next;
+   });
+ }
+};
+
+
   const connectGmail = () => {
     const returnTo = `${window.location.origin}${window.location.pathname}`;
     startGmailConnect(returnTo);
@@ -204,13 +256,26 @@ export default function EmailScanner() {
               {MAX_EMAILS} emails, then check them together.
             </p>
           </button>
-          <button className="es-choice-card" onClick={connectGmail}>
+          <button
+            className={`es-choice-card ${!session ? "disabled" : ""}`}
+            onClick={session ? connectGmail : undefined}
+            disabled={!session}
+          >
             <h3>Connect Gmail account</h3>
-            <p>
-              Sign in with Google, then pick up to {MAX_EMAILS} messages straight from your inbox
-              to scan. Read-only access — CyberGuard can never send, delete, or change anything.
-            </p>
-          </button>
+
+            {session ? (
+              <p>
+                Sign in with Google, then pick up to {MAX_EMAILS} messages straight
+                from your inbox to scan. After the scan you can move phishing
+                emails to Trash — CyberGuard never sends mail or deletes anything permanently.
+              </p>
+            ) : (
+              <p>
+                  Log in to your CyberGuard account to connect Gmail and scan emails
+                  directly from your inbox.
+              </p>
+            )}
+        </button>
         </div>
       )}
 
@@ -332,6 +397,21 @@ export default function EmailScanner() {
             </div>
           )}
 
+          {trashableIds("PHISHING").length > 0 && (
+              <div className="es-row">
+                <span className="es-count">
+                  {trashableIds("PHISHING").length} phishing email{trashableIds("PHISHING").length === 1 ? "" : "s"} still in your inbox
+                </span>
+                <button
+                    className="es-btn danger"
+                    onClick={() => moveToTrash(trashableIds("PHISHING"))}
+                    disabled={trashingIds.size > 0}
+                >
+                  {trashingIds.size > 0 ? "Moving to Trash…" : "Move all phishing to Trash"}
+                </button>
+              </div>
+          )}
+
           <div className="es-results-list">
             {results.map((r, i) => (
               <div key={r.id ?? i} className={`es-result-card ${r.classification}`}>
@@ -353,6 +433,21 @@ export default function EmailScanner() {
                       <li key={j}>{line}</li>
                     ))}
                   </ul>
+                )}
+                {canTrash(r) && (
+                    <div className="es-result-actions">{trashedIds.has(r.id) ? (
+                        <span className="es-trashed">Moved to Trash</span>
+                    ) : (
+                        <button
+                            className="es-btn danger small"
+                            onClick={() => moveToTrash([r.id])}
+                            disabled={trashingIds.has(r.id)}
+                        >
+                          {trashingIds.has(r.id) ? "Moving…" : "Move to Trash"}
+                        </button>
+                    )}
+                      {trashErrors[r.id] && <span className="es-trash-error">{trashErrors[r.id]}</span>}
+                    </div>
                 )}
               </div>
             ))}
