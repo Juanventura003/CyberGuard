@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend": "src\\backend\\.venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --port 8000 --app-dir src/backend",
+    "backend": "node scripts/run-backend.mjs",
     "dev:all": "concurrently \"npm run dev\" \"npm run backend\"",
     "build": "tsc -b && vite build",
     "build:extension": "node extension/build.mjs",

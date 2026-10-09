@@ -19,7 +19,7 @@ No account needed.
 2. Tick the messages you want to scan from your inbox list.
 3. Click the analyze button.
 
-Access is read-only (`gmail.readonly`). CyberGuard cannot send, delete or modify mail.
+CyberGuard requests `gmail.modify` so it can read messages and move emails you choose to Trash from the scan results. It never sends mail or permanently deletes anything; trashed messages stay recoverable in Gmail for 30 days.
 
 ### Reading the results
 - **Risk score** (0–100): higher means more likely phishing.
@@ -33,38 +33,43 @@ Access is read-only (`gmail.readonly`). CyberGuard cannot send, delete or modify
 - [Python](https://www.python.org/downloads/) 3.10 or newer
 - Git
 
-### 1. Start the backend
+### 1. One-time setup
 Open a terminal in the project root (the `CyberGuard` folder).
+
+Create the backend's Python virtual environment and install its packages:
 
 **Windows (PowerShell):**
 ```powershell
-cd src\backend
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python -m venv src\backend\.venv
+src\backend\.venv\Scripts\python.exe -m pip install -r src\backend\requirements.txt
 ```
 
 **macOS / Linux:**
 ```bash
-cd src/backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python3 -m venv src/backend/.venv
+src/backend/.venv/bin/python -m pip install -r src/backend/requirements.txt
 ```
 
-Check it works: open http://localhost:8000/api/health. You should see `{"status":"healthy"}`. Interactive API docs are at http://localhost:8000/docs.
-
-### 2. Start the frontend
-Open a **second** terminal in the project root:
+Then install the frontend packages (same on every OS):
 ```bash
 npm install
-npm run dev
 ```
-Then open http://localhost:5173.
 
-Both servers must be running at the same time. Stop them with `Ctrl+C`.
+Finally, add your settings to `src/backend/.env` and the root `.env` (see [Configuration](#configuration)).
+
+### 2. Run the app
+From the project root, on Windows, macOS or Linux:
+```bash
+npm run dev:all
+```
+This starts the frontend and the backend together in one terminal. `npm run backend` picks the right virtual environment Python for your OS automatically (`.venv\Scripts\python.exe` on Windows, `.venv/bin/python` on macOS/Linux).
+
+- Frontend: http://localhost:5173
+- Backend health check: http://localhost:8000/api/health should show `{"status":"healthy"}`. Interactive API docs are at http://localhost:8000/docs.
+
+Stop both with `Ctrl+C`.
+
+To run them in separate terminals instead, use `npm run backend` in one and `npm run dev` in the other.
 
 ## Configuration
 
@@ -107,8 +112,8 @@ Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like
 
 ## Troubleshooting
 
-- **`ModuleNotFoundError` when starting the backend**: the virtual environment isn't activated, or `pip install -r requirements.txt` wasn't run.
-- **PowerShell won't activate the venv**: run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+- **`Backend virtualenv not found`**: the virtual environment hasn't been created on this computer yet. Run the one-time setup above. A `.venv` copied from another OS won't work; create a fresh one on each machine.
+- **`ModuleNotFoundError` when starting the backend**: the backend packages aren't installed in the virtual environment. Rerun the `pip install` step from the one-time setup.
 - **Frontend shows a network or CORS error**: make sure the backend is running on port 8000 and `FRONTEND_ORIGIN` matches the URL in your browser.
 - **Google says `redirect_uri_mismatch`**: the redirect URI in Google Cloud must match `GOOGLE_REDIRECT_URI` exactly.
 - **Google says the app isn't verified or access is blocked**: add your account as a test user.
