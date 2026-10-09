@@ -1,5 +1,7 @@
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from threading import Event, Thread
 from urllib.parse import urlencode, urlparse
 
 from fastapi import FastAPI, Header, HTTPException, Path, Query, UploadFile, File
@@ -20,8 +22,30 @@ from .schemas import (
 )
 from .web_risk import WebRiskLookupError, lookup_url
 from . import supabase_store
+from . import news_feed
 
-app = FastAPI(title="CyberGuard Email Scanner", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop = Event()
+    worker = Thread(
+        target=news_feed.run_refresh_loop,
+        args=(stop,),
+        name="cyberguard-news-refresh",
+        daemon=True,
+    )
+    worker.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        await asyncio.to_thread(worker.join, 20)
+
+
+app = FastAPI(
+    title="CyberGuard Email Scanner",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +59,14 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/api/news")
+def cybersecurity_news():
+    try:
+        return news_feed.get_news()
+    except news_feed.NewsFeedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 # Link Checker
 @app.post("/api/security/link-check")
