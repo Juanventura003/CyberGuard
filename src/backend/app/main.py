@@ -1,3 +1,9 @@
+import logging
+from googleapiclient.errors import HttpError
+
+logger = logging.getLogger(__name__)
+
+
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -345,13 +351,32 @@ def gmail_attachment_list(
 ):
     try:
         return gmail_oauth.list_attachments(session, limit)
+
     except LookupError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
-    except Exception:
+
+    except HttpError as exc:
+        print("\n===== GMAIL API ERROR =====")
+        print("Google HTTP Status:", exc.resp.status)
+        print("Error Details:", exc)
+        print("===========================\n")
+
         raise HTTPException(
             status_code=502,
             detail="Could not retrieve Gmail attachments.",
-        )
+        ) from exc
+
+    except Exception as exc:
+        import traceback
+
+        print("\n===== UNEXPECTED GMAIL ERROR =====")
+        traceback.print_exc()
+        print("==================================\n")
+
+        raise HTTPException(
+            status_code=502,
+            detail="Could not retrieve Gmail attachments.",
+        ) from exc
 
 
 @app.post("/api/security/gmail/scan-attachment")
