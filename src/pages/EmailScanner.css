@@ -184,6 +184,33 @@
   color: #d99a00;
 }
 
+/* Refresh / Select all / Analyze buttons in the Gmail picker */
+.es-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* "Gmail connected · Disconnect" line under the start screen cards */
+.es-row.es-connected {
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (max-width: 600px) {
+  .es-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .es-row-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
 
 /* BUTTONS*/
 
