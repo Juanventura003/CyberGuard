@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import {
   Link,
   FileText,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import "./SecurityChecker.css";
+import GmailAttachmentPicker from "../components/GmailAttachmentPopup";
 
 type CheckerType =
   | "link"
@@ -44,7 +45,11 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 function SecurityChecker() {
   const [activeChecker, setActiveChecker] =
-    useState<CheckerType>("link");
+  useState<CheckerType>(() =>
+    new URLSearchParams(window.location.search).get("checker") === "file"
+      ? "file"
+      : "link"
+  );
 
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState("");
@@ -58,6 +63,102 @@ function SecurityChecker() {
   const [isFileScanning, setIsFileScanning] = useState(false);
   const [fileScanResult, setFileScanResult] =
     useState<FileScanResult | null>(null);
+
+  const [fileSource, setFileSource] = useState<"device" | "gmail">("device");
+  const [gmailSession, setGmailSession] = useState(
+    () => sessionStorage.getItem("cyberguard_gmail_session") || ""
+  );
+  const [gmailPickerOpen, setGmailPickerOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    const session = params.get("gmail_session");
+    const error = params.get("gmail_error");
+    const checker = params.get("checker");
+
+    if (checker === "file" || session) {
+      setActiveChecker("file");
+    }
+
+    if (session) {
+      sessionStorage.setItem("cyberguard_gmail_session", session);
+      setGmailSession(session);
+      setActiveChecker("file");
+      setFileSource("gmail");
+      setGmailPickerOpen(true);
+    }
+
+    if (error) {
+      setFileSource("gmail");
+      setFileError(`Gmail connection failed: ${error}`);
+    }
+
+    if (session || error || checker) {
+      params.delete("gmail_session");
+      params.delete("gmail_error");
+      params.delete("checker");
+
+      const remaining = params.toString();
+
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname +
+          (remaining ? `?${remaining}` : "")
+      );
+    }
+  }, []);
+
+  const connectGmail = () => {
+    const returnTo = `${window.location.origin}${window.location.pathname}?checker=file`;
+    window.location.assign(
+      `http://127.0.0.1:8000/api/email/oauth/login?return_to=${encodeURIComponent(returnTo)}`
+    );
+  };
+
+  const scanGmailAttachment = async (
+    messageId: string,
+    attachmentIndex: number
+  ) => {
+    setFileError("");
+    setFileScanResult(null);
+    setIsFileScanning(true);
+
+    try {
+      const params = new URLSearchParams({
+        session: gmailSession,
+        message_id: messageId,
+        attachment_index: String(attachmentIndex),
+      });
+
+      const response = await fetch(
+        `http://127.0.0.1:8000/api/security/gmail/scan-attachment?${params}`,
+        { method: "POST" }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Attachment scan failed.");
+      }
+
+      const result: FileScanResult = await response.json();
+      setFileScanResult(result);
+      setGmailPickerOpen(false);
+    } catch (error) {
+      console.error("Gmail attachment scan error:", error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to scan Gmail attachment.";
+
+      setFileError(message);
+      throw error;
+    } finally {
+      setIsFileScanning(false);
+    }
+  };
   const [isDragging, setIsDragging] = useState(false);
 
   const handleCheckLink = async () => {
@@ -569,6 +670,85 @@ function SecurityChecker() {
           </div>
 
           {!fileScanResult && (
+            <div className="file-source-options">
+              <button
+                type="button"
+                className={`file-source-button ${fileSource === "device" ? "active" : ""}`}
+                onClick={() => {
+                  setFileSource("device");
+                  setFileError("");
+                }}
+              >
+                Upload from Device
+              </button>
+
+              <button
+                type="button"
+                className={`file-source-button ${fileSource === "gmail" ? "active" : ""}`}
+                onClick={() => {
+                  setFileSource("gmail");
+                  setFileError("");
+                }}
+              >
+                Connect Gmail
+              </button>
+            </div>
+          )}
+
+          
+        {!fileScanResult && fileSource === "gmail" && (
+          <div className="gmail-connect-card">
+            <div className="gmail-connect-icon">
+              <Mail size={30} />
+            </div>
+
+            <h3>Scan Gmail Attachments</h3>
+
+            <p className="gmail-connect-description">
+              Securely connect your Gmail account to select and
+              analyze email attachments for potential security threats.
+            </p>
+
+            <button
+              type="button"
+              className="gmail-connect-button"
+              disabled={isFileScanning}
+              onClick={() => {
+                if (gmailSession) {
+                  setGmailPickerOpen(true);
+                } else {
+                  connectGmail();
+                }
+              }}
+            >
+            <Mail size={18} />
+            <span>
+              {gmailSession
+                ? "Browse Gmail Attachments"
+                : "Connect to Gmail"}
+              </span>
+            </button>
+
+            {fileError && (
+              <p className="file-error-message">{fileError}</p>
+            )}
+
+            <div className="gmail-connect-footer">
+              <CheckCircle size={15} />
+              <span>Maximum attachment size: 25 MB</span>
+            </div>
+          </div>
+        )}
+
+          {gmailPickerOpen && gmailSession && (
+            <GmailAttachmentPicker
+              session={gmailSession}
+              onClose={() => setGmailPickerOpen(false)}
+              onScan={scanGmailAttachment}
+            />
+          )}
+
+          {!fileScanResult && fileSource === "device" && (
             <div className="file-checker-form">
               <label htmlFor="file-upload">
                 FILE

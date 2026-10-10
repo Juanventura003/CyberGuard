@@ -1,6 +1,9 @@
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from threading import Event, Thread
 from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, urlsplit, urlunsplit, parse_qsl
 
 from fastapi import FastAPI, Header, HTTPException, Path, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +25,30 @@ from .schemas import (
 )
 from .web_risk import WebRiskLookupError, lookup_url
 from . import supabase_store
+from . import news_feed
 
-app = FastAPI(title="CyberGuard Email Scanner", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    stop = Event()
+    worker = Thread(
+        target=news_feed.run_refresh_loop,
+        args=(stop,),
+        name="cyberguard-news-refresh",
+        daemon=True,
+    )
+    worker.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        await asyncio.to_thread(worker.join, 20)
+
+
+app = FastAPI(
+    title="CyberGuard Email Scanner",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,10 +58,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def gmail_redirect_url(return_to: str, **values: str) -> str:
+    parts = urlsplit(return_to)
+    params = dict(parse_qsl(parts.query, keep_blank_values=True))
+    params.update(values)
+
+    return urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        parts.path,
+        urlencode(params),
+        parts.fragment,
+    ))
 
 @app.get("/api/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/api/news")
+def cybersecurity_news():
+    try:
+        return news_feed.get_news()
+    except news_feed.NewsFeedError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 # Link Checker
 @app.post("/api/security/link-check")
@@ -267,7 +312,9 @@ def oauth_callback(code: str | None = None, state: str = "", error: str | None =
     if error:
         pending = gmail_oauth.pop_pending(state)
         return_to = pending["return_to"] if pending else settings.FRONTEND_ORIGIN
-        return RedirectResponse(f"{return_to}?{urlencode({'gmail_error': error})}")
+        return RedirectResponse(
+            gmail_redirect_url(return_to, gmail_error=error)
+        )
 
     if not code:
         raise HTTPException(status_code=400, detail="Missing authorization code from Google.")
@@ -277,7 +324,9 @@ def oauth_callback(code: str | None = None, state: str = "", error: str | None =
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return RedirectResponse(f"{return_to}?{urlencode({'gmail_session': session_id})}")
+    return RedirectResponse(
+        gmail_redirect_url(return_to, gmail_session=session_id)
+    )
 
 
 @app.get("/api/email/gmail/list", response_model=list[GmailHeaderItem])
@@ -289,6 +338,56 @@ def gmail_list(session: str = Query(...), limit: int = Query(50, le=100)):
     except Exception as exc:  # Gmail API errors, expired refresh token, etc.
         raise HTTPException(status_code=502, detail=f"Could not read Gmail inbox: {exc}")
 
+@app.get("/api/security/gmail/attachments")
+def gmail_attachment_list(
+    session: str = Query(...),
+    limit: int = Query(50, ge=1, le=100),
+):
+    try:
+        return gmail_oauth.list_attachments(session, limit)
+    except LookupError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not retrieve Gmail attachments.",
+        )
+
+
+@app.post("/api/security/gmail/scan-attachment")
+async def scan_gmail_attachment(
+    session: str = Query(...),
+    message_id: str = Query(...),
+    attachment_index: int = Query(..., ge=0),
+):
+    try:
+        filename, contents = await asyncio.to_thread(
+            gmail_oauth.get_attachment,
+            session,
+            message_id,
+            attachment_index,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not retrieve Gmail attachment.",
+        )
+
+    try:
+        return await asyncio.to_thread(
+            file_checker.check_file,
+            filename,
+            contents,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Could not scan Gmail attachment.",
+        )
 
 @app.post("/api/email/gmail/analyze", response_model=list[EmailResult])
 async def gmail_analyze(payload: GmailAnalyzeRequest):

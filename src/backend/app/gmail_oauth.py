@@ -16,6 +16,7 @@ import re
 import time
 from email.utils import parseaddr
 from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -194,3 +195,149 @@ def trash_message(session_id: str, message_id: str) -> None:
            ) from exc
        raise
 
+def _attachment_parts(payload: dict) -> list[dict]:
+    found = []
+
+    def walk(part: dict):
+        filename = part.get("filename", "")
+        body = part.get("body", {})
+
+        if filename and (body.get("attachmentId") or body.get("data")):
+            found.append({
+                "filename": filename,
+                "attachment_id": body.get("attachmentId"),
+                "size": body.get("size", 0),
+                "inline_data": body.get("data"),
+            })
+
+        for child in part.get("parts", []) or []:
+            walk(child)
+
+    walk(payload)
+    return found
+
+
+
+
+def list_attachments(session_id: str, limit: int = 50) -> list[dict]:
+    service = _get_gmail_service(session_id)
+
+    limit = max(1, min(limit, 100))
+
+    response = service.users().messages().list(
+        userId="me",
+        labelIds=["INBOX"],
+        maxResults=limit,
+    ).execute()
+
+    message_refs = response.get("messages", [])
+
+    # Get credentials once, then create a separate Gmail
+    # service per worker for safe concurrent requests.
+    creds_json = session_store.get_credentials(session_id)
+
+    if creds_json is None:
+        raise LookupError(
+            "No active Gmail session. Please reconnect your Gmail account."
+        )
+
+    def fetch_email(ref: dict) -> dict:
+        credentials = Credentials.from_authorized_user_info(
+            json.loads(creds_json),
+            GMAIL_SCOPES,
+        )
+
+        worker_service = build(
+            "gmail",
+            "v1",
+            credentials=credentials,
+            cache_discovery=False,
+        )
+
+        msg = worker_service.users().messages().get(
+            userId="me",
+            id=ref["id"],
+            format="full",
+        ).execute()
+
+        payload = msg.get("payload", {})
+
+        headers = {
+            h["name"].lower(): h["value"]
+            for h in payload.get("headers", [])
+        }
+
+        attachments = _attachment_parts(payload)
+
+        return {
+            "id": msg["id"],
+            "sender": headers.get(
+                "from", "(unknown sender)"
+            ),
+            "subject": headers.get(
+                "subject", "(no subject)"
+            ),
+            "date": headers.get("date", ""),
+            "snippet": msg.get("snippet", ""),
+            "attachments": [
+                {
+                    "index": index,
+                    "filename": item["filename"],
+                    "size": item["size"],
+                }
+                for index, item in enumerate(attachments)
+            ],
+        }
+
+    # Fetch up to 8 emails simultaneously instead of
+    # waiting for each individual Gmail request.
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(
+            executor.map(fetch_email, message_refs)
+        )
+
+    return results
+
+def get_attachment(
+    session_id: str,
+    message_id: str,
+    attachment_index: int,
+) -> tuple[str, bytes]:
+    service = _get_gmail_service(session_id)
+
+    msg = service.users().messages().get(
+        userId="me",
+        id=message_id,
+        format="full",
+    ).execute()
+
+    attachments = _attachment_parts(msg.get("payload", {}))
+
+    if attachment_index < 0 or attachment_index >= len(attachments):
+        raise ValueError("Attachment not found.")
+
+    item = attachments[attachment_index]
+    max_size = 25 * 1024 * 1024
+
+    if item["size"] > max_size:
+        raise ValueError("File must be 25 MB or smaller.")
+
+    if item["attachment_id"]:
+        attachment = service.users().messages().attachments().get(
+            userId="me",
+            messageId=message_id,
+            id=item["attachment_id"],
+        ).execute()
+        encoded = attachment["data"]
+    else:
+        encoded = item["inline_data"]
+
+    if not encoded:
+        raise ValueError("Attachment has no downloadable data.")
+
+    contents = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
+
+    if len(contents) > max_size:
+        raise ValueError("File must be 25 MB or smaller.")
+
+    return item["filename"], contents
