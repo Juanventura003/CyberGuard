@@ -8,6 +8,10 @@ import {
   analyzeGmailMessages,
   analyzeManualEmails,
   trashGmailMessages,
+  ApiError,
+  saveGmailSession,
+  loadGmailSession,
+  clearGmailSession,
   type GmailHeaderItem,
   type EmailResult,
   type ManualEmailInput,
@@ -27,16 +31,22 @@ function emptyForm(): ManualEmailInput {
   return { sender: "", subject: "", body: "", urls: [] };
 }
 
-function readGmailReturnParams(): { session: string | null; error: string | null } {
+function readGmailReturnParams(): { session: string | null; error: string | null; fromRedirect: boolean } {
   const params = new URLSearchParams(window.location.search);
+  const returned = params.get("gmail_session");
   return {
-    session: params.get("gmail_session"),
+    // Coming back from Google's sign-in, or a session saved on an earlier
+    // visit that hasn't expired yet.
+    session: returned ?? loadGmailSession(),
     error: params.get("gmail_error"),
+    fromRedirect: returned !== null,
   };
 }
 
+const isSessionExpired = (err: unknown) => err instanceof ApiError && err.status === 401;
+
 export default function EmailScanner() {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [, setSearchParams] = useSearchParams();
 
   // Read the OAuth-return params exactly once, during the component's first
@@ -62,7 +72,7 @@ export default function EmailScanner() {
   const [gmailSession, setGmailSession] = useState<string | null>(initialGmail.session);
   const [gmailEmails, setGmailEmails] = useState<GmailHeaderItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailLoading, setGmailLoading] = useState(Boolean(initialGmail.session));
 
   // shared
   const [results, setResults] = useState<EmailResult[] | null>(null);
@@ -75,6 +85,25 @@ const [trashingIds, setTrashingIds] = useState<Set<string>>(new Set());
 const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
 
 
+  /** Forget the Gmail session and return to the start screen. */
+  const disconnectGmail = (message: string | null = null) => {
+    clearGmailSession();
+    setGmailSession(null);
+    setGmailEmails([]);
+    setSelectedIds(new Set());
+    setGmailLoading(false);
+    setResults(null);
+    setTrashedIds(new Set());
+    setTrashingIds(new Set());
+    setTrashErrors({});
+    setErrorMsg(null);
+    setBanner(message);
+    setMode("landing");
+  };
+
+  const handleGmailExpired = () =>
+    disconnectGmail("Your Gmail session expired. Connect your Gmail account again to keep scanning.");
+
   const loadGmailList = async (session: string) => {
     await Promise.resolve();
 
@@ -83,7 +112,13 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
     try {
       const items = await listGmailMessages(session, MAX_EMAILS);
       setGmailEmails(items);
+      // Drop selections for emails that are no longer in the inbox.
+      setSelectedIds((prev) => new Set(items.map((m) => m.id).filter((id) => prev.has(id))));
     } catch (err) {
+      if (isSessionExpired(err)) {
+        handleGmailExpired();
+        return;
+      }
       setErrorMsg(err instanceof Error ? err.message : "Could not load your Gmail inbox.");
     } finally {
       setGmailLoading(false);
@@ -91,8 +126,11 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
   };
 
   useEffect(() => {
-    if (initialGmail.session || initialGmail.error) {
+    if (initialGmail.fromRedirect || initialGmail.error) {
       setSearchParams({}, { replace: true });
+    }
+    if (initialGmail.fromRedirect && initialGmail.session) {
+      saveGmailSession(initialGmail.session);
     }
     if (initialGmail.session) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -101,21 +139,55 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const resetAll = () => {
+  // Gmail is only available while signed in to CyberGuard, so signing out
+  // also forgets the Gmail session saved in this browser.
+  useEffect(() => {
+    if (!authLoading && !session && gmailSession) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      disconnectGmail();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, session, gmailSession]);
+
+  const resetManual = () => {
     setMode("landing");
     setForm(emptyForm());
     setUrlsText("");
     setQueue([]);
-    setGmailSession(null);
-    setGmailEmails([]);
-    setSelectedIds(new Set());
     setResults(null);
     setErrorMsg(null);
     setBanner(null);
-    setTrashedIds(new Set());
-    setTrashingIds(new Set());
-    setTrashErrors({});
+  };
 
+  /** Back from the inbox picker: keep the Gmail session and the loaded inbox. */
+  const leavePicker = () => {
+    setMode("landing");
+    setErrorMsg(null);
+    setBanner(null);
+  };
+
+  const openInbox = () => {
+    if (!gmailSession) return;
+    setBanner(null);
+    setErrorMsg(null);
+    setMode("gmail-picker");
+    if (gmailEmails.length === 0) void loadGmailList(gmailSession);
+  };
+
+  /** From the results screen: Gmail scans go back to the inbox, manual scans start over. */
+  const scanMore = () => {
+    const fromGmail = results?.some((r) => r.source === "gmail") && gmailSession;
+    if (!fromGmail) {
+      resetManual();
+      return;
+    }
+    setGmailEmails((prev) => prev.filter((m) => !trashedIds.has(m.id)));
+    setSelectedIds(new Set());
+    setResults(null);
+    setTrashedIds(new Set());
+    setTrashErrors({});
+    setErrorMsg(null);
+    setMode("gmail-picker");
   };
 
   // ---- manual paste-in ----
@@ -171,6 +243,14 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
     });
   };
 
+  // "Select all" picks every listed email, up to the per-scan limit.
+  const selectableIds = gmailEmails.slice(0, MAX_EMAILS).map((m) => m.id);
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(selectableIds));
+  };
+
   const analyzeGmailSelection = async () => {
     if (!gmailSession || selectedIds.size === 0) return;
     setAnalyzing(true);
@@ -180,6 +260,10 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
       setResults(data);
       setMode("results");
     } catch (err) {
+      if (isSessionExpired(err)) {
+        handleGmailExpired();
+        return;
+      }
       setErrorMsg(err instanceof Error ? err.message : "Analysis failed.");
     } finally {
       setAnalyzing(false);
@@ -214,6 +298,10 @@ const moveToTrash = async (ids: string[]) => {
      return next;
    });
  } catch (err) {
+   if (isSessionExpired(err)) {
+     handleGmailExpired();
+     return;
+   }
    setErrorMsg(err instanceof Error ? err.message : "Could not move emails to Trash.");
  } finally {
    setTrashingIds((prev) => {
@@ -258,12 +346,17 @@ const moveToTrash = async (ids: string[]) => {
           </button>
           <button
             className={`es-choice-card ${!session ? "disabled" : ""}`}
-            onClick={session ? connectGmail : undefined}
+            onClick={session ? (gmailSession ? openInbox : connectGmail) : undefined}
             disabled={!session}
           >
-            <h3>Connect Gmail account</h3>
+            <h3>{session && gmailSession ? "Open your Gmail inbox" : "Connect Gmail account"}</h3>
 
-            {session ? (
+            {session && gmailSession ? (
+              <p>
+                Your Gmail account is connected. Pick up to {MAX_EMAILS} messages from your
+                inbox to scan, without signing in again.
+              </p>
+            ) : session ? (
               <p>
                 Sign in with Google, then pick up to {MAX_EMAILS} messages straight
                 from your inbox to scan. After the scan you can move phishing
@@ -279,9 +372,18 @@ const moveToTrash = async (ids: string[]) => {
         </div>
       )}
 
+      {mode === "landing" && session && gmailSession && (
+        <div className="es-row es-connected">
+          <span className="es-count">Gmail connected</span>
+          <button className="es-btn secondary small" onClick={() => disconnectGmail()}>
+            Disconnect Gmail
+          </button>
+        </div>
+      )}
+
       {mode === "manual" && (
         <>
-          <button className="es-back" onClick={resetAll}>&larr; Back</button>
+          <button className="es-back" onClick={resetManual}>&larr; Back</button>
 
           <div className="es-form">
             <div className="es-field">
@@ -346,7 +448,7 @@ const moveToTrash = async (ids: string[]) => {
 
       {mode === "gmail-picker" && (
         <>
-          <button className="es-back" onClick={resetAll}>&larr; Back</button>
+          <button className="es-back" onClick={leavePicker}>&larr; Back</button>
 
           {gmailLoading && <p className="es-loading">Loading your inbox…</p>}
 
@@ -356,9 +458,25 @@ const moveToTrash = async (ids: string[]) => {
                 <span className={`es-count ${selectedIds.size >= MAX_EMAILS ? "at-limit" : ""}`}>
                   {selectedIds.size} / {MAX_EMAILS} selected
                 </span>
-                <button className="es-btn" onClick={analyzeGmailSelection} disabled={selectedIds.size === 0 || analyzing}>
-                  {analyzing ? "Analyzing…" : `Analyze ${selectedIds.size || ""} email${selectedIds.size === 1 ? "" : "s"}`}
-                </button>
+                <div className="es-row-actions">
+                  <button
+                    className="es-btn secondary"
+                    onClick={() => gmailSession && void loadGmailList(gmailSession)}
+                    disabled={analyzing}
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    className="es-btn secondary"
+                    onClick={toggleSelectAll}
+                    disabled={selectableIds.length === 0 || analyzing}
+                  >
+                    {allSelected ? "Clear selection" : `Select all (${selectableIds.length})`}
+                  </button>
+                  <button className="es-btn" onClick={analyzeGmailSelection} disabled={selectedIds.size === 0 || analyzing}>
+                    {analyzing ? "Analyzing…" : `Analyze ${selectedIds.size || ""} email${selectedIds.size === 1 ? "" : "s"}`}
+                  </button>
+                </div>
               </div>
 
               <div className="es-picker-list">
@@ -386,7 +504,7 @@ const moveToTrash = async (ids: string[]) => {
 
       {mode === "results" && results && (
         <>
-          <button className="es-back" onClick={resetAll}>&larr; Scan more emails</button>
+          <button className="es-back" onClick={scanMore}>&larr; Scan more emails</button>
 
           {summary && (
             <div className="es-summary">
