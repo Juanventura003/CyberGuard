@@ -1,6 +1,7 @@
-
 import hashlib
 import os
+import platform
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -10,19 +11,10 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-
 SUSPICIOUS_EXTENSIONS = {
-    ".exe",
-    ".bat",
-    ".cmd",
-    ".scr",
-    ".ps1",
-    ".vbs",
-    ".js",
-    ".msi",
+    ".exe", ".bat", ".cmd", ".scr", ".ps1", ".vbs", ".js", ".msi"
 }
 
-# Common file signatures (magic bytes)
 FILE_SIGNATURES = {
     ".pdf": [b"%PDF-"],
     ".jpg": [b"\xff\xd8\xff"],
@@ -32,24 +24,11 @@ FILE_SIGNATURES = {
     ".exe": [b"MZ"],
 }
 
-OFFICE_EXTENSIONS = {
-    ".docx",
-    ".xlsx",
-    ".pptx",
-}
-
-IMAGE_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".webp",
-}
+OFFICE_EXTENSIONS = {".docx", ".xlsx", ".pptx"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
 def is_webp(contents: bytes):
-    """Check whether the file has a WebP signature."""
-
     return (
         len(contents) >= 12
         and contents[:4] == b"RIFF"
@@ -58,26 +37,20 @@ def is_webp(contents: bytes):
 
 
 def detect_file_type(contents: bytes):
-    """Identify supported file formats from their signatures."""
-
     if is_webp(contents):
         return ".webp"
 
     for extension, signatures in FILE_SIGNATURES.items():
-        for signature in signatures:
-            if contents.startswith(signature):
-                return extension
+        if any(contents.startswith(signature) for signature in signatures):
+            return extension
 
     return None
 
 
 def check_file_signature(filename: str, contents: bytes):
-    """Compare the filename extension with the detected file type."""
-
     extension = Path(filename).suffix.lower()
     detected_type = detect_file_type(contents)
 
-    # Normalize extensions that share file signatures
     if extension in OFFICE_EXTENSIONS:
         expected_type = ".zip"
     elif extension == ".jpeg":
@@ -87,14 +60,14 @@ def check_file_signature(filename: str, contents: bytes):
     else:
         expected_type = extension
 
-    supported_extensions = (
+    supported = (
         set(FILE_SIGNATURES)
         | OFFICE_EXTENSIONS
         | {".jpeg", ".dll", ".webp"}
     )
 
     if detected_type is None:
-        if extension in supported_extensions:
+        if extension in supported:
             return {
                 "status": "MISMATCH",
                 "detected_type": "UNKNOWN",
@@ -124,25 +97,21 @@ def check_file_signature(filename: str, contents: bytes):
         "status": "MISMATCH",
         "detected_type": detected_type,
         "reason": (
-            f"The file extension is {extension}, but the contents "
-            f"appear to be {detected_type}."
+            f"The file extension is {extension}, but the "
+            f"contents appear to be {detected_type}."
         ),
     }
 
 
 def check_virustotal(sha256: str):
-    """Look up an existing file hash in VirusTotal."""
-
     api_key = os.getenv("VIRUSTOTAL_API_KEY")
 
     if not api_key:
         raise RuntimeError("VirusTotal API key is not configured.")
 
-    url = f"https://www.virustotal.com/api/v3/files/{sha256}"
-
     try:
         response = requests.get(
-            url,
+            f"https://www.virustotal.com/api/v3/files/{sha256}",
             headers={"x-apikey": api_key},
             timeout=15,
         )
@@ -185,23 +154,42 @@ def check_virustotal(sha256: str):
 
 
 def check_defender(contents: bytes):
-    """Scan uploaded file contents using Microsoft Defender."""
+    """Scan file bytes using Microsoft Defender on Windows."""
+
+    if platform.system() != "Windows":
+        return {
+            "status": "UNAVAILABLE",
+            "reason": "Microsoft Defender is only used on Windows.",
+        }
 
     defender_path = Path(
         r"C:\Program Files\Windows Defender\MpCmdRun.exe"
     )
 
     if not defender_path.exists():
-        return {
-            "status": "UNAVAILABLE",
-            "reason": "Microsoft Defender scanner was not found.",
-        }
+        platform_dir = Path(
+            r"C:\ProgramData\Microsoft\Windows Defender\Platform"
+        )
 
-    # Use a temporary directory to ensure cleanup
-    with tempfile.TemporaryDirectory(prefix="cyberguard_") as temp_dir:
-        file_path = Path(temp_dir) / "upload.bin"
+        candidates = sorted(
+            platform_dir.glob("*/MpCmdRun.exe"),
+            reverse=True,
+        )
 
-        try:
+        if candidates:
+            defender_path = candidates[0]
+        else:
+            return {
+                "status": "UNAVAILABLE",
+                "reason": "Microsoft Defender scanner was not found.",
+            }
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="cyberguard_defender_"
+        ) as temp_dir:
+
+            file_path = Path(temp_dir) / "upload.bin"
             file_path.write_bytes(contents)
 
             result = subprocess.run(
@@ -220,46 +208,129 @@ def check_defender(contents: bytes):
                 check=False,
             )
 
-            output = (result.stdout + "\n" + result.stderr).lower()
+            output = (
+                result.stdout + "\n" + result.stderr
+            ).lower()
 
-            # Defender uses exit code 0 for a successful clean scan.
-            if result.returncode == 0 and "found no threats" in output:
+            if (
+                result.returncode == 0
+                and "found no threats" in output
+            ):
                 return {
                     "status": "CLEAN",
-                    "reason": "Microsoft Defender found no threats.",
+                    "reason": (
+                        "Microsoft Defender found no known threats."
+                    ),
                 }
 
-            # Exit code 2 can indicate a malware detection,
-            # but may also indicate other scan problems.
-            if (
-                "found threats" in output
-                or "threat found" in output
-                or "threats found" in output
+            if any(
+                phrase in output
+                for phrase in (
+                    "found threats",
+                    "threat found",
+                    "threats found",
+                )
             ):
                 return {
                     "status": "INFECTED",
-                    "reason": "Microsoft Defender detected a potential threat.",
+                    "reason": (
+                        "Microsoft Defender detected a potential threat."
+                    ),
                 }
 
             return {
                 "status": "ERROR",
                 "reason": (
-                    "Microsoft Defender could not confirm a clean scan "
-                    f"(exit code {result.returncode})."
+                    "Microsoft Defender could not confirm a clean "
+                    f"scan (exit code {result.returncode})."
                 ),
             }
 
-        except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "ERROR",
+            "reason": "Microsoft Defender scan timed out.",
+        }
+
+    except OSError:
+        return {
+            "status": "ERROR",
+            "reason": (
+                "Microsoft Defender scan could not be started."
+            ),
+        }
+
+
+def check_clamav(contents: bytes):
+    """Scan file bytes using locally installed ClamAV."""
+
+    scanner = shutil.which("clamscan")
+
+    if not scanner:
+        return {
+            "status": "UNAVAILABLE",
+            "reason": (
+                "ClamAV is not installed or clamscan is not in PATH. "
+                "Install and initialize ClamAV to enable local scanning."
+            ),
+        }
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="cyberguard_clamav_"
+        ) as temp_dir:
+
+            file_path = Path(temp_dir) / "upload.bin"
+            file_path.write_bytes(contents)
+
+            result = subprocess.run(
+                [
+                    scanner,
+                    "--no-summary",
+                    "--stdout",
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                errors="replace",
+                timeout=120,
+                check=False,
+            )
+
+            if result.returncode == 0:
+                return {
+                    "status": "CLEAN",
+                    "reason": "ClamAV found no known threats.",
+                }
+
+            if result.returncode == 1:
+                return {
+                    "status": "INFECTED",
+                    "reason": (
+                        "ClamAV detected a potential threat."
+                    ),
+                }
+
             return {
                 "status": "ERROR",
-                "reason": "Microsoft Defender scan timed out.",
+                "reason": (
+                    "ClamAV could not complete the scan. "
+                    "Check that its virus database is initialized "
+                    "and updated."
+                ),
             }
 
-        except OSError:
-            return {
-                "status": "ERROR",
-                "reason": "Microsoft Defender scan could not be started.",
-            }
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "ERROR",
+            "reason": "ClamAV scan timed out.",
+        }
+
+    except OSError:
+        return {
+            "status": "ERROR",
+            "reason": "ClamAV scan could not be started.",
+        }
 
 
 def check_file(filename: str, contents: bytes):
@@ -271,25 +342,27 @@ def check_file(filename: str, contents: bytes):
     risk_score = 0
     reasons = []
 
-    # Check potentially risky file extensions
+    # 1. Check suspicious extensions
     if extension in SUSPICIOUS_EXTENSIONS:
         risk_score += 30
         reasons.append(
-            f"The file uses the potentially risky {extension} file type."
+            f"The file uses the potentially risky "
+            f"{extension} file type."
         )
 
-    # Check empty files
-    if len(contents) == 0:
+    if not contents:
         risk_score += 20
         reasons.append("The file is empty.")
 
-    # Check the actual file signature
-    signature_result = check_file_signature(filename, contents)
+    # 2. Verify file signature
+    signature_result = check_file_signature(
+        filename,
+        contents,
+    )
 
     if signature_result["status"] == "MISMATCH":
         detected_type = signature_result["detected_type"]
 
-        # Different image formats are a minor warning
         if (
             extension in IMAGE_EXTENSIONS
             and detected_type in IMAGE_EXTENSIONS
@@ -302,18 +375,47 @@ def check_file(filename: str, contents: bytes):
         else:
             risk_score += 40
             reasons.append(signature_result["reason"])
-
     else:
         reasons.append(signature_result["reason"])
 
-    # Scan actual file contents using Microsoft Defender
-    defender_result = check_defender(contents)
-    reasons.append(defender_result["reason"])
+    # 3. Select antivirus based on backend operating system
+    defender_result = {
+        "status": "UNAVAILABLE",
+        "reason": "Microsoft Defender was not selected.",
+    }
 
-    if defender_result["status"] == "INFECTED":
-        risk_score = max(risk_score, 95)
+    clamav_result = {
+        "status": "UNAVAILABLE",
+        "reason": "ClamAV was not selected.",
+    }
 
-    # Look up the file hash in VirusTotal
+    if platform.system() == "Windows":
+        defender_result = check_defender(contents)
+
+        if defender_result["status"] in (
+            "UNAVAILABLE",
+            "ERROR",
+        ):
+            clamav_result = check_clamav(contents)
+
+    else:
+        # macOS and Linux
+        clamav_result = check_clamav(contents)
+
+    # 4. Evaluate antivirus results
+    for result in (defender_result, clamav_result):
+        if result["reason"] in (
+            "Microsoft Defender was not selected.",
+            "ClamAV was not selected.",
+        ):
+            continue
+
+        reasons.append(result["reason"])
+
+        if result["status"] == "INFECTED":
+            risk_score = max(risk_score, 95)
+
+    # 5. VirusTotal hash lookup
     vt_result = check_virustotal(sha256)
 
     if vt_result["status"] == "FOUND":
@@ -323,8 +425,8 @@ def check_file(filename: str, contents: bytes):
         if malicious >= 5:
             risk_score = max(risk_score, 90)
             reasons.append(
-                f"VirusTotal: {malicious} security engines flagged "
-                "this file as malicious."
+                f"VirusTotal: {malicious} security engines "
+                "flagged this file as malicious."
             )
 
         elif malicious >= 1 or suspicious >= 2:
@@ -351,21 +453,27 @@ def check_file(filename: str, contents: bytes):
             "This file was not found in VirusTotal's database."
         )
 
+    # 6. Determine final classification
     risk_score = min(risk_score, 100)
 
-    # Determine classification
+    antivirus_clean = any(
+        result["status"] == "CLEAN"
+        for result in (defender_result, clamav_result)
+    )
+
     if risk_score > 70:
         classification = "HIGH RISK"
 
     elif risk_score > 30:
         classification = "SUSPICIOUS"
 
-    elif defender_result["status"] == "CLEAN":
+    elif antivirus_clean:
         classification = "SAFE"
 
     else:
         classification = "UNKNOWN"
 
+    # 7. Return results to frontend
     return {
         "filename": filename,
         "file_size": len(contents),
@@ -376,4 +484,5 @@ def check_file(filename: str, contents: bytes):
         "signature": signature_result,
         "virustotal": vt_result,
         "defender": defender_result,
+        "clamav": clamav_result,
     }
