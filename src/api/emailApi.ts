@@ -33,7 +33,7 @@ export interface WebsiteHistoryEntry {
   domain: string;
   risk_score: number;
   risk_level: "HIGH_RISK" | "SUSPICIOUS" | "NO_KNOWN_THREAT" | "UNABLE_TO_VERIFY";
-  source: "GOOGLE_WEB_RISK" | "UNABLE_TO_VERIFY";
+  source: "GOOGLE_WEB_RISK" | "LAYERED_ANALYSIS" | "UNABLE_TO_VERIFY";
   threat_types: string[];
   explanation: string[];
   visited_at: string;
