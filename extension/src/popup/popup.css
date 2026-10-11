@@ -7,7 +7,11 @@ body {
 	margin: 0;
 	color: #1f2d3d;
 	background: #eef1f5;
-	font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	font:
+		14px/1.45 -apple-system,
+		BlinkMacSystemFont,
+		"Segoe UI",
+		sans-serif;
 }
 
 main {
@@ -201,30 +205,126 @@ header {
 	border: 1px solid #c5cbd3;
 }
 
-.activity-list {
-	display: grid;
+.banner-setting {
+	display: flex;
+	align-items: center;
 	gap: 8px;
-	margin: 0;
-	padding: 0;
-	list-style: none;
+	margin-top: 16px;
+	font-size: 12px;
 }
 
-.activity-list li {
+.blocking-settings {
+	margin-bottom: 14px;
+	padding: 12px;
+	border: 1px solid #c5cbd3;
+	border-radius: 10px;
+	background: #fff;
+}
+.blocking-heading {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 8px;
+}
+.blocking-heading h2 {
+	margin: 0;
+	text-transform: none;
+	letter-spacing: 0;
+}
+.blocking-heading > span {
+	padding: 2px 7px;
+	border-radius: 20px;
+	background: #eef1f5;
+	color: #667085;
+	font-size: 10px;
+}
+#blocking-domain {
+	margin: 0;
+	font-size: 12px;
+	color: #667085;
+	min-width: 0;
+	flex: 1;
+	overflow-wrap: anywhere;
+}
+.blocking-current {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 10px 0;
+}
+.block-site-button {
+	flex-shrink: 0;
+	max-width: 140px;
+	padding: 6px 10px;
+	border: 1px solid #b42318;
+	border-radius: 7px;
+	background: #fff5f4;
+	color: #b42318;
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.block-site-button.is-blocked {
+	color: #1f2d3d;
+	border-color: #b8c0cc;
+	background: #f5f6f8;
+}
+.block-site-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.blocking-help {
+	margin: 8px 0;
+	color: #667085;
+	font-size: 11px;
+}
+.blocking-settings details {
+	border-top: 1px solid #e4e7ec;
+	padding-top: 8px;
+}
+.blocking-settings summary {
+	cursor: pointer;
+	color: #4169e1;
+	font-size: 12px;
+}
+.blocking-settings summary:hover {
+	text-decoration: underline;
+}
+.blocking-settings summary:focus-visible,
+.block-site-button:focus-visible {
+	outline: 2px solid #4169e1;
+	outline-offset: 3px;
+	border-radius: 5px;
+}
+#blocked-count {
+	color: #667085;
+	margin-left: 4px;
+}
+#blocked-sites {
+	padding: 0;
+	list-style: none;
+	max-height: 160px;
+	overflow: auto;
+	font-size: 12px;
+}
+#blocked-sites li {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
-	padding: 10px 0;
-	border-bottom: 1px solid #d5dae1;
+	gap: 8px;
+	padding: 8px 0;
+	border-bottom: 1px solid #eef1f5;
 }
-
-.activity-list strong,
-.activity-list small {
-	display: block;
+#blocked-sites span {
+	overflow-wrap: anywhere;
+	min-width: 0;
 }
-
-.activity-list small {
-	margin-top: 2px;
-	color: #667085;
-	font-size: 11px;
+#blocked-sites button {
+	border: 1px solid #b8c0cc;
+	padding: 4px 8px;
+	border-radius: 5px;
+	background: #fff;
+	color: #1f2d3d;
+	cursor: pointer;
 }
