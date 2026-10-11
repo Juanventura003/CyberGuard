@@ -18,7 +18,15 @@
 					<p class="subtitle">Live protection for every tab.</p>
 				</div>
 				<div class="header-actions">
-					<button id="refresh-button" class="icon-button" type="button" aria-label="Refresh activity" title="Refresh activity">&#x21bb;</button>
+					<button
+						id="refresh-button"
+						class="icon-button"
+						type="button"
+						aria-label="Refresh activity"
+						title="Refresh activity"
+					>
+						&#x21bb;
+					</button>
 					<label class="toggle-label" for="monitoring-toggle">
 						<span>Monitor</span>
 						<input id="monitoring-toggle" type="checkbox" />
@@ -26,9 +34,41 @@
 				</div>
 			</header>
 
+			<label class="banner-setting"
+				><input id="banner-toggle" type="checkbox" /> Show draggable
+				website notification</label
+			>
 			<p id="status" class="status">Loading activity...</p>
 			<section id="latest" class="latest" aria-live="polite"></section>
-			<button id="history-button" class="history-button" type="button">Start saving history to CyberGuard dashboard</button>
+			<section
+				class="blocking-settings"
+				aria-label="Manual website blocking"
+			>
+				<div class="blocking-heading">
+					<h2>Website blocking</h2>
+					<span>Manual</span>
+				</div>
+				<div class="blocking-current">
+					<p id="blocking-domain">Current website</p>
+					<button id="block-site" type="button" class="block-site-button">
+						Block website
+					</button>
+				</div>
+				<details>
+					<summary>
+						Manage blocked websites
+						<span id="blocked-count">0</span>
+					</summary>
+					<p class="blocking-help">
+						Blocking applies to a hostname and its subdomains. You can
+						unblock anytime.
+					</p>
+					<ul id="blocked-sites"></ul>
+				</details>
+			</section>
+			<button id="history-button" class="history-button" type="button">
+				Start saving history to CyberGuard dashboard
+			</button>
 		</main>
 		<script src="../popup.js"></script>
 	</body>

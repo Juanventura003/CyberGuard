@@ -4,16 +4,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=Path(__file__).resolve().parent.parent / ".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parent.parent / ".env", extra="ignore"
+    )
 
     GOOGLE_WEB_RISK_API_KEY: str = ""
+    OPENPHISH_ENABLED: bool = True
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/email/oauth/callback"
     FRONTEND_ORIGIN: str = "http://localhost:5173"
 
     GOOGLE_SAFE_BROWSING_API_KEY: str = ""
-    
+
     SESSION_TTL_MINUTES: int = 30
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""

@@ -28,10 +28,13 @@ from .schemas import (
     WebsiteAnalyzeResponse,
     WebsiteHistoryEntry,
     LinkCheckRequest,
+    PageAnalyzeRequest,
 )
-from .web_risk import WebRiskLookupError, lookup_url
+from .website_analyzer import analyze_url, analyze_page_signals
 from . import supabase_store
 from . import news_feed
+from . import threat_feeds
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,12 +45,20 @@ async def lifespan(app: FastAPI):
         name="cyberguard-news-refresh",
         daemon=True,
     )
+    feed_worker = Thread(
+        target=threat_feeds.run_refresh_loop,
+        args=(stop,),
+        name="extension-threat-feeds",
+        daemon=True,
+    )
+    feed_worker.start()
     worker.start()
     try:
         yield
     finally:
         stop.set()
         await asyncio.to_thread(worker.join, 20)
+        await asyncio.to_thread(feed_worker.join, 25)
 
 
 app = FastAPI(
@@ -64,6 +75,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 def gmail_redirect_url(return_to: str, **values: str) -> str:
     parts = urlsplit(return_to)
     params = dict(parse_qsl(parts.query, keep_blank_values=True))
@@ -77,6 +89,7 @@ def gmail_redirect_url(return_to: str, **values: str) -> str:
         parts.fragment,
     ))
 
+
 @app.get("/api/health")
 def health():
     return {"status": "healthy"}
@@ -89,6 +102,7 @@ def cybersecurity_news():
     except news_feed.NewsFeedError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+
 # Link Checker
 @app.post("/api/security/link-check")
 def check_link(payload: LinkCheckRequest):
@@ -99,6 +113,7 @@ def check_link(payload: LinkCheckRequest):
         raise HTTPException(status_code=500, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Could not check URL: {exc}")
+
 
 # File Checker
 @app.post("/api/security/file-check")
@@ -129,7 +144,7 @@ async def check_uploaded_file(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Could not check file: {exc}"
         )
-        
+
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
     limit: int = Query(1000, ge=1, le=1000),
@@ -225,45 +240,14 @@ def analyze_website(
 ):
     parsed_url = urlparse(payload.url)
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
-        raise HTTPException(status_code=400, detail="URL must include an http or https scheme.")
+        raise HTTPException(
+            status_code=400, detail="URL must include an http or https scheme."
+        )
 
     try:
-        lookup = lookup_url(payload.url)
-    except WebRiskLookupError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    threat_types = lookup["threat_types"]
-    if "MALWARE" in threat_types or "SOCIAL_ENGINEERING" in threat_types:
-        risk_score = 95.0
-        risk_level = "HIGH_RISK"
-        explanation = ["Google Web Risk identified this URL as a known malicious threat."]
-    elif "UNWANTED_SOFTWARE" in threat_types:
-        risk_score = 80.0
-        risk_level = "SUSPICIOUS"
-        explanation = ["Google Web Risk identified this URL as associated with unwanted software."]
-    else:
-        risk_score = 0.0
-        risk_level = "NO_KNOWN_THREAT"
-        transport_note = (
-            "HTTPS is enabled, which protects the connection in transit."
-            if parsed_url.scheme == "https"
-            else "This site does not use HTTPS, so the connection is not encrypted in transit."
-        )
-        explanation = [
-            f"Google Web Risk found no known threat for this URL. {transport_note}",
-            "No known threat is not a guarantee that the website is safe.",
-        ]
-
-    response = WebsiteAnalyzeResponse(
-        url=payload.url,
-        domain=parsed_url.hostname or parsed_url.netloc,
-        risk_score=risk_score,
-        risk_level=risk_level,
-        source="GOOGLE_WEB_RISK",
-        threat_types=threat_types,
-        explanation=explanation,
-        expire_time=lookup["expire_time"],
-    )
+        response = WebsiteAnalyzeResponse(**analyze_url(payload.url))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     user_id = _authenticated_user_id(authorization)
     if user_id:
@@ -278,14 +262,19 @@ def analyze_website(
             visited_at=datetime.now(timezone.utc).isoformat(),
         )
         try:
-            supabase_store.insert_history(user_id, history_entry.model_dump(exclude_none=True))
+            supabase_store.insert_history(
+                user_id, history_entry.model_dump(exclude_none=True)
+            )
         except supabase_store.SupabaseStoreError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return response
+
+
 # ---------------------------------------------------------------------------
 # Manual paste-in (no Gmail account needed)
 # ---------------------------------------------------------------------------
+
 
 @app.post("/api/email/batch-analyze", response_model=list[EmailResult])
 def batch_analyze_manual(payload: BatchManualRequest):
@@ -301,6 +290,7 @@ def batch_analyze_manual(payload: BatchManualRequest):
 # ---------------------------------------------------------------------------
 # Gmail OAuth
 # ---------------------------------------------------------------------------
+
 
 @app.get("/api/email/oauth/login")
 def oauth_login(return_to: str = Query(...)):
@@ -439,6 +429,7 @@ async def gmail_analyze(payload: GmailAnalyzeRequest):
 
     return await asyncio.gather(*(fetch_and_score(mid) for mid in payload.message_ids))
 
+
 @app.post("/api/email/gmail/trash", response_model=GmailTrashResponse)
 async def gmail_trash(payload: GmailTrashRequest):
    semaphore = asyncio.Semaphore(8)
@@ -464,7 +455,32 @@ async def gmail_trash(payload: GmailTrashRequest):
    )
 
 
-
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+@app.post("/api/websites/page-signals")
+def analyze_extension_page(payload: PageAnalyzeRequest):
+    try:
+        return analyze_page_signals(payload.url, payload.page.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/websites/history/{history_id}", response_model=WebsiteHistoryEntry)
+def update_website_history(
+    payload: WebsiteAnalyzeResponse,
+    history_id: str = Path(..., min_length=1),
+    authorization: str | None = Header(default=None),
+):
+    user_id = _authenticated_user_id(authorization)
+    if not user_id:
+        raise HTTPException(
+            status_code=401, detail="Sign in before updating website history."
+        )
+    try:
+        return supabase_store.update_history(user_id, history_id, payload.model_dump())
+    except supabase_store.SupabaseStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc

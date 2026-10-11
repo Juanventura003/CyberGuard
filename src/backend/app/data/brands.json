@@ -1,0 +1,670 @@
+{
+    "version": 1,
+    "source": {
+        "title": "Phishing Website Dataset",
+        "author": "I Kadek Agus Ariesta Putra",
+        "url": "https://zenodo.org/records/8041387",
+        "doi": "10.5281/zenodo.8041387",
+        "dataset_version": "1",
+        "license": "CC-BY-4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0/",
+        "file": "brands.csv",
+        "sha256": "038b324c03aff3c0003c44f88a8f41e16b549dd05bc31f79604b0266afffac61",
+        "changes": "Only identifier, name and website retained; CyberGuard adds explicit activation, domain exceptions and review notes."
+    },
+    "brands": [
+        {
+            "identifier": "1and1ionos",
+            "name": "1&1 IONOS",
+            "website": "https://www.ionos.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "absa",
+            "name": "Amalgamated Banks of South Africa",
+            "website": "https://www.absa.co.za/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "adobe",
+            "name": "Adobe",
+            "website": "https://www.adobe.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "alibaba",
+            "name": "Alibaba",
+            "website": "https://www.alibaba.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "amazon",
+            "name": "Amazon",
+            "website": "https://www.amazon.com/",
+            "enabled": true,
+            "domains": [
+                "amazon.com",
+                "amazon.co.uk",
+                "amazon.de",
+                "amazon.ca",
+                "amazon.in"
+            ],
+            "ascii_lookalikes": true,
+            "review_note": "Existing exceptions retained."
+        },
+        {
+            "identifier": "anzbank",
+            "name": "ANZ Bank",
+            "website": "https://www.anz.com.au/personal/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "aol",
+            "name": "AOL (America Online)",
+            "website": "https://www.aol.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "apple",
+            "name": "Apple",
+            "website": "https://www.apple.com/",
+            "enabled": true,
+            "domains": [
+                "apple.com",
+                "icloud.com"
+            ],
+            "ascii_lookalikes": true,
+            "review_note": "Existing exceptions retained."
+        },
+        {
+            "identifier": "aruba",
+            "name": "Aruba Networks",
+            "website": "https://www.arubacloud.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "att",
+            "name": "AAT&T Inc.",
+            "website": "https://www.att.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "auid",
+            "name": "auone.jp",
+            "website": "https://portal.auone.jp/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bancaintesasanpaolo",
+            "name": "Banca Intesa Sanpaolo",
+            "website": "https://www.intesasanpaolo.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bancoindustrial",
+            "name": "Banco Industrial",
+            "website": "https://www.corporacionbi.com/gt/bancoindustrial/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bancoitau",
+            "name": "Banco Ita\u00fa",
+            "website": "https://www.itau.com.br/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bancolombia",
+            "name": "Bancolombia",
+            "website": "https://www.bancolombia.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bankofamerica",
+            "name": "Bank of America",
+            "website": "https://www.bankofamerica.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "banquepostale",
+            "name": "La Banque Postale",
+            "website": "https://www.labanquepostale.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "banreservas",
+            "name": "Banreservas",
+            "website": "https://www.banreservas.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bantrab",
+            "name": "Bantrab",
+            "website": "https://www.bantrab.com.gt/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bdobank",
+            "name": "Banco de Oro",
+            "website": "https://www.bdo.com.ph/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "biglobe",
+            "name": "BIGLOBE",
+            "website": "https://www.biglobe.ne.jp/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bimcell",
+            "name": "Bimcell",
+            "website": "https://www.bimcell.com.tr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bperbanca",
+            "name": "BPER Banca",
+            "website": "https://www.bper.it/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "bt",
+            "name": "BT",
+            "website": "https://www.bt.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "chainlink",
+            "name": "Chainlink",
+            "website": "https://chain.link/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "chase",
+            "name": "Chase Bank",
+            "website": "https://www.chase.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "citibank",
+            "name": "Citibank",
+            "website": "https://www.citi.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "citizensbank",
+            "name": "Citizens Bank",
+            "website": "https://www.citizensbank.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "coinbase",
+            "name": "Coinbase",
+            "website": "https://www.coinbase.com/",
+            "enabled": true,
+            "domains": [
+                "coinbase.com"
+            ],
+            "ascii_lookalikes": false,
+            "review_note": "Primary website corroborated; additional domains require review. ASCII spelling rule disabled pending false-positive evaluation.",
+            "review_source": "https://www.coinbase.com/"
+        },
+        {
+            "identifier": "commonwealthbank",
+            "name": "Commonwealth Bank",
+            "website": "https://www.commbank.com.au/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "creditagricole",
+            "name": "Cr\u00e9dit Agricole",
+            "website": "https://www.credit-agricole.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "dbsbank",
+            "name": "DBS Bank",
+            "website": "https://www.dbs.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "denizbank",
+            "name": "DenizBank",
+            "website": "https://www.denizbank.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "dhl",
+            "name": "DHL",
+            "website": "https://www.dhl.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "discord",
+            "name": "Discord",
+            "website": "https://discord.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "dkb",
+            "name": "Das kann Bank",
+            "website": "https://www.dkb.de/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "docusign",
+            "name": "DocuSign",
+            "website": "https://www.docusign.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "ebay",
+            "name": "eBay",
+            "website": "https://www.ebay.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "excelpdfdownload",
+            "name": "Excel PDF Download",
+            "website": "-",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "facebook",
+            "name": "Facebook",
+            "website": "https://www.facebook.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "garanti",
+            "name": "Garanti BBVA",
+            "website": "https://www.garantibbva.com.tr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "generic",
+            "name": "Generic",
+            "website": "-",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "genericcrypto",
+            "name": "Generic Crypto",
+            "website": "-",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "genericemail",
+            "name": "Generic Email",
+            "website": "-",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "google",
+            "name": "Google",
+            "website": "https://www.google.com/",
+            "enabled": true,
+            "domains": [
+                "google.com",
+                "googleusercontent.com",
+                "googleapis.com"
+            ],
+            "ascii_lookalikes": true,
+            "review_note": "Existing exceptions retained."
+        },
+        {
+            "identifier": "govau",
+            "name": "Australian Government",
+            "website": "https://my.gov.au/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "hdfcbank",
+            "name": "HDFC Bank",
+            "website": "https://www.hdfcbank.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "hipercard",
+            "name": "Hipercard",
+            "website": "https://www.hipercard.com.br/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "impotsgouv",
+            "name": "impotsgouv",
+            "website": "https://www.impots.gouv.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "instagram",
+            "name": "Instagram",
+            "website": "https://www.instagram.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "leboncoin",
+            "name": "Leboncoin",
+            "website": "https://www.leboncoin.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "linkedin",
+            "name": "LinkedIn",
+            "website": "https://www.linkedin.com/",
+            "enabled": true,
+            "domains": [
+                "linkedin.com"
+            ],
+            "ascii_lookalikes": false,
+            "review_note": "Primary website corroborated; additional domains require review. ASCII spelling rule disabled pending false-positive evaluation.",
+            "review_source": "https://www.linkedin.com/"
+        },
+        {
+            "identifier": "madeinchina",
+            "name": "Made-in-China.com",
+            "website": "https://www.made-in-china.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "metamask",
+            "name": "MetaMask",
+            "website": "https://metamask.io/",
+            "enabled": true,
+            "domains": [
+                "metamask.io"
+            ],
+            "ascii_lookalikes": false,
+            "review_note": "Primary website corroborated; additional domains require review. ASCII spelling rule disabled pending false-positive evaluation.",
+            "review_source": "https://metamask.io/"
+        },
+        {
+            "identifier": "microsoft",
+            "name": "Microsoft",
+            "website": "https://www.microsoft.com/",
+            "enabled": true,
+            "domains": [
+                "microsoft.com",
+                "microsoftonline.com",
+                "live.com",
+                "office.com"
+            ],
+            "ascii_lookalikes": true,
+            "review_note": "Existing exceptions retained."
+        },
+        {
+            "identifier": "mtbank",
+            "name": "M&T Bank",
+            "website": "https://www3.mtb.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "netflix",
+            "name": "Netflix",
+            "website": "https://www.netflix.com/",
+            "enabled": true,
+            "domains": [
+                "netflix.com"
+            ],
+            "ascii_lookalikes": false,
+            "review_note": "Primary website corroborated; additional domains require review. ASCII spelling rule disabled pending false-positive evaluation.",
+            "review_source": "https://www.netflix.com/"
+        },
+        {
+            "identifier": "nfcu",
+            "name": "Navy Federal Credit Union",
+            "website": "https://www.navyfederal.org/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "office365",
+            "name": "Microsoft 365",
+            "website": "https://www.office.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "onedrive",
+            "name": "OneDrive",
+            "website": "https://onedrive.live.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "opensea",
+            "name": "OpenSea",
+            "website": "https://opensea.io/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "orange",
+            "name": "Orange",
+            "website": "https://www.orange.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "paypal",
+            "name": "PayPal",
+            "website": "https://www.paypal.com/",
+            "enabled": true,
+            "domains": [
+                "paypal.com",
+                "paypalobjects.com"
+            ],
+            "ascii_lookalikes": true,
+            "review_note": "Existing exceptions retained."
+        },
+        {
+            "identifier": "postbank",
+            "name": "Deutsche Postbank",
+            "website": "https://www.postbank.de/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "posteitaliane",
+            "name": "Poste Italiane",
+            "website": "https://www.poste.it/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "rakuten",
+            "name": "Rakuten",
+            "website": "https://www.rakuten.co.jp/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "santander",
+            "name": "Santander",
+            "website": "https://www.santander.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "sbbch",
+            "name": "Swiss Federal Railways",
+            "website": "https://www.sbb.ch/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "sbi",
+            "name": "State Bank of India",
+            "website": "https://www.onlinesbi.sbi/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "sfrfr",
+            "name": "SFR",
+            "website": "https://www.sfr.fr/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "smbc",
+            "name": "Sumitomo Mitsui Banking Corporation",
+            "website": "https://www.smbc.co.jp/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "sparkasse",
+            "name": "Sparkasse",
+            "website": "https://www.sparkasse.de/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "square",
+            "name": "Square",
+            "website": "https://squareup.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "steam",
+            "name": "Steam",
+            "website": "https://store.steampowered.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "swisspost",
+            "name": "Swiss Post",
+            "website": "https://www.post.ch/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "telekom",
+            "name": "Telekom",
+            "website": "https://www.telekom.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "trustwallet",
+            "name": "Trust Wallet",
+            "website": "https://trustwallet.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "unionbankph",
+            "name": "Unionbank",
+            "website": "https://www.unionbankph.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "uniswap",
+            "name": "Uniswap",
+            "website": "https://uniswap.org/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "ups",
+            "name": "United Parcel Service",
+            "website": "https://www.ups.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "usps",
+            "name": "United States Postal Service",
+            "website": "https://www.usps.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "wellsfargo",
+            "name": "Wells Fargo",
+            "website": "https://www.wellsfargo.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "whatsapp",
+            "name": "WhatsApp",
+            "website": "https://www.whatsapp.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "xfinity",
+            "name": "Xfinity",
+            "website": "https://www.xfinity.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "yahoo",
+            "name": "Yahoo!",
+            "website": "https://www.yahoo.com/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        },
+        {
+            "identifier": "yamatotransport",
+            "name": "YAMATO TRANSPORT",
+            "website": "https://www.kuronekoyamato.co.jp/",
+            "enabled": false,
+            "review_note": "Reference only; domain exceptions and matching ambiguity have not been reviewed."
+        }
+    ]
+}
