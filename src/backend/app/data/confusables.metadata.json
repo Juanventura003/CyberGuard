@@ -1,0 +1,8 @@
+{
+  "source": "https://www.unicode.org/Public/security/latest/confusables.txt",
+  "version": "18.0.0",
+  "table_date": "2026-08-06",
+  "downloaded_on": "2026-10-11",
+  "sha256": "6ed3ee967c9dfdf6677d563c9985182fbc50a2efb7d6059cd57b2e2ce18f5b92",
+  "license": "https://www.unicode.org/terms_of_use.html"
+}
