@@ -14,6 +14,13 @@ import {
 
 import "./SecurityChecker.css";
 import GmailAttachmentPicker from "../components/GmailAttachmentPopup";
+import {
+  API_BASE,
+  startGmailConnect,
+  saveGmailSession,
+  loadGmailSession,
+  clearGmailSession,
+} from "../api/emailApi";
 
 type CheckerType =
   | "link"
@@ -66,9 +73,29 @@ function SecurityChecker() {
 
   const [fileSource, setFileSource] = useState<"device" | "gmail">("device");
   const [gmailSession, setGmailSession] = useState(
-    () => sessionStorage.getItem("cyberguard_gmail_session") || ""
+    () => loadGmailSession() || ""
   );
   const [gmailPickerOpen, setGmailPickerOpen] = useState(false);
+
+
+  useEffect(() => {
+    const syncGmailSession = () => {
+      const savedSession = loadGmailSession() || "";
+      setGmailSession(savedSession);
+
+      if (!savedSession) {
+        setGmailPickerOpen(false);
+      }
+    };
+
+    window.addEventListener("focus", syncGmailSession);
+    window.addEventListener("storage", syncGmailSession);
+
+    return () => {
+      window.removeEventListener("focus", syncGmailSession);
+      window.removeEventListener("storage", syncGmailSession);
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -82,7 +109,7 @@ function SecurityChecker() {
     }
 
     if (session) {
-      sessionStorage.setItem("cyberguard_gmail_session", session);
+      saveGmailSession(session);
       setGmailSession(session);
       setActiveChecker("file");
       setFileSource("gmail");
@@ -112,9 +139,7 @@ function SecurityChecker() {
 
   const connectGmail = () => {
     const returnTo = `${window.location.origin}${window.location.pathname}?checker=file`;
-    window.location.assign(
-      `http://127.0.0.1:8000/api/email/oauth/login?return_to=${encodeURIComponent(returnTo)}`
-    );
+    startGmailConnect(returnTo);
   };
 
   const scanGmailAttachment = async (
@@ -133,12 +158,23 @@ function SecurityChecker() {
       });
 
       const response = await fetch(
-        `http://127.0.0.1:8000/api/security/gmail/scan-attachment?${params}`,
+        `${API_BASE}/api/security/gmail/scan-attachment?${params}`,
         { method: "POST" }
       );
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          clearGmailSession();
+          setGmailSession("");
+          setGmailPickerOpen(false);
+
+          throw new Error(
+            "Your Gmail session expired. Please reconnect your Gmail account."
+          );
+        }
+
         throw new Error(data.detail || "Attachment scan failed.");
       }
 
@@ -690,7 +726,7 @@ function SecurityChecker() {
                   setFileError("");
                 }}
               >
-                Connect Gmail
+                {gmailSession ? "Gmail Connected" : "Connect Gmail"}
               </button>
             </div>
           )}

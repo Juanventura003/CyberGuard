@@ -1,8 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { Mail, Paperclip, X, RefreshCw } from "lucide-react";
-
-const API = "http://127.0.0.1:8000";
+import { API_BASE, clearGmailSession } from "../api/emailApi";
 
 type Attachment = {
   index: number;
@@ -28,6 +27,81 @@ type Props = {
   ) => Promise<void>;
 };
 
+// Cache Gmail inbox results for 60 seconds.
+const CACHE_DURATION = 60 * 1000;
+
+type CacheEntry = {
+  emails: GmailMessage[];
+  timestamp: number;
+};
+
+const gmailCache = new Map<string, CacheEntry>();
+
+// Share pending requests to avoid duplicate API calls.
+const pendingRequests = new Map<
+  string,
+  Promise<GmailMessage[]>
+>();
+
+async function fetchGmailEmails(
+  session: string
+): Promise<GmailMessage[]> {
+  const existing = pendingRequests.get(session);
+
+  if (existing) {
+    return existing;
+  }
+
+  const request = (async () => {
+    const params = new URLSearchParams({
+      session,
+      limit: "50",
+    });
+
+    const response = await fetch(
+      `${API_BASE}/api/security/gmail/attachments?${params}`
+    );
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        gmailCache.delete(session);
+        clearGmailSession();
+      }
+
+      if (response.status === 502 || response.status === 429) {
+        throw new Error(
+          "Gmail is temporarily unavailable or has reached its API limit. Please try again in 60–90 seconds."
+        );
+      }
+
+      const details = await response.json().catch(() => ({}));
+
+      throw new Error(
+        details.detail || "Unable to load Gmail inbox."
+      );
+    }
+
+    const data: GmailMessage[] = await response.json();
+
+    gmailCache.set(session, {
+      emails: data,
+      timestamp: Date.now(),
+    });
+
+    return data;
+  })();
+
+  pendingRequests.set(session, request);
+
+  try {
+    return await request;
+  } finally {
+    if (pendingRequests.get(session) === request) {
+      pendingRequests.delete(session);
+    }
+  }
+}
+
 export default function GmailAttachmentPicker({
   session,
   onClose,
@@ -50,45 +124,45 @@ export default function GmailAttachmentPicker({
       setError("");
 
       try {
-        const params = new URLSearchParams({
-          session,
-          limit: "50",
-        });
+        const cached = gmailCache.get(session);
 
-        const response = await fetch(
-          `${API}/api/security/gmail/attachments?${params}`
+        let data: GmailMessage[];
+
+        if (
+          cached &&
+          Date.now() - cached.timestamp < CACHE_DURATION
+        ) {
+          // Reuse inbox results without calling Gmail API.
+          data = cached.emails;
+        } else {
+          data = await fetchGmailEmails(session);
+        }
+
+        if (cancelled) return;
+
+        setEmails(data);
+
+        setSelectedEmail((previous) =>
+          data.some((email) => email.id === previous)
+            ? previous
+            : data[0]?.id || ""
         );
 
-        if (!response.ok) {
-          const details = await response.json().catch(() => ({}));
-          throw new Error(
-            details.detail || "Unable to load Gmail inbox."
-          );
-        }
-
-        const data: GmailMessage[] = await response.json();
-
-        if (!cancelled) {
-          setEmails(data);
-
-          setSelectedEmail((previous) =>
-            data.some((email) => email.id === previous)
-              ? previous
-              : data[0]?.id || ""
-          );
-
-          setSelectedAttachment(0);
-        }
+        setSelectedAttachment(0);
       } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to connect to Gmail."
-          );
-        }
+        if (cancelled) return;
+
+        setEmails([]);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to connect to Gmail."
+        );
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -115,6 +189,11 @@ export default function GmailAttachmentPicker({
     setError("");
   }
 
+  function refreshInbox() {
+    gmailCache.delete(session);
+    setRefreshCount((count) => count + 1);
+  }
+
   async function scanAttachment() {
     if (!currentEmail || !selectedFile || scanning) return;
 
@@ -125,7 +204,9 @@ export default function GmailAttachmentPicker({
       await onScan(currentEmail.id, selectedFile.index);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Attachment scan failed."
+        err instanceof Error
+          ? err.message
+          : "Attachment scan failed."
       );
     } finally {
       setScanning(false);
@@ -134,9 +215,11 @@ export default function GmailAttachmentPicker({
 
   function formatSize(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
+
     if (bytes < 1024 * 1024) {
       return `${(bytes / 1024).toFixed(1)} KB`;
     }
+
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
@@ -197,7 +280,13 @@ export default function GmailAttachmentPicker({
               <Mail size={24} />
               Gmail Inbox
             </h2>
-            <p style={{ color: "#9ca3af", margin: "8px 0 0" }}>
+
+            <p
+              style={{
+                color: "#9ca3af",
+                margin: "8px 0 0",
+              }}
+            >
               Browse your latest 50 emails and scan attachments.
             </p>
           </div>
@@ -206,7 +295,7 @@ export default function GmailAttachmentPicker({
             <button
               type="button"
               disabled={loading || scanning}
-              onClick={() => setRefreshCount((n) => n + 1)}
+              onClick={refreshInbox}
               aria-label="Refresh inbox"
               style={{
                 background: "#283449",
@@ -237,6 +326,7 @@ export default function GmailAttachmentPicker({
           </div>
         </div>
 
+        {/* Error message */}
         {error && (
           <p
             role="alert"
@@ -250,7 +340,14 @@ export default function GmailAttachmentPicker({
         )}
 
         {loading ? (
-          <p style={{ padding: 24 }}>Loading your latest emails...</p>
+          <p style={{ padding: 24 }}>
+            Loading your latest emails...
+          </p>
+        ) : error && emails.length === 0 ? (
+          <p style={{ padding: 24, color: "#aab5c5" }}>
+            Your inbox could not be loaded. Please try again
+            shortly or use the refresh button.
+          </p>
         ) : emails.length === 0 ? (
           <p style={{ padding: 24 }}>
             No emails were found in your inbox.
@@ -259,7 +356,8 @@ export default function GmailAttachmentPicker({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+              gridTemplateColumns:
+                "minmax(0, 1fr) minmax(0, 1fr)",
               minHeight: 0,
               flex: 1,
               overflow: "hidden",
@@ -386,7 +484,9 @@ export default function GmailAttachmentPicker({
                     }}
                   />
 
-                  <h3>Attachments ({attachments.length})</h3>
+                  <h3>
+                    Attachments ({attachments.length})
+                  </h3>
 
                   {attachments.length === 0 ? (
                     <p style={{ color: "#aab5c5" }}>
@@ -429,7 +529,10 @@ export default function GmailAttachmentPicker({
                             >
                               {file.filename}
                             </div>
-                            <small style={{ color: "#aab5c5" }}>
+
+                            <small
+                              style={{ color: "#aab5c5" }}
+                            >
                               {formatSize(file.size)}
                             </small>
                           </div>
@@ -442,7 +545,8 @@ export default function GmailAttachmentPicker({
                         disabled={
                           scanning ||
                           !selectedFile ||
-                          selectedFile.size > 25 * 1024 * 1024
+                          selectedFile.size >
+                            25 * 1024 * 1024
                         }
                         style={{
                           width: "100%",
@@ -464,9 +568,11 @@ export default function GmailAttachmentPicker({
                       </button>
 
                       {selectedFile &&
-                        selectedFile.size > 25 * 1024 * 1024 && (
+                        selectedFile.size >
+                          25 * 1024 * 1024 && (
                           <p style={{ color: "#ff8585" }}>
-                            This attachment exceeds the 25 MB limit.
+                            This attachment exceeds the 25 MB
+                            limit.
                           </p>
                         )}
                     </>
