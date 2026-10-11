@@ -31,3 +31,11 @@ dist-ssr
 __pycache__/
 *.pyc
 .env
+
+# Downloaded browser-extension threat intelligence
+src/backend/.cache/
+
+# Local evaluation datasets, tools, and their dependent tests
+src/backend/evaluation/
+src/backend/tests/
+extension/tests/

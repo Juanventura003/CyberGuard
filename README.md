@@ -93,16 +93,25 @@ Keep all backend credentials in `src/backend/.env`; never copy them into the fro
 
 ### Browser extension and Website Tracker
 
-The extension monitors completed HTTP(S) tabs, analyzes URLs through the local backend, caches successful analyses locally for 24 hours, and keeps a local activity list. Signed-in website analyses are also written to the Supabase `website_history` table by the backend.
+The Chrome extension combines Google Web Risk, OpenPhish Community and URL/page rules. It checks for embedded URL credentials, brand impersonation and spelling/Unicode lookalikes, insecure password forms, GET submissions, misleading links and labeled recovery-secret fields. Page checks send bounded facts, never passwords, entered values, raw page text or HTML.
 
-Build the extension from the project root:
+Scores describe evidence strength, not phishing probability. Strong rules can produce suspicious warnings at 35; reputation matches produce high-risk results. Weak page signals alone are capped at 25. Missing enabled providers produce incomplete checks. Blocking is always manual through the popup or Website Tracker.
+
+#### Setup and use
 
 ```bash
 npm run build:extension
 ```
 
-In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `extension/dist`. After source changes, run the build again and click **Reload** for the extension. Keep both the frontend and backend running. Open the Website Tracker while signed in once so the extension can receive the current Supabase access token. The extension itself does not contain API keys; it sends the token to the local backend over the configured development connection.
+In `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist`. Keep the backend running. To save history, sign in to the frontend and open Website Tracker once to connect the extension. Combined URL/page results update the saved visit.
 
+Enable **Show draggable website notification** in the popup to display the banner. Drag its header to move it; × disables notifications across tabs. Page checks continue while the banner is hidden if monitoring is enabled. Chrome internal and restricted pages cannot display it.
+
+After extension changes, rebuild, reload the extension and refresh website tabs. Backend changes require a backend restart. URL results are cached for five minutes, up to 100 entries; **Refresh** forces a new check. Tracker loads up to 1,000 history records, pauses polling while hidden and retains loaded rows if refreshing fails.
+
+#### Threat feed
+
+OpenPhish Community is enabled by default (`OPENPHISH_ENABLED=true`), needs no key and refreshes every 12 hours. Cached feeds older than 24 hours are unavailable. Exact URL matching preserves paths and queries; browsing URLs are not sent to OpenPhish. See [OpenPhish terms](https://openphish.com/terms.html).
 
 ### Cyber Assistant
 The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
