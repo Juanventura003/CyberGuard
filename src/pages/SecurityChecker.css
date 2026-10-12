@@ -699,6 +699,22 @@
   color: #16a34a;
 }
 
+.gmail-locked-card {
+  opacity: 0.55;
+  cursor: not-allowed;
+  user-select: none;
+}
+
+.gmail-locked-card .gmail-connect-icon {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.gmail-locked-card h3,
+.gmail-locked-card p {
+  color: #64748b;
+}
+
 @media (max-width: 600px) {
   .gmail-connect-card {
     padding: 28px 16px;
