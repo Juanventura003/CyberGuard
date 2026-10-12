@@ -22,6 +22,8 @@ import {
   clearGmailSession,
 } from "../api/emailApi";
 
+import { useAuth } from "../context/AuthContext";
+
 type CheckerType =
   | "link"
   | "file"
@@ -51,6 +53,8 @@ type FileScanResult = {
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 function SecurityChecker() {
+  const { session, loading } = useAuth();
+  const isLoggedIn = !loading && !!session;
   const [activeChecker, setActiveChecker] =
   useState<CheckerType>(() =>
     new URLSearchParams(window.location.search).get("checker") === "file"
@@ -138,7 +142,11 @@ function SecurityChecker() {
   }, []);
 
   const connectGmail = () => {
-    const returnTo = `${window.location.origin}${window.location.pathname}?checker=file`;
+    if (!isLoggedIn) return;
+
+    const returnTo =
+      `${window.location.origin}${window.location.pathname}?checker=file`;
+
     startGmailConnect(returnTo);
   };
 
@@ -146,6 +154,10 @@ function SecurityChecker() {
     messageId: string,
     attachmentIndex: number
   ) => {
+
+    if (!isLoggedIn) {
+      throw new Error("Please log in to CyberGuard first.");
+    }
     setFileError("");
     setFileScanResult(null);
     setIsFileScanning(true);
@@ -715,7 +727,7 @@ function SecurityChecker() {
                   setFileError("");
                 }}
               >
-                Upload from Device
+                {"Choose from Device"}
               </button>
 
               <button
@@ -726,13 +738,34 @@ function SecurityChecker() {
                   setFileError("");
                 }}
               >
-                {gmailSession ? "Gmail Connected" : "Connect Gmail"}
+                {isLoggedIn && gmailSession
+                  ? "Gmail Connected"
+                  : "Connect Gmail"}
               </button>
             </div>
           )}
 
           
-        {!fileScanResult && fileSource === "gmail" && (
+        
+      {!fileScanResult && fileSource === "gmail" && (
+        !isLoggedIn ? (
+          <div
+            className="gmail-connect-card gmail-locked-card"
+            aria-disabled="true"
+            title="Log in to CyberGuard to use Gmail scanning"
+          >
+            <div className="gmail-connect-icon">
+              <Mail size={30} />
+            </div>
+
+            <h3>Connect Gmail account</h3>
+
+            <p className="gmail-connect-description">
+              Log in to your CyberGuard account to connect Gmail
+              and scan email attachments directly from your inbox.
+            </p>
+          </div>
+        ) : (
           <div className="gmail-connect-card">
             <div className="gmail-connect-icon">
               <Mail size={30} />
@@ -752,18 +785,18 @@ function SecurityChecker() {
               onClick={() => {
                 if (gmailSession) {
                   setGmailPickerOpen(true);
-                } else {
-                  connectGmail();
-                }
-              }}
-            >
-            <Mail size={18} />
-            <span>
-              {gmailSession
-                ? "Browse Gmail Attachments"
-                : "Connect to Gmail"}
-              </span>
-            </button>
+                  } else {
+                    connectGmail();
+                  }
+                }}
+              >
+                <Mail size={18} />
+                <span>
+                  {gmailSession
+                    ? "Browse Gmail Attachments"
+                    : "Connect to Gmail"}
+                </span>
+              </button>
 
             {fileError && (
               <p className="file-error-message">{fileError}</p>
@@ -774,9 +807,10 @@ function SecurityChecker() {
               <span>Maximum attachment size: 25 MB</span>
             </div>
           </div>
+          )
         )}
 
-          {gmailPickerOpen && gmailSession && (
+          {isLoggedIn && gmailPickerOpen && gmailSession && (
             <GmailAttachmentPicker
               session={gmailSession}
               onClose={() => setGmailPickerOpen(false)}
