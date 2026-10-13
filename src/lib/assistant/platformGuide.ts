@@ -1,7 +1,4 @@
-/**
- * CyberGuard in-app features the assistant can explain and deep-link to.
- * Keep paths in sync with App.tsx routes.
- */
+
 export type PlatformFeature = {
   id: string;
   name: string;
@@ -118,9 +115,9 @@ Results show a risk score, SAFE/PHISHING classification, and a plain-English exp
     name: "Reports",
     path: "/reports",
     summary:
-      "View CyberGuard reports and scan summaries (available from the sidebar).",
+      "View scan summaries with risk breakdown, filters, detail explanations, and CSV/JSON export.",
     howTo:
-      "Open **Reports** in the left sidebar, or go to [Reports](/reports).",
+      "Open **Reports** in the left sidebar, or go to [Reports](/reports). Filter by date or risk level, select a scan for its explanation, and export the current view as CSV or JSON.",
     keywords: [
       "reports",
       "report",
@@ -128,6 +125,8 @@ Results show a risk score, SAFE/PHISHING classification, and a plain-English exp
       "results history",
       "past scans",
       "summary",
+      "export",
+      "risk breakdown",
     ],
   },
   {

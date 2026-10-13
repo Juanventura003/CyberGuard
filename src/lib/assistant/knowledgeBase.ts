@@ -8,10 +8,6 @@ export type KnowledgeTopic = {
   reply: string;
 };
 
-/**
- * Guided cybersecurity knowledge for CyberGuard’s local assistant.
- * Defensive consumer advice only — no attack/exploit guidance.
- */
 export const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
   {
     id: "phishing",
@@ -912,7 +908,7 @@ Private browsing reduces local leftovers; it does not hide activity from the net
 - [Website Tracker](/website-tracker) — site risk scores
 - [Email Scanner](/email-scanner) — phishing scans (paste or Gmail)
 - [Security Checker](/security-checker) — security checks
-- [Reports](/reports) — report summaries
+- [Reports](/reports) — scan summaries, risk breakdown, and export
 - [Settings](/settings) — preferences
 - Login / Sign up — buttons at the top of the sidebar
 
