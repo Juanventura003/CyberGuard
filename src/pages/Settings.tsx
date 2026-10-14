@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import "./Settings.css";
 
+const NOT_CONFIGURED = "Supabase is not configured, so this action is unavailable.";
+
 interface Profile {
   first_name: string | null;
   last_name: string | null;
@@ -36,12 +38,19 @@ function NameForm({ userId, initialFirstName, initialLastName, onSaved }: NameFo
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setMessage(null);
+
+    const client = supabase;
+    if (!client) {
+      setMessage({ type: "error", text: NOT_CONFIGURED });
+      return;
+    }
+
     setSaving(true);
 
     const first = firstName.trim();
     const last = lastName.trim();
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from("profiles")
       .update({ first_name: first, last_name: last })
       .eq("id", userId)
@@ -115,6 +124,12 @@ function EmailForm({ currentEmail, pendingEmail }: EmailFormProps) {
     event.preventDefault();
     setMessage(null);
 
+    const client = supabase;
+    if (!client) {
+      setMessage({ type: "error", text: NOT_CONFIGURED });
+      return;
+    }
+
     const email = newEmail.trim().toLowerCase();
 
     if (email === currentEmail.toLowerCase()) {
@@ -124,7 +139,7 @@ function EmailForm({ currentEmail, pendingEmail }: EmailFormProps) {
 
     setSaving(true);
 
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
+    const { error: verifyError } = await client.auth.signInWithPassword({
       email: currentEmail,
       password: currentPassword,
     });
@@ -135,7 +150,7 @@ function EmailForm({ currentEmail, pendingEmail }: EmailFormProps) {
       return;
     }
 
-    const { error: updateError } = await supabase.auth.updateUser(
+    const { error: updateError } = await client.auth.updateUser(
       { email },
       { emailRedirectTo: `${window.location.origin}/settings` }
     );
@@ -212,6 +227,12 @@ function PasswordForm({ email }: PasswordFormProps) {
     event.preventDefault();
     setMessage(null);
 
+    const client = supabase;
+    if (!client) {
+      setMessage({ type: "error", text: NOT_CONFIGURED });
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       setMessage({ type: "error", text: "New passwords don't match." });
       return;
@@ -224,7 +245,7 @@ function PasswordForm({ email }: PasswordFormProps) {
 
     setSaving(true);
 
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
+    const { error: verifyError } = await client.auth.signInWithPassword({
       email,
       password: currentPassword,
     });
@@ -235,7 +256,7 @@ function PasswordForm({ email }: PasswordFormProps) {
       return;
     }
 
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    const { error: updateError } = await client.auth.updateUser({ password: newPassword });
 
     setSaving(false);
 
@@ -305,11 +326,12 @@ function Settings() {
   const [result, setResult] = useState<ProfileResult | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    const client = supabase;
+    if (!user || !client) return;
     let cancelled = false;
 
     const loadProfile = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("profiles")
         .select("first_name, last_name, username")
         .eq("id", user.id)
@@ -339,6 +361,17 @@ function Settings() {
         : previous
     );
   };
+
+  if (!supabase) {
+    return (
+      <div className="settings">
+        <h1 className="settings-title">Settings</h1>
+        <p className="settings-subtitle">
+          Account settings are unavailable because Supabase is not configured.
+        </p>
+      </div>
+    );
+  }
 
   if (authLoading) {
     return (
