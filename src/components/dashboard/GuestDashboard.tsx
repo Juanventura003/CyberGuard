@@ -157,7 +157,7 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Check links, files, passwords, phone numbers, email
+            Check files, passwords, phone numbers, email
             addresses, and data breaches.
           </p>
 

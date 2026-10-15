@@ -172,7 +172,6 @@ function LoggedInDashboard() {
 
           <div className="security-tools">
             <div>Password Check</div>
-            <div>Link Check</div>
             <div>Phone Number Check</div>
             <div>File Check</div>
             <div>Email Address Check</div>
