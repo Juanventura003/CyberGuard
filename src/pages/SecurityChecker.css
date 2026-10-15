@@ -841,6 +841,184 @@
   line-height: 1.6;
 }
 
+/* phone number checker */
+.phone-checker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.phone-checker-form > label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.phone-input-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.phone-country-select,
+.phone-input-row input {
+  padding: 14px;
+  border: 1px solid #d9dfe7;
+  border-radius: 8px;
+  font-size: 15px;
+  background: #fff;
+  color: #222;
+}
+
+.phone-country-select {
+  min-width: 190px;
+}
+
+.phone-input-row input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.check-phone-button {
+  padding: 14px 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-phone-button:hover {
+  background: #1d4ed8;
+}
+
+.phone-error-message {
+  color: #dc3545;
+  font-size: 14px;
+}
+
+.phone-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.phone-result-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.phone-result-heading h3 {
+  margin: 0 0 5px;
+}
+
+.phone-result-heading p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.phone-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.phone-detail-item {
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.phone-detail-item span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.phone-detail-item strong {
+  font-size: 15px;
+}
+
+.phone-security-note {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: #eff6ff;
+  border-radius: 8px;
+  color: #1e40af;
+}
+
+.phone-security-note p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/*phone reputation checker */
+.phone-reputation-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.phone-reputation-section h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.phone-reputation-section > p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.phone-reputation-results {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.phone-reputation-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.phone-reputation-score strong {
+  font-size: 26px;
+}
+
+.phone-reputation-disclaimer {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .phone-details {
+    grid-template-columns: 1fr;
+  }
+
+  .phone-country-select {
+    width: 100%;
+  }
+}
+
 @media (max-width: 650px) {
   .password-strength-heading {
     gap: 12px;

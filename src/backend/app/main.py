@@ -3,8 +3,14 @@ from googleapiclient.errors import HttpError
 
 logger = logging.getLogger(__name__)
 
-
+import os
+import re
+import httpx
 import asyncio
+from pathlib import Path as FilePath
+from dotenv import load_dotenv
+from fastapi import HTTPException
+from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from threading import Event, Thread
@@ -33,6 +39,8 @@ from .website_analyzer import analyze_url, analyze_page_signals
 from . import supabase_store
 from . import news_feed
 from . import threat_feeds
+
+load_dotenv(FilePath(__file__).resolve().parents[1] / ".env")
 
 
 @asynccontextmanager
@@ -65,6 +73,80 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+class PhoneReputationRequest(BaseModel):
+    phone_number: str
+    country: str = "US"
+
+
+@app.post("/api/security/phone-reputation")
+async def check_phone_reputation(request: PhoneReputationRequest):
+    api_key = os.getenv("IPQS_API_KEY")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Phone reputation API is not configured."
+        )
+
+    phone = re.sub(r"[^\d+]", "", request.phone_number)
+
+    if not re.fullmatch(r"\+?\d{7,15}", phone):
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid phone number."
+        )
+
+    country = request.country.upper()
+
+    if not re.fullmatch(r"[A-Z]{2}", country):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid country code."
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                "https://ipqualityscore.com/api/json/phone",
+                headers={"IPQS-KEY": api_key},
+                params={
+                    "phone": phone,
+                    "country": country,
+                    "strictness": 0
+                }
+            )
+
+            response.raise_for_status()
+            data = response.json()
+
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(
+            status_code=502,
+            detail="Phone reputation service is unavailable."
+        )
+
+    if data.get("success") is not True:
+        raise HTTPException(
+            status_code=502,
+            detail="Phone reputation lookup failed. Check API access or credits."
+        )
+
+    score = data.get("fraud_score")
+
+    if not isinstance(score, int) or not 0 <= score <= 100:
+        score = None
+
+    return {
+        "fraud_score": score,
+        "spammer": data.get("spammer"),
+        "recent_abuse": data.get("recent_abuse"),
+        "risky": data.get("risky"),
+        "voip": data.get("VOIP"),
+        "carrier": data.get("carrier"),
+        "line_type": data.get("line_type"),
+        "valid": data.get("valid")
+    }
 
 app.add_middleware(
     CORSMiddleware,
