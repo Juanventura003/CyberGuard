@@ -715,6 +715,226 @@
   color: #64748b;
 }
 
+/* password checker */
+.password-checker-form {
+  max-width: 900px;
+}
+
+.password-checker-form > label {
+  display: block;
+  margin-bottom: 10px;
+  color: #1f2d3d;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.password-input-row {
+  display: flex;
+  align-items: center;
+  border: 1px solid #b8c0cc;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.password-input-row:focus-within {
+  border-color: #4169e1;
+}
+
+.password-input-row input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
+  border: none;
+  outline: none;
+  color: #1f2d3d;
+  background: transparent;
+  font-size: 14px;
+}
+
+.password-visibility-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 46px;
+  border: none;
+  background: #f7f8fa;
+  color: #667085;
+  cursor: pointer;
+}
+
+.password-visibility-button:hover {
+  background: #eef2ff;
+  color: #4169e1;
+}
+
+.password-analysis {
+  margin-top: 26px;
+}
+
+.password-strength-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.password-strength-heading strong {
+  font-size: 15px;
+}
+
+.password-strength-meter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.password-strength-segment {
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.password-feedback {
+  padding: 20px;
+  margin-bottom: 24px;
+  background: #f7f8fa;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+}
+
+.password-feedback h3 {
+  margin: 0 0 14px;
+  color: #1f2d3d;
+  font-size: 16px;
+}
+
+.password-feedback p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #667085;
+  font-size: 14px;
+}
+
+.password-feedback ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.password-feedback li {
+  margin-bottom: 8px;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.password-warning {
+  color: #dc3545 !important;
+}
+
+.password-privacy-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.password-privacy-note svg {
+  flex-shrink: 0;
+  color: #198754;
+}
+
+.password-checklist {
+  padding: 20px;
+  margin-bottom: 20px;
+  background: #f8fafc;
+  border: 1px solid #e1e5eb;
+  border-radius: 10px;
+}
+
+.password-checklist h3 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.password-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.password-check-item:last-child {
+  margin-bottom: 0;
+}
+
+.check-passed {
+  color: #198754;
+  flex-shrink: 0;
+}
+
+.check-pending {
+  color: #98a2b3;
+  flex-shrink: 0;
+}
+
+.password-crack-time {
+  padding: 22px;
+  margin-bottom: 20px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+}
+
+.password-crack-time-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #4169e1;
+}
+
+.password-crack-time-heading h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.crack-time-value {
+  margin: 14px 0 8px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.crack-time-description {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 650px) {
+  .password-strength-heading {
+    gap: 12px;
+  }
+
+  .password-privacy-note {
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 600px) {
   .gmail-connect-card {
     padding: 28px 16px;

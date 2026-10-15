@@ -10,6 +10,11 @@ import {
   AlertTriangle,
   XCircle,
   UploadCloud,
+  Eye, 
+  EyeOff, 
+  ShieldCheck, 
+  CircleCheck, 
+  Circle
 } from "lucide-react";
 
 import "./SecurityChecker.css";
@@ -23,6 +28,8 @@ import {
 } from "../api/emailApi";
 
 import { useAuth } from "../context/AuthContext";
+
+import zxcvbn from "zxcvbn";
 
 type CheckerType =
   | "link"
@@ -208,6 +215,64 @@ function SecurityChecker() {
     }
   };
   const [isDragging, setIsDragging] = useState(false);
+
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const passwordResult = password ? zxcvbn(password) : null;
+  const passwordScore = passwordResult?.score ?? 0;
+
+  const passwordChecks = [
+    {
+      label: "At least 12 characters",
+      passed: password.length >= 12,
+    },
+    {
+      label: "At least 16 characters (recommended)",
+      passed: password.length >= 16,
+    },
+    {
+      label: "Uses a mix of character types",
+      passed:
+        [
+          /[a-z]/.test(password),
+          /[A-Z]/.test(password),
+          /[0-9]/.test(password),
+          /[^A-Za-z0-9]/.test(password),
+        ].filter(Boolean).length >= 3,
+    },
+  ];
+
+  const estimatedCrackTime =
+    passwordResult?.crack_times_display.offline_slow_hashing_1e4_per_second ??
+    "Not available";
+
+  const passwordSuggestions = passwordResult
+    ? [
+        ...(password.length < 12
+          ? ["Use a longer password or passphrase with at least 12 characters."]
+          : []),
+        ...(passwordResult.feedback.warning
+          ? [passwordResult.feedback.warning]
+          : []),
+        ...passwordResult.feedback.suggestions,
+      ]
+    : [];
+  const strengthLabels = [
+    "Very Weak",
+    "Weak",
+    "Fair",
+    "Good",
+    "Strong",
+  ];
+
+  const strengthColors = [
+    "#dc3545",
+    "#ef4444",
+    "#d99a00",
+    "#4169e1",
+    "#198754",
+  ];
 
   const handleCheckLink = async () => {
     const trimmedUrl = url.trim();
@@ -987,7 +1052,142 @@ function SecurityChecker() {
           )}
         </div>
       )}
-    </div>
+
+    {/* PASSWORD CHECKER */}
+    {activeChecker === "password" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <KeyRound size={22} />
+          </div>
+          <div>
+            <h2>Password Strength Checker</h2>
+            <p>Analyze your password strength and receive security recommendations.</p>
+          </div>
+        </div>
+
+        <div className="password-checker-form">
+          <label htmlFor="password-input">PASSWORD</label>
+
+          <div className="password-input-row">
+            <input
+              id="password-input"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter a password to analyze"
+              autoComplete="off"
+              spellCheck={false}
+            />
+
+            <button
+              type="button"
+              className="password-visibility-button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          </div>
+
+          {passwordResult && (
+            <div className="password-analysis">
+              <div className="password-strength-heading">
+                <span>Password Strength</span>
+                <strong style={{ color: strengthColors[passwordScore] }}>
+                  {strengthLabels[passwordScore]}
+                </strong>
+              </div>
+
+              <div className="password-strength-meter">
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <div
+                    key={index}
+                    className="password-strength-segment"
+                    style={{
+                      backgroundColor:
+                        index <= passwordScore
+                          ? strengthColors[passwordScore]
+                          : "#e1e5eb",
+                    }}
+                  />
+                ))}
+              </div>
+                
+              {/* Password Checklist */}
+              <div className="password-checklist">
+                <h3>Password Recommendations</h3>
+
+                {passwordChecks.map((check) => (
+                  <div className="password-check-item" key={check.label}>
+                    {check.passed ? (
+                      <CircleCheck size={19} className="check-passed" />
+                    ) : (
+                      <Circle size={19} className="check-pending" />
+                    )}
+                    <span>{check.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Estimated Cracking Time */}
+              <div className="password-crack-time">
+                <div className="password-crack-time-heading">
+                  <ShieldCheck size={20} />
+                  <h3>Estimated Cracking Time</h3>
+                </div>
+
+                <p className="crack-time-value">
+                  {estimatedCrackTime}
+                </p>
+
+                <p className="crack-time-description">
+                  Estimated time for an offline attack against a slow
+                  password hash. Actual cracking times may vary.
+                </p>
+              </div>
+
+              {/* Security Analysis */}
+              <div className="password-feedback">
+                <h3>Security Analysis</h3>
+
+                {passwordSuggestions.length > 0 ? (
+                  <ul>
+                    {passwordSuggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>
+                    <ShieldCheck size={18} />
+                    No obvious weaknesses detected. Use unique passwords
+                    for every account.
+                  </p>
+                )}
+              </div>
+
+              {/* Reset Password Checker */}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={() => {
+                  setPassword("");
+                  setShowPassword(false);
+                }}
+              >
+                Check Another Password
+              </button>
+            </div>
+          )}
+
+          {/* Privacy Notice */}
+          <p className="password-privacy-note">
+            CyberGuard does not send or save the entered password.
+          </p>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
 
