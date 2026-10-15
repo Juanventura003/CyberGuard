@@ -30,6 +30,11 @@ import { useAuth } from "../context/AuthContext";
 
 import zxcvbn from "zxcvbn";
 
+import {
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from "libphonenumber-js/max";
+
 type CheckerType =
   | "file"
   | "password"
@@ -194,6 +199,118 @@ function SecurityChecker() {
   };
   const [isDragging, setIsDragging] = useState(false);
 
+  type PhoneReputationResult = {
+    fraud_score: number | null;
+    spammer: boolean | null;
+    recent_abuse: boolean | null;
+    risky: boolean | null;
+    voip: boolean | null;
+    carrier: string | null;
+    line_type: string | null;
+    valid: boolean | null;
+  };
+
+  const [phoneInput, setPhoneInput] = useState("");
+  const [phoneReputation, setPhoneReputation] =
+    useState<PhoneReputationResult | null>(null);
+
+  const [phoneReputationLoading, setPhoneReputationLoading] = useState(false);
+  const [phoneReputationError, setPhoneReputationError] = useState("");
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>("US");
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneResult, setPhoneResult] = useState<{
+    valid: boolean;
+    possible: boolean;
+    international: string;
+    national: string;
+    country: string;
+    callingCode: string;
+    type: string;
+  } | null>(null);
+
+  const handleCheckPhone = () => {
+    setPhoneError("");
+    setPhoneResult(null);
+    setPhoneReputation(null);
+    setPhoneReputationError("");
+
+    if (!phoneInput.trim()) {
+      setPhoneError("Please enter a phone number.");
+      return;
+    }
+
+    try {
+      const parsed = parsePhoneNumberFromString(phoneInput, phoneCountry);
+
+      if (!parsed) {
+        setPhoneError("Unable to recognize this phone number.");
+        return;
+      }
+
+      const valid = parsed.isValid();
+      const possible = parsed.isPossible();
+
+      setPhoneResult({
+        valid,
+        possible,
+        international: parsed.formatInternational(),
+        national: parsed.formatNational(),
+        country: parsed.country || "Unknown",
+        callingCode: `+${parsed.countryCallingCode}`,
+        type: parsed.getType() || "Unknown",
+      });
+    } catch {
+      setPhoneError("Unable to analyze this phone number.");
+    }
+  };
+
+  const handleCheckPhoneReputation = async () => {
+    if (!phoneResult?.valid) return;
+
+    setPhoneReputationLoading(true);
+    setPhoneReputationError("");
+    setPhoneReputation(null);
+
+    try {
+      const response = await fetch(
+        "http://127.0.0.1:8000/api/security/phone-reputation",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone_number: phoneResult.international,
+            country: phoneResult.country !== "Unknown"
+              ? phoneResult.country
+              : phoneCountry,
+          }),
+        }
+      );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || "Phone reputation lookup failed.");
+    }
+
+    const data: PhoneReputationResult = await response.json();
+    setPhoneReputation(data);
+  } catch (error) {
+    setPhoneReputationError(
+      error instanceof Error ? error.message : "Unable to check phone reputation."
+    );
+  } finally {
+    setPhoneReputationLoading(false);
+  }
+};
+
+  const handleResetPhone = () => {
+    setPhoneInput("");
+    setPhoneError("");
+    setPhoneResult(null);
+    setPhoneReputation(null);
+    setPhoneReputationError("");
+  };
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -941,6 +1058,212 @@ function SecurityChecker() {
           <p className="password-privacy-note">
             CyberGuard does not send or save the entered password.
           </p>
+        </div>
+      </div>
+    )}
+
+    {/* PHONE NUMBER CHECKER */}
+    {activeChecker === "phone" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <Phone size={22} />
+          </div>
+          <div>
+            <h2>Phone Number Checker</h2>
+            <p>Validate a phone number and view its information.</p>
+          </div>
+        </div>
+
+        <div className="phone-checker-form">
+          <label htmlFor="phone-input">PHONE NUMBER</label>
+
+          <div className="phone-input-row">
+            <select
+              className="phone-country-select"
+              value={phoneCountry}
+              onChange={(e) => {
+                setPhoneCountry(e.target.value as CountryCode);
+                setPhoneResult(null);
+                setPhoneError("");
+                setPhoneReputation(null);
+                setPhoneReputationError("");
+              }}
+            >
+              <option value="US">United States (+1)</option>
+              <option value="CA">Canada (+1)</option>
+              <option value="GB">United Kingdom (+44)</option>
+              <option value="AU">Australia (+61)</option>
+              <option value="IN">India (+91)</option>
+              <option value="FR">France (+33)</option>
+              <option value="DE">Germany (+49)</option>
+              <option value="JP">Japan (+81)</option>
+              <option value="MX">Mexico (+52)</option>
+            </select>
+
+            <input
+              id="phone-input"
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => {
+                setPhoneInput(e.target.value);
+                setPhoneResult(null);
+                setPhoneError("");
+                setPhoneReputation(null);
+                setPhoneReputationError("");
+              }}
+              placeholder="Enter a phone number"
+            />
+          </div>
+
+          <button
+            type="button"
+            className="check-phone-button"
+            onClick={handleCheckPhone}
+          >
+            Check Phone Number
+          </button>
+
+          {phoneError && (
+            <p className="phone-error-message">{phoneError}</p>
+          )}
+
+          {phoneResult && (
+            <div className="phone-analysis">
+              <div className="phone-result-heading">
+                {phoneResult.valid ? (
+                  <CheckCircle size={26} color="#198754" />
+                ) : (
+                  <AlertTriangle size={26} color="#d99a00" />
+                )}
+
+                <div>
+                  <h3>
+                    {phoneResult.valid
+                      ? "Valid Phone Number"
+                      : "Invalid Phone Number"}
+                  </h3>
+                  <p>
+                    {phoneResult.valid
+                      ? "This number matches the numbering rules for its region."
+                      : "This number does not meet the numbering rules for its region."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="phone-details">
+                <div className="phone-detail-item">
+                  <span>Country / Region</span>
+                  <strong>{phoneResult.country}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Country Calling Code</span>
+                  <strong>{phoneResult.callingCode}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>International Format</span>
+                  <strong>{phoneResult.international}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>National Format</span>
+                  <strong>{phoneResult.national}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Number Type</span>
+                  <strong>{phoneResult.type.replace(/_/g, " ")}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Possible Number Length</span>
+                  <strong>{phoneResult.possible ? "Yes" : "No"}</strong>
+                </div>
+              </div>
+              
+              {phoneResult.valid && (
+              <div className="phone-reputation-section">
+                <h3>Spam & Scam Detection</h3>
+                <p>
+                  Check whether this number has suspicious activity reported by
+                  our phone reputation provider.
+                </p>
+
+                <button
+                  type="button"
+                  className="check-phone-button"
+                  onClick={handleCheckPhoneReputation}
+                  disabled={phoneReputationLoading}
+                >
+                  {phoneReputationLoading
+                    ? "Checking Reputation..."
+                    : "Check Spam & Scam Risk"}
+                </button>
+
+                {phoneReputationError && (
+                  <p className="phone-error-message">{phoneReputationError}</p>
+                )}
+
+                {phoneReputation && (
+                  <div className="phone-reputation-results">
+                    <div className="phone-reputation-score">
+                      <span>Fraud Score</span>
+                      <strong>
+                        {phoneReputation.fraud_score === null
+                          ? "Not Available"
+                          : `${phoneReputation.fraud_score}/100`}
+                      </strong>
+                    </div>
+
+                    <div className="phone-details">
+                      {[
+                        ["Spam Indicator", phoneReputation.spammer],
+                        ["Recent Abuse", phoneReputation.recent_abuse],
+                        ["Risk Flag", phoneReputation.risky],
+                        ["VoIP Number", phoneReputation.voip],
+                      ].map(([label, value]) => (
+                        <div className="phone-detail-item" key={String(label)}>
+                          <span>{String(label)}</span>
+                          <strong>
+                            {value === null
+                              ? "Unknown"
+                              : value === true
+                              ? "Yes"
+                              : "No"}
+                          </strong>
+                        </div>
+                      ))}
+
+                      <div className="phone-detail-item">
+                        <span>Carrier</span>
+                        <strong>{phoneReputation.carrier || "Unknown"}</strong>
+                      </div>
+
+                      <div className="phone-detail-item">
+                        <span>Line Type</span>
+                        <strong>{phoneReputation.line_type || "Unknown"}</strong>
+                      </div>
+                    </div>
+
+                    <p className="phone-reputation-disclaimer">
+                      Reputation results are indicators, not proof that a caller
+                      is safe or malicious. Caller ID can be spoofed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={handleResetPhone}
+              >
+                Check Another Number
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )}
