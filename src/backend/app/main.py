@@ -15,7 +15,7 @@ from fastapi import FastAPI, Header, HTTPException, Path, Query, UploadFile, Fil
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from . import gmail_oauth, phishing_detector, link_checker, file_checker
+from . import gmail_oauth, phishing_detector, file_checker
 from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
@@ -27,7 +27,6 @@ from .schemas import (
     WebsiteAnalyzeRequest,
     WebsiteAnalyzeResponse,
     WebsiteHistoryEntry,
-    LinkCheckRequest,
     PageAnalyzeRequest,
 )
 from .website_analyzer import analyze_url, analyze_page_signals
@@ -101,18 +100,6 @@ def cybersecurity_news():
         return news_feed.get_news()
     except news_feed.NewsFeedError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-
-# Link Checker
-@app.post("/api/security/link-check")
-def check_link(payload: LinkCheckRequest):
-    try:
-        result = link_checker.check_url(payload.url)
-        return result
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Could not check URL: {exc}")
 
 
 # File Checker

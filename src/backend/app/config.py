@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/email/oauth/callback"
     FRONTEND_ORIGIN: str = "http://localhost:5173"
 
-    GOOGLE_SAFE_BROWSING_API_KEY: str = ""
-
     SESSION_TTL_MINUTES: int = 30
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
