@@ -1,6 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import {
-  Link,
   FileText,
   KeyRound,
   Phone,
@@ -32,21 +31,11 @@ import { useAuth } from "../context/AuthContext";
 import zxcvbn from "zxcvbn";
 
 type CheckerType =
-  | "link"
   | "file"
   | "password"
   | "phone"
   | "email"
   | "breach";
-
-type LinkScanResult = {
-  url: string;
-  risk_score: number;
-  classification: "SAFE" | "SUSPICIOUS" | "HIGH RISK";
-  known_threat: boolean;
-  threat_types: string[];
-  reasons: string[];
-};
 
 type FileScanResult = {
   filename: string;
@@ -62,18 +51,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 function SecurityChecker() {
   const { session, loading } = useAuth();
   const isLoggedIn = !loading && !!session;
-  const [activeChecker, setActiveChecker] =
-  useState<CheckerType>(() =>
-    new URLSearchParams(window.location.search).get("checker") === "file"
-      ? "file"
-      : "link"
-  );
-
-  const [url, setUrl] = useState("");
-  const [urlError, setUrlError] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] =
-    useState<LinkScanResult | null>(null);
+  const [activeChecker, setActiveChecker] = useState<CheckerType>("file");
 
   const [selectedFile, setSelectedFile] =
     useState<File | null>(null);
@@ -274,85 +252,6 @@ function SecurityChecker() {
     "#198754",
   ];
 
-  const handleCheckLink = async () => {
-    const trimmedUrl = url.trim();
-
-    if (!trimmedUrl) {
-      setUrlError("Please enter a URL.");
-      return;
-    }
-
-    try {
-      const parsedUrl = new URL(trimmedUrl);
-
-      if (
-        parsedUrl.protocol !== "http:" &&
-        parsedUrl.protocol !== "https:"
-      ) {
-        setUrlError("Please enter a valid HTTP or HTTPS URL.");
-        return;
-      }
-    } catch {
-      setUrlError("Please enter a valid URL.");
-      return;
-    }
-
-    setUrlError("");
-    setIsScanning(true);
-    setScanResult(null);
-
-    try {
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/security/link-check",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            url: trimmedUrl,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to scan link.");
-      }
-
-      const data: LinkScanResult = await response.json();
-      setScanResult(data);
-    } catch (error) {
-      console.error("Link scan error:", error);
-
-      setUrlError(
-        "Unable to scan this link. Please make sure the CyberGuard backend is running."
-      );
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const handleScanAnother = () => {
-    setUrl("");
-    setUrlError("");
-    setScanResult(null);
-  };
-
-  const getResultIcon = () => {
-    if (!scanResult) return null;
-
-    if (scanResult.classification === "SAFE") {
-      return <CheckCircle size={30} />;
-    }
-
-    if (scanResult.classification === "SUSPICIOUS") {
-      return <AlertTriangle size={30} />;
-    }
-
-    return <XCircle size={30} />;
-  };
-
-
   const validateFile = (file: File) => {
     if (file.size > MAX_FILE_SIZE) {
       setSelectedFile(null);
@@ -535,23 +434,6 @@ function SecurityChecker() {
 
       {/* Checker Options */}
       <div className="checker-options">
-        {/* Link Checker */}
-        <button
-          className={`checker-option ${
-            activeChecker === "link" ? "active" : ""
-          }`}
-          onClick={() => setActiveChecker("link")}
-        >
-          <div className="checker-option-icon">
-            <Link size={24} />
-          </div>
-
-          <div>
-            <h3>Link Checker</h3>
-            <p>Check a URL before opening it.</p>
-          </div>
-        </button>
-
         {/* File Checker */}
         <button
           className={`checker-option ${
@@ -605,7 +487,7 @@ function SecurityChecker() {
 
         {/* Email Address Checker */}
         <button
-          className={`checker-option email-checker-option ${
+          className={`checker-option ${
             activeChecker === "email" ? "active" : ""
           }`}
           onClick={() => setActiveChecker("email")}
@@ -622,7 +504,7 @@ function SecurityChecker() {
 
         {/* Data Breach Checker */}
         <button
-          className={`checker-option breach-checker-option ${
+          className={`checker-option ${
             activeChecker === "breach" ? "active" : ""
           }`}
           onClick={() => setActiveChecker("breach")}
@@ -639,131 +521,6 @@ function SecurityChecker() {
           </div>
         </button>
       </div>
-
-      {/* LINK CHECKER*/}
-
-      {activeChecker === "link" && (
-        <div className="checker-panel">
-          <div className="checker-panel-title">
-            <div className="checker-panel-icon">
-              <Link size={22} />
-            </div>
-
-            <div>
-              <h2>Link Checker</h2>
-              <p>Check any link before visiting it.</p>
-            </div>
-          </div>
-
-          {!scanResult && (
-            <div className="link-checker-form">
-              <label htmlFor="link-url">URL</label>
-
-              <div className="link-input-row">
-                <input
-                  id="link-url"
-                  type="text"
-                  placeholder="https://example.com"
-                  value={url}
-                  disabled={isScanning}
-                  onChange={(event) => {
-                    setUrl(event.target.value);
-
-                    if (urlError) {
-                      setUrlError("");
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (
-                      event.key === "Enter" &&
-                      !isScanning
-                    ) {
-                      handleCheckLink();
-                    }
-                  }}
-                />
-
-                <button
-                  className="check-link-button"
-                  onClick={handleCheckLink}
-                  disabled={!url.trim() || isScanning}
-                >
-                  {isScanning ? "Scanning..." : "Check Link"}
-                </button>
-              </div>
-
-              {urlError && (
-                <p className="link-error-message">
-                  {urlError}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Link Scan Result */}
-          {scanResult && (
-            <div
-              className={`link-scan-result ${scanResult.classification
-                .toLowerCase()
-                .replace(" ", "-")}`}
-            >
-              <div className="result-status">
-                <div className="result-icon">
-                  {getResultIcon()}
-                </div>
-
-                <div>
-                  <p className="result-label">Scan Result</p>
-                  <h2>{scanResult.classification}</h2>
-                </div>
-              </div>
-
-              <div className="result-url">
-                <span>Scanned URL</span>
-                <p>{scanResult.url}</p>
-              </div>
-
-              <div className="risk-score-section">
-                <div className="risk-score-heading">
-                  <span>Risk Score</span>
-
-                  <strong>
-                    {scanResult.risk_score} / 100
-                  </strong>
-                </div>
-
-                <div className="risk-score-track">
-                  <div
-                    className="risk-score-fill"
-                    style={{
-                      width: `${scanResult.risk_score}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="result-reasons">
-                <h3>Analysis</h3>
-
-                <ul>
-                  {scanResult.reasons.map(
-                    (reason, index) => (
-                      <li key={index}>{reason}</li>
-                    )
-                  )}
-                </ul>
-              </div>
-
-              <button
-                className="scan-another-button"
-                onClick={handleScanAnother}
-              >
-                Scan Another Link
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* FILE CHECKER*/}
 
@@ -975,7 +732,7 @@ function SecurityChecker() {
           {/* File Scan Result */}
           {fileScanResult && (
             <div
-              className={`link-scan-result ${fileScanResult.classification
+              className={`file-scan-result ${fileScanResult.classification
                 .toLowerCase()
                 .replace(" ", "-")}`}
             >
@@ -990,7 +747,7 @@ function SecurityChecker() {
                 </div>
               </div>
 
-              <div className="result-url">
+              <div className="result-file">
                 <span>Scanned File</span>
                 <p>{fileScanResult.filename}</p>
               </div>

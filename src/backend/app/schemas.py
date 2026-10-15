@@ -87,10 +87,6 @@ class WebsiteHistoryEntry(BaseModel):
     visited_at: str
 
 
-class LinkCheckRequest(BaseModel):
-    url: str
-
-
 class PageFormSignal(BaseModel):
     action_origin: str = Field(..., max_length=300)
     method: Literal["get", "post", "other"] = "post"
