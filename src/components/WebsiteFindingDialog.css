@@ -1,0 +1,54 @@
+.website-finding-dialog {
+  width: min(620px, calc(100vw - 48px));
+  max-height: 85vh;
+  box-sizing: border-box;
+  overflow: auto;
+  border: 1px solid #cfdbed;
+  border-radius: 16px;
+  padding: 26px;
+  background: #fff;
+  color: #203a59;
+  box-shadow: 0 18px 70px #172e5033;
+}
+.website-finding-dialog::backdrop {
+  background: #172e506b;
+}
+.website-finding-dialog header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.website-finding-dialog h2 {
+  margin: 0;
+  font-size: 21px;
+}
+.website-finding-dialog p {
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.website-finding-dialog header p {
+  margin: 7px 0;
+  color: #315dd6;
+}
+.website-finding-dialog header > button,
+.tracker-finding-action {
+  border: 1px solid #c4d3e9;
+  background: #fff;
+  color: #294e99;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tracker-finding-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.website-finding-dialog :focus-visible,
+.tracker-finding-action:focus-visible {
+  outline: 3px solid #315dd6;
+  outline-offset: 3px;
+}

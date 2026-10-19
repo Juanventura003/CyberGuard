@@ -1,0 +1,86 @@
+.finding-share {
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid #dce5e9;
+}
+.finding-share form {
+  padding: 18px;
+  background: #f7faf9;
+  border: 1px solid #d5e4df;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+.finding-share h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.finding-share p,
+.finding-share-hint,
+.finding-share-success {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.finding-share label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 16px 0;
+}
+.finding-share select,
+.finding-share textarea {
+  font: inherit;
+  font-weight: 400;
+  border: 1px solid #bdcec8;
+  padding: 10px;
+  border-radius: 6px;
+  background: white;
+  color: #203140;
+  max-width: 100%;
+}
+.finding-share textarea {
+  resize: vertical;
+}
+.finding-share pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.8 monospace;
+  font-weight: 400;
+  background: white;
+  border: 1px solid #dce5e9;
+  padding: 14px;
+  border-radius: 6px;
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+}
+.finding-share-success {
+  margin-top: 15px;
+  background: #e4f4ed;
+  padding: 14px;
+  color: #176648;
+  border-radius: 6px;
+}
+.finding-share a,
+.finding-share-success a {
+  color: #136e61;
+}
+.finding-share .finding-share-error {
+  color: #a33127;
+}
+.finding-share :focus-visible {
+  outline: 3px solid #147c70;
+  outline-offset: 3px;
+}
+
+.finding-share button {
+  cursor: pointer;
+  border: 1px solid #b9cbe5;
+  border-radius: 7px;
+  padding: 9px 13px;
+  background: #fff;
+  color: #244c96;
+  font: inherit;
+  font-size: 12px;
+}
