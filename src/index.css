@@ -722,7 +722,7 @@ body {
   grid-template-columns: minmax(150px, 1.6fr) 0.6fr 0.9fr 0.8fr minmax(
       150px,
       1.4fr
-    ) 110px auto;
+    ) 110px 120px 40px;
   align-items: center;
 }
 
@@ -1456,7 +1456,9 @@ body {
   .tracker-score,
   .tracker-risk,
   .tracker-time,
-  .tracker-explanation {
+  .tracker-explanation,
+  .tracker-blocking-cell,
+  .tracker-sharing-cell {
     grid-column: 1 / -1;
     justify-self: stretch;
     width: auto;
