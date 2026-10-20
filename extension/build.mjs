@@ -36,6 +36,8 @@ await fs.writeFile(
 
 for (const [source, output] of [
 	["background.ts", "background.js"],
+	["blocked.ts", "blocked.js"],
+	["organization-protection.ts", "organization-protection.js"],
 	["redirect-tracker.ts", "redirect-tracker.js"],
 	["content.ts", "content.js"],
 	["banner.ts", "banner.js"],
@@ -69,4 +71,13 @@ await fs.copyFile(
 await fs.copyFile(
 	path.join(sourceRoot, "popup", "popup.css"),
 	path.join(outputRoot, "popup", "popup.css"),
+);
+
+await fs.copyFile(
+	path.join(sourceRoot, "blocked.html"),
+	path.join(outputRoot, "blocked.html"),
+);
+await fs.copyFile(
+	path.join(sourceRoot, "blocked.css"),
+	path.join(outputRoot, "blocked.css"),
 );

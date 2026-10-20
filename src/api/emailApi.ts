@@ -1,4 +1,5 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+export const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export interface ManualEmailInput {
   sender: string;
@@ -32,11 +33,16 @@ export interface WebsiteHistoryEntry {
   url: string;
   domain: string;
   risk_score: number;
-  risk_level: "HIGH_RISK" | "SUSPICIOUS" | "NO_KNOWN_THREAT" | "UNABLE_TO_VERIFY";
+  risk_level:
+    | "HIGH_RISK"
+    | "SUSPICIOUS"
+    | "NO_KNOWN_THREAT"
+    | "UNABLE_TO_VERIFY";
   source: "GOOGLE_WEB_RISK" | "LAYERED_ANALYSIS" | "UNABLE_TO_VERIFY";
   threat_types: string[];
   explanation: string[];
   visited_at: string;
+  updated_at?: string | null;
 }
 
 /** An error from the backend that keeps the HTTP status, so callers can tell
@@ -76,7 +82,10 @@ const GMAIL_SESSION_MINUTES = 30;
 export function saveGmailSession(sessionId: string) {
   try {
     const expiresAt = Date.now() + GMAIL_SESSION_MINUTES * 60 * 1000;
-    localStorage.setItem(GMAIL_SESSION_KEY, JSON.stringify({ sessionId, expiresAt }));
+    localStorage.setItem(
+      GMAIL_SESSION_KEY,
+      JSON.stringify({ sessionId, expiresAt }),
+    );
   } catch {
     /* storage blocked (private mode etc.): the session just won't be remembered */
   }
@@ -86,7 +95,10 @@ export function loadGmailSession(): string | null {
   try {
     const raw = localStorage.getItem(GMAIL_SESSION_KEY);
     if (!raw) return null;
-    const { sessionId, expiresAt } = JSON.parse(raw) as { sessionId?: string; expiresAt?: number };
+    const { sessionId, expiresAt } = JSON.parse(raw) as {
+      sessionId?: string;
+      expiresAt?: number;
+    };
     if (!sessionId || !expiresAt || Date.now() >= expiresAt) {
       localStorage.removeItem(GMAIL_SESSION_KEY);
       return null;
@@ -112,12 +124,19 @@ export function startGmailConnect(returnTo: string) {
   window.location.href = url;
 }
 
-export function listGmailMessages(session: string, limit = 50): Promise<GmailHeaderItem[]> {
-  return fetch(`${API_BASE}/api/email/gmail/list?${new URLSearchParams({ session, limit: String(limit) })}`)
-    .then((r) => asJson<GmailHeaderItem[]>(r));
+export function listGmailMessages(
+  session: string,
+  limit = 50,
+): Promise<GmailHeaderItem[]> {
+  return fetch(
+    `${API_BASE}/api/email/gmail/list?${new URLSearchParams({ session, limit: String(limit) })}`,
+  ).then((r) => asJson<GmailHeaderItem[]>(r));
 }
 
-export function analyzeGmailMessages(session: string, messageIds: string[]): Promise<EmailResult[]> {
+export function analyzeGmailMessages(
+  session: string,
+  messageIds: string[],
+): Promise<EmailResult[]> {
   return fetch(`${API_BASE}/api/email/gmail/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -131,7 +150,10 @@ export interface GmailTrashResponse {
 }
 
 /** Moves messages to Gmail's Trash (recoverable there for 30 days). */
-export function trashGmailMessages(session: string, messageIds: string[]): Promise<GmailTrashResponse> {
+export function trashGmailMessages(
+  session: string,
+  messageIds: string[],
+): Promise<GmailTrashResponse> {
   return fetch(`${API_BASE}/api/email/gmail/trash`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -139,8 +161,9 @@ export function trashGmailMessages(session: string, messageIds: string[]): Promi
   }).then((r) => asJson<GmailTrashResponse>(r));
 }
 
-
-export function analyzeManualEmails(emails: ManualEmailInput[]): Promise<EmailResult[]> {
+export function analyzeManualEmails(
+  emails: ManualEmailInput[],
+): Promise<EmailResult[]> {
   return fetch(`${API_BASE}/api/email/batch-analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -148,20 +171,50 @@ export function analyzeManualEmails(emails: ManualEmailInput[]): Promise<EmailRe
   }).then((r) => asJson<EmailResult[]>(r));
 }
 
-export function listWebsiteHistory(limit = 1000, accessToken?: string, since?: string): Promise<WebsiteHistoryEntry[]> {
+export function listWebsiteHistory(
+  limit = 1000,
+  accessToken?: string,
+  since?: string,
+): Promise<WebsiteHistoryEntry[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (since) params.set("since", since);
-  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
-  return fetch(`${API_BASE}/api/websites/history?${params}`, { headers })
-    .then((r) => asJson<WebsiteHistoryEntry[]>(r));
+  const headers = accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : undefined;
+  return fetch(`${API_BASE}/api/websites/history?${params}`, { headers }).then(
+    (r) => asJson<WebsiteHistoryEntry[]>(r),
+  );
 }
 
-export function deleteWebsiteHistory(historyId: string, accessToken: string, url?: string): Promise<void> {
+export async function syncWebsiteHistory(
+  known: Record<string, string>,
+  accessToken?: string,
+  since?: string,
+): Promise<{ entries: WebsiteHistoryEntry[]; ids: string[] }> {
+  const response = await fetch(`${API_BASE}/api/websites/history/sync`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify({ known, since, limit: 1000 }),
+  });
+  return asJson<{ entries: WebsiteHistoryEntry[]; ids: string[] }>(response);
+}
+
+export function deleteWebsiteHistory(
+  historyId: string,
+  accessToken: string,
+  url?: string,
+): Promise<void> {
   const query = url ? `?url=${encodeURIComponent(url)}` : "";
-  return fetch(`${API_BASE}/api/websites/history/${encodeURIComponent(historyId)}${query}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  }).then(async (r) => {
+  return fetch(
+    `${API_BASE}/api/websites/history/${encodeURIComponent(historyId)}${query}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  ).then(async (r) => {
     if (!r.ok) {
       await asJson<void>(r);
     }

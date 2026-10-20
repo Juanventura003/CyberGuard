@@ -11,6 +11,15 @@ const extensionChrome = (
 						| { type: "clearHistory" }
 						| { type: "getBlockedSites" }
 						| {
+								type: "organizationProtection";
+								action: "status" | "enroll" | "sync" | "disconnect";
+								organizationId?: string;
+								organizationName?: string;
+								name?: string;
+								userId?: string;
+								accessToken?: string;
+						  }
+						| {
 								type: "setSiteBlocked";
 								domain: string;
 								blocked: boolean;
@@ -93,6 +102,52 @@ function handleDashboardMessage(event: MessageEvent) {
 	)
 		return;
 	if (
+		event.data.type === "CYBERGUARD_PROTECTION_REQUEST" &&
+		typeof event.data.requestId === "string"
+	) {
+		const {
+			requestId,
+			action,
+			organizationId,
+			organizationName,
+			name,
+			userId,
+			accessToken,
+		} = event.data;
+		if (!["status", "enroll", "sync", "disconnect"].includes(action)) return;
+		void (async () => {
+			try {
+				// Protection uses its own credential or request-specific account token.
+				// Do not wait for unrelated history/auth messages to finish.
+				if (!hasExtensionContext())
+					throw new Error("Reload this tab after reloading the extension.");
+				const state = await extensionChrome.runtime.sendMessage({
+					type: "organizationProtection",
+					action,
+					organizationId,
+					organizationName,
+					name,
+					userId,
+					accessToken,
+				});
+				window.postMessage(
+					{ type: "CYBERGUARD_PROTECTION_RESPONSE", requestId, state },
+					window.location.origin,
+				);
+			} catch {
+				window.postMessage(
+					{
+						type: "CYBERGUARD_PROTECTION_RESPONSE",
+						requestId,
+						error: "Extension unavailable. Reload the extension and this tab.",
+					},
+					window.location.origin,
+				);
+			}
+		})();
+		return;
+	}
+	if (
 		event.data.type === "CYBERGUARD_BLOCKING_REQUEST" &&
 		typeof event.data.requestId === "string"
 	) {
@@ -103,10 +158,7 @@ function handleDashboardMessage(event: MessageEvent) {
 					stopBridge();
 					return;
 				}
-				if (
-					typeof domain === "string" &&
-					typeof blocked === "boolean"
-				) {
+				if (typeof domain === "string" && typeof blocked === "boolean") {
 					const changed = (await extensionChrome.runtime.sendMessage({
 						type: "setSiteBlocked",
 						domain,
@@ -157,17 +209,44 @@ function handleDashboardMessage(event: MessageEvent) {
 	}
 
 	if (
-		event.data.type === "CYBERGUARD_HISTORY_DELETE" &&
-		typeof event.data.url === "string"
+		event.data.type === "CYBERGUARD_HISTORY_DELETE_ALL" ||
+		(event.data.type === "CYBERGUARD_HISTORY_DELETE" &&
+			typeof event.data.url === "string")
 	) {
-		sendToExtension({
-			type: "suppressUrl",
-			url: event.data.url,
-		});
-	}
-
-	if (event.data.type === "CYBERGUARD_HISTORY_DELETE_ALL") {
-		sendToExtension({ type: "clearHistory" });
+		const { requestId, url, type } = event.data;
+		const reply = (values: Record<string, unknown>) => {
+			if (typeof requestId === "string")
+				window.postMessage(
+					{ type: "CYBERGUARD_HISTORY_DELETE_RESPONSE", requestId, ...values },
+					window.location.origin,
+				);
+		};
+		reply({ phase: "started" });
+		void (async () => {
+			try {
+				if (!hasExtensionContext())
+					throw new Error(
+						"Reload the extension and refresh this tab before deleting history.",
+					);
+				const result = await extensionChrome.runtime.sendMessage(
+					type === "CYBERGUARD_HISTORY_DELETE_ALL"
+						? { type: "clearHistory" }
+						: { type: "suppressUrl", url },
+				);
+				if (!(result as { ok?: boolean })?.ok)
+					throw new Error(
+						"Could not clear extension history. Reload the extension and try again.",
+					);
+				reply({ phase: "complete" });
+			} catch (error) {
+				reply({
+					error:
+						error instanceof Error
+							? error.message
+							: "Could not prepare history deletion.",
+				});
+			}
+		})();
 	}
 }
 

@@ -17,6 +17,7 @@ import {
   type ManualEmailInput,
 } from "../api/emailApi";
 
+import ShareFinding from "../components/ShareFinding";
 import "./EmailScanner.css";
 
 const MAX_EMAILS = 50;
@@ -552,6 +553,7 @@ const moveToTrash = async (ids: string[]) => {
                     ))}
                   </ul>
                 )}
+                {r.classification !== 'ERROR' && <ShareFinding finding={{ title: r.subject.trim() || 'Suspicious email', kind: 'email', details: `Sender: ${r.sender}\nSubject: ${r.subject}\nScanner: ${r.classification} · Risk ${r.risk_score}/100\n${r.explanation.join('\n')}`, scanner: { source: 'email_scanner', verdict: r.classification, score: r.risk_score, reasons: r.explanation } }} />}
                 {canTrash(r) && (
                     <div className="es-result-actions">{trashedIds.has(r.id) ? (
                         <span className="es-trashed">Moved to Trash</span>

@@ -33,12 +33,15 @@ from .schemas import (
     WebsiteAnalyzeRequest,
     WebsiteAnalyzeResponse,
     WebsiteHistoryEntry,
+    WebsiteHistorySyncRequest,
+    WebsiteHistorySyncResponse,
     PageAnalyzeRequest,
 )
 from .website_analyzer import analyze_url, analyze_page_signals
 from . import supabase_store
 from . import news_feed
 from . import threat_feeds
+from .protection import router as protection_router
 
 load_dotenv(FilePath(__file__).resolve().parents[1] / ".env")
 
@@ -147,6 +150,7 @@ async def check_phone_reputation(request: PhoneReputationRequest):
         "line_type": data.get("line_type"),
         "valid": data.get("valid")
     }
+app.include_router(protection_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -226,6 +230,20 @@ def get_website_history(
 
     try:
         return supabase_store.list_history(user_id, limit, since)
+    except supabase_store.SupabaseStoreError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/websites/history/sync", response_model=WebsiteHistorySyncResponse)
+def sync_website_history(
+    payload: WebsiteHistorySyncRequest,
+    authorization: str | None = Header(default=None),
+):
+    user_id = _authenticated_user_id(authorization)
+    if not user_id:
+        return {"entries": [], "ids": []}
+    try:
+        return supabase_store.sync_history(user_id, payload.known, payload.limit, payload.since)
     except supabase_store.SupabaseStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

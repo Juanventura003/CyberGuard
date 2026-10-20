@@ -1,4 +1,5 @@
 import {
+  Users,
   LayoutDashboard,
   Globe2,
   Mail,
@@ -87,6 +88,7 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="sidebar-nav">
+        <NavLink to="/organization" className={({ isActive }) => `nav-item ${isActive ? "active" : ""}`}><Users size={18} /><span>Team Security</span></NavLink>
         <NavLink
           to="/dashboard"
           className={({ isActive }) =>

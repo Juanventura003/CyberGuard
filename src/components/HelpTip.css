@@ -1,0 +1,42 @@
+.cg-help {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  margin-left: 6px;
+}
+.org-page .cg-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  color: #60738c;
+  border-radius: 50%;
+  box-shadow: none;
+  cursor: help;
+}
+.org-page .cg-help-button:hover,
+.org-page .cg-help-button:focus-visible {
+  background: #e8effb;
+  color: #315dd6;
+}
+.cg-help-tooltip {
+  position: fixed;
+  z-index: 2000;
+  max-height: min(260px, 70vh);
+  overflow: auto;
+  padding: 14px 16px;
+  border: 1px solid #354f72;
+  border-radius: 10px;
+  background: #1d3453;
+  color: #fff;
+  font:
+    400 13px/1.65 system-ui,
+    sans-serif;
+  letter-spacing: normal;
+  box-shadow: 0 10px 30px #152a4a2b;
+  overflow-wrap: anywhere;
+}

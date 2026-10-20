@@ -1,11 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, Globe2, X, Trash2 } from "lucide-react";
 import {
   deleteAllWebsiteHistory,
   deleteWebsiteHistory,
-  listWebsiteHistory,
+  syncWebsiteHistory,
+  type WebsiteHistoryEntry,
 } from "../api/emailApi";
+import WebsiteFindingDialog, {
+  type WebsiteFindingPreview,
+} from "../components/WebsiteFindingDialog";
+import { normalizeFindingDomain } from "../lib/organizationFindings";
 import { useAuth } from "../context/AuthContext";
+
+import { prepareHistoryDeletion } from "../lib/extensionBridge";
+import { mergeHistorySnapshot } from "../lib/websiteHistory";
 
 type Website = {
   id?: string;
@@ -13,7 +21,10 @@ type Website = {
   url: string;
   riskScore: number;
   riskLevel:
-    "No Known Threat" | "Suspicious" | "High Risk" | "Unable to Verify";
+    | "No Known Threat"
+    | "Suspicious"
+    | "High Risk"
+    | "Unable to Verify";
   visitedAt: string;
   timeVisited: string;
   explanation: string[];
@@ -44,48 +55,54 @@ const getSinceDate = (filter: DateFilter) => {
 };
 
 const requestBlocking = (domain?: string, blocked?: boolean) =>
-  new Promise<{ domains: string[]; monitoringEnabled: boolean | null }>((resolve, reject) => {
-    const requestId = crypto.randomUUID();
-    const timeout = window.setTimeout(() => {
-      window.removeEventListener("message", receive);
-      reject(
-        new Error(
-          "Reload the extension and this page to connect blocking controls.",
-        ),
+  new Promise<{ domains: string[]; monitoringEnabled: boolean | null }>(
+    (resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const timeout = window.setTimeout(() => {
+        window.removeEventListener("message", receive);
+        reject(
+          new Error(
+            "Reload the extension and this page to connect blocking controls.",
+          ),
+        );
+      }, 4000);
+      function receive(event: MessageEvent) {
+        if (
+          event.source !== window ||
+          event.origin !== window.location.origin ||
+          event.data?.type !== "CYBERGUARD_BLOCKING_RESPONSE" ||
+          event.data.requestId !== requestId
+        )
+          return;
+        window.clearTimeout(timeout);
+        window.removeEventListener("message", receive);
+        if (event.data.error || !Array.isArray(event.data.state?.domains))
+          reject(new Error(event.data.error ?? "Extension unavailable."));
+        else
+          resolve({
+            domains: event.data.state.domains,
+            monitoringEnabled:
+              typeof event.data.state.monitoringEnabled === "boolean"
+                ? event.data.state.monitoringEnabled
+                : null,
+          });
+      }
+      window.addEventListener("message", receive);
+      window.postMessage(
+        { type: "CYBERGUARD_BLOCKING_REQUEST", requestId, domain, blocked },
+        window.location.origin,
       );
-    }, 4000);
-    function receive(event: MessageEvent) {
-      if (
-        event.source !== window ||
-        event.origin !== window.location.origin ||
-        event.data?.type !== "CYBERGUARD_BLOCKING_RESPONSE" ||
-        event.data.requestId !== requestId
-      )
-        return;
-      window.clearTimeout(timeout);
-      window.removeEventListener("message", receive);
-      if (event.data.error || !Array.isArray(event.data.state?.domains))
-        reject(new Error(event.data.error ?? "Extension unavailable."));
-      else resolve({
-        domains: event.data.state.domains,
-        monitoringEnabled: typeof event.data.state.monitoringEnabled === "boolean"
-          ? event.data.state.monitoringEnabled
-          : null,
-      });
-    }
-    window.addEventListener("message", receive);
-    window.postMessage(
-      { type: "CYBERGUARD_BLOCKING_REQUEST", requestId, domain, blocked },
-      window.location.origin,
-    );
-  });
+    },
+  );
 
 function WebsiteTracker() {
   const [blockedDomains, setBlockedDomains] = useState<string[] | null>(null);
   const [blockingConnecting, setBlockingConnecting] = useState(true);
   const [blockingError, setBlockingError] = useState("");
   const [blockingBusy, setBlockingBusy] = useState<string | null>(null);
-  const [monitoringEnabled, setMonitoringEnabled] = useState<boolean | null>(null);
+  const [monitoringEnabled, setMonitoringEnabled] = useState<boolean | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -144,6 +161,8 @@ function WebsiteTracker() {
     }
   }
 
+  const [selectedFinding, setSelectedFinding] =
+    useState<WebsiteFindingPreview | null>(null);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("timeVisited");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -154,9 +173,11 @@ function WebsiteTracker() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [urlTooltip, setUrlTooltip] = useState<UrlTooltip>(null);
   const { session } = useAuth();
+  const historyMutation = useRef(0);
 
   useEffect(() => {
     setWebsites([]);
+    setSelectedFinding(null);
     setHistoryError("");
   }, [session?.user.id]);
 
@@ -164,19 +185,27 @@ function WebsiteTracker() {
     let ignore = false;
     let timer: number | undefined;
     let requestInFlight = false;
+    let cachedEntries = new Map<string, WebsiteHistoryEntry>();
 
     const loadWebsites = async () => {
       if (ignore || document.hidden || requestInFlight) return;
       requestInFlight = true;
+      const mutation = historyMutation.current;
       try {
-        const history = await listWebsiteHistory(
-          1000,
+        const delta = await syncWebsiteHistory(
+          Object.fromEntries(
+            [...cachedEntries].flatMap(([id, entry]) =>
+              entry.updated_at ? [[id, entry.updated_at]] : [],
+            ),
+          ),
           session?.access_token,
           getSinceDate(dateFilter),
         );
-        if (ignore) return;
+        if (ignore || mutation !== historyMutation.current) return;
 
+        cachedEntries = mergeHistorySnapshot(cachedEntries, delta);
         setHistoryError("");
+        const history = [...cachedEntries.values()];
         const mapped = history.map((entry) => ({
           id: entry.id,
           domain: entry.domain,
@@ -328,18 +357,20 @@ function WebsiteTracker() {
   const handleDelete = async (website: Website) => {
     if (!website.id || !session?.access_token) return;
 
-    window.postMessage(
-      { type: "CYBERGUARD_HISTORY_DELETE", url: website.url },
-      window.location.origin,
-    );
-
     try {
+      await prepareHistoryDeletion(website.url);
       await deleteWebsiteHistory(website.id, session.access_token, website.url);
+      historyMutation.current++;
       setWebsites((current) =>
         current.filter((entry) => entry.url !== website.url),
       );
     } catch (error) {
       console.error("Could not delete website history", error);
+      setHistoryError(
+        error instanceof Error
+          ? error.message
+          : "Could not delete website history.",
+      );
     }
   };
 
@@ -354,15 +385,18 @@ function WebsiteTracker() {
 
     setDeletingAll(true);
     try {
-      window.postMessage(
-        { type: "CYBERGUARD_HISTORY_DELETE_ALL" },
-        window.location.origin,
-      );
+      await prepareHistoryDeletion();
       await deleteAllWebsiteHistory(session.access_token);
+      historyMutation.current++;
       setWebsites([]);
       setSearch("");
     } catch (error) {
       console.error("Could not delete all website history", error);
+      setHistoryError(
+        error instanceof Error
+          ? error.message
+          : "Could not delete all website history.",
+      );
     } finally {
       setDeletingAll(false);
     }
@@ -509,8 +543,8 @@ function WebsiteTracker() {
         <strong>What CyberGuard checks</strong>
         <ul>
           <li>
-            <strong>URLs:</strong> Google Web Risk, OpenPhish, misleading domains,
-            and spelling or Unicode lookalikes.
+            <strong>URLs:</strong> Google Web Risk, OpenPhish, misleading
+            domains, and spelling or Unicode lookalikes.
           </li>
           <li>
             <strong>Pages:</strong> visible password forms and their declared
@@ -518,7 +552,8 @@ function WebsiteTracker() {
           </li>
         </ul>
         <p>
-          Select <strong>View reasons</strong> for the findings saved with each visit.
+          Select <strong>View reasons</strong> for the findings saved with each
+          visit.
         </p>
       </div>
       {blockingError && (
@@ -553,7 +588,8 @@ function WebsiteTracker() {
 
           <span>Explanation</span>
           <span>Blocking</span>
-          <span>Actions</span>
+          <span>Share with team</span>
+          <span>Delete</span>
         </div>
 
         <div className="tracker-result-count" aria-live="polite">
@@ -571,13 +607,20 @@ function WebsiteTracker() {
             {historyUnavailable
               ? "Could not load saved history. Start the backend to reconnect; this page will retry automatically."
               : websites.length > 0 && normalizedSearch
-              ? `No websites match “${search.trim()}”.`
-              : "No websites have been scanned yet. Open a page in the browser extension and it will appear here."}
+                ? `No websites match “${search.trim()}”.`
+                : "No websites have been scanned yet. Open a page in the browser extension and it will appear here."}
           </div>
         ) : (
           filteredWebsites.map((website) => {
             const riskClass = getRiskClass(website.riskLevel);
             const hostname = new URL(website.url).hostname;
+            const findingDomain = (() => {
+              try {
+                return normalizeFindingDomain(website.url);
+              } catch {
+                return null;
+              }
+            })();
             const coveringBlock = blockedDomains?.find(
               (domain) =>
                 hostname === domain || hostname.endsWith(`.${domain}`),
@@ -685,7 +728,11 @@ function WebsiteTracker() {
                   </span>
                   <button
                     type="button"
-                    className={coveringBlock ? "tracker-unblock-button" : "tracker-block-button"}
+                    className={
+                      coveringBlock
+                        ? "tracker-unblock-button"
+                        : "tracker-block-button"
+                    }
                     disabled={blockedDomains === null || blockingBusy !== null}
                     aria-label={`${coveringBlock ? "Unblock" : "Block"} ${coveringBlock ?? hostname}`}
                     title={
@@ -712,6 +759,26 @@ function WebsiteTracker() {
                   </button>
                 </div>
 
+                <div className="tracker-sharing-cell">
+                  <button
+                    type="button"
+                    className="tracker-finding-action"
+                    disabled={!session || !findingDomain}
+                    aria-label={`Share finding for ${website.domain} with your team`}
+                    onClick={() => {
+                      if (findingDomain)
+                        setSelectedFinding({
+                          domain: findingDomain,
+                          verdict: website.riskLevel,
+                          score: website.riskScore,
+                          reasons: website.explanation,
+                          recordedAt: website.visitedAt,
+                        });
+                    }}
+                  >
+                    Share with team
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="tracker-delete"
@@ -728,6 +795,12 @@ function WebsiteTracker() {
         )}
       </div>
 
+      {selectedFinding && (
+        <WebsiteFindingDialog
+          finding={selectedFinding}
+          onClose={() => setSelectedFinding(null)}
+        />
+      )}
       {urlTooltip && (
         <div
           className="tracker-url-tooltip"

@@ -1,0 +1,236 @@
+.org-findings {
+  display: grid;
+  gap: 20px;
+}
+.org-findings > .org-card {
+  margin-bottom: 0;
+}
+.finding-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.finding-overview h2 {
+  margin: 6px 0;
+}
+.finding-overview p {
+  margin: 0;
+}
+.finding-overview-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 20px;
+  border-radius: 10px;
+  background: #f1f5fd;
+  color: #294e99;
+  flex-shrink: 0;
+}
+.finding-overview-count strong {
+  font-size: 28px;
+}
+.finding-overview-count span {
+  font-size: 11px;
+}
+.finding-workspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.3fr);
+  gap: 20px;
+  align-items: start;
+}
+.finding-workspace > .org-card {
+  margin: 0;
+}
+.finding-detail h2 {
+  overflow-wrap: anywhere;
+}
+.finding-response-available {
+  grid-column: 1/-1;
+  font-size: 11px;
+  color: #176644;
+}
+.finding-progress {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.finding-progress li {
+  flex: 1;
+  text-align: center;
+  padding: 9px 4px;
+  font-size: 11px;
+  background: #edf1f7;
+  color: #4b617a;
+  border-radius: 7px;
+}
+.finding-progress li.done {
+  color: #176143;
+  background: #e8f6ee;
+}
+.finding-scan-summary {
+  padding: 16px;
+  background: #f4f7fd;
+  border: 1px solid #dce5f1;
+  border-radius: 10px;
+  margin: 18px 0;
+}
+.finding-scan-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #294c8d;
+  font-size: 13px;
+}
+.finding-scan-summary ul {
+  padding-left: 18px;
+  font-size: 12px;
+  color: #354f70;
+  line-height: 1.7;
+}
+.finding-scan-summary small {
+  color: #4d627c;
+  font-size: 11px;
+}
+.finding-evidence {
+  margin: 18px 0;
+}
+.finding-evidence summary,
+.finding-submit > summary {
+  cursor: pointer;
+  color: #294c8d;
+  font-size: 13px;
+  font-weight: 600;
+}
+.finding-evidence .org-evidence {
+  margin-top: 12px;
+  max-height: 300px;
+  overflow: auto;
+}
+.finding-guidance {
+  padding: 16px;
+  border-left: 3px solid #315dd6;
+  background: #f5f8fe;
+  border-radius: 0 8px 8px 0;
+}
+.finding-guidance h3 {
+  margin: 0;
+}
+.finding-guidance p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.finding-protection,
+.finding-response {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid #dce5f1;
+}
+.finding-protection h3,
+.finding-response h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #294c8d;
+}
+.finding-protection .org-protection-badge {
+  margin-left: 8px;
+}
+.finding-delivery-count {
+  font-size: 27px;
+  color: #176644;
+}
+.finding-protection small {
+  color: #4d627c;
+}
+.org-findings .finding-response form {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 15px;
+}
+.org-findings .finding-response form label {
+  min-width: 0;
+}
+.finding-action-preview {
+  padding: 16px;
+  background: #f0f5ff;
+  border: 1px solid #c8d8f5;
+  border-radius: 9px;
+}
+.finding-action-preview > strong {
+  overflow-wrap: anywhere;
+}
+.finding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.finding-submit > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.finding-submit form {
+  margin-top: 18px;
+}
+.finding-submit form label:last-of-type {
+  flex-basis: 100%;
+}
+.org-findings .finding-review-request form {
+  flex-direction: column;
+  align-items: stretch;
+}
+.org-findings .finding-review-request form label {
+  min-width: 0;
+}
+.finding-review-request strong {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1000px) {
+  .finding-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .finding-overview {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .finding-overview-count {
+    flex-direction: row;
+    gap: 12px;
+  }
+  .finding-progress {
+    flex-wrap: wrap;
+  }
+  .finding-progress li {
+    flex-basis: 28%;
+  }
+}
+
+.finding-list-rows {
+  max-height: min(65dvh, 800px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 3px 3px;
+  scrollbar-gutter: stable;
+}
+.finding-detail {
+  scroll-margin-top: 16px;
+}
+.org-findings .finding-response form,
+.org-findings .finding-review-request form {
+  width: 100%;
+}
+.org-findings .finding-response form label,
+.org-findings .finding-review-request form label {
+  width: 100%;
+}
+@media (max-width: 1000px) {
+  .finding-list-rows {
+    max-height: 45dvh;
+  }
+}

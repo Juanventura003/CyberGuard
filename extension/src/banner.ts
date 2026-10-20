@@ -275,7 +275,7 @@
 		}
 	}
 	async function checkPage() {
-		if (!hasContext()) return;
+		if (!hasContext() || document.hidden) return;
 		const page = collectPageSignals();
 		pageFingerprint = JSON.stringify(page);
 		nextPageScan = Date.now() + 5000;
@@ -466,5 +466,9 @@
 			void render();
 		}
 	}, 1000);
+	document.addEventListener("visibilitychange", () => {
+		if (!document.hidden) void checkPage();
+	});
+	window.addEventListener("focus", () => { void checkPage(); });
 	void checkPage();
 })();

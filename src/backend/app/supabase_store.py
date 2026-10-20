@@ -149,3 +149,24 @@ def update_history(
     if not rows:
         raise SupabaseStoreError("Website history entry is unavailable.")
     return rows[0]
+
+
+def sync_history(
+    user_id: str,
+    known: dict[str, str],
+    limit: int,
+    since: str | None = None,
+) -> dict[str, Any]:
+    response = httpx.post(
+        f"{settings.SUPABASE_URL.rstrip('/')}/rest/v1/rpc/cg_sync_website_history",
+        headers=_service_headers(),
+        json={"member": user_id, "known": known, "after_visit": since, "max_rows": limit},
+        timeout=10,
+    )
+    # Keep the current UI working while the new migration has not yet been applied.
+    if response.status_code == 404 and response.json().get("code") == "PGRST202":
+        entries = list_history(user_id, limit, since)
+        return {"entries": entries, "ids": [entry["id"] for entry in entries]}
+    if not response.is_success:
+        raise SupabaseStoreError("Could not synchronize website history.")
+    return response.json()
