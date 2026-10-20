@@ -1,0 +1,96 @@
+/* Role-specific layouts keep personal setup separate from team management. */
+.org-protection.org-protection-admin {
+  grid-template-areas: "overview overview" "rules connections" "personal connections";
+  grid-template-rows: auto min-content 1fr;
+}
+.org-protection.org-protection-member {
+  grid-template-areas: "personal rules";
+}
+.org-protection > .org-protection-intro {
+  grid-area: overview;
+}
+.org-protection > .org-protection-rules {
+  grid-area: rules;
+}
+.org-protection > .org-protection-connections {
+  grid-area: connections;
+}
+.org-protection > .org-protection-connect,
+.org-protection > .org-admin-browser {
+  grid-area: personal;
+}
+.org-personal-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.org-personal-status .org-protection-badge {
+  margin: 0;
+  font-size: 12px;
+  padding: 7px 12px;
+}
+.org-personal-status > span:last-child {
+  color: #405b79;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.org-admin-browser > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  color: #244d9a;
+  font-size: 14px;
+  font-weight: 600;
+  list-style: none;
+}
+.org-admin-browser > summary::-webkit-details-marker {
+  display: none;
+}
+.org-admin-browser > summary::after {
+  content: "+";
+  margin-left: auto;
+  font-size: 23px;
+  font-weight: 400;
+}
+.org-admin-browser[open] > summary::after {
+  content: "−";
+}
+.org-admin-browser > summary > svg {
+  flex-shrink: 0;
+}
+.org-admin-browser > summary small {
+  display: block;
+  margin-top: 5px;
+  color: #4b617d;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.org-admin-browser-content {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid #dce5f1;
+}
+.org-other-connections {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #dce5f1;
+}
+.org-other-connections > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #315dd6;
+  font-weight: 600;
+}
+@media (max-width: 1150px) {
+  .org-protection.org-protection-admin {
+    grid-template-rows: none;
+    grid-template-areas: "overview" "rules" "connections" "personal";
+  }
+  .org-protection.org-protection-member {
+    grid-template-areas: "personal" "rules";
+  }
+}
