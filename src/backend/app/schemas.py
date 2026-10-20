@@ -85,6 +85,7 @@ class WebsiteHistoryEntry(BaseModel):
     threat_types: list[str]
     explanation: list[str]
     visited_at: str
+    updated_at: str | None = None
 
 
 class PageFormSignal(BaseModel):
@@ -121,3 +122,21 @@ class PageSignals(BaseModel):
 class PageAnalyzeRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2048)
     page: PageSignals
+
+
+class WebsiteHistorySyncRequest(BaseModel):
+    known: dict[str, str] = Field(default_factory=dict, max_length=1000)
+    since: str | None = Field(default=None, max_length=80)
+    limit: int = Field(default=1000, ge=1, le=1000)
+
+    @field_validator("known")
+    @classmethod
+    def bounded_versions(cls, value):
+        if any(len(key) > 64 or len(version) > 80 for key, version in value.items()):
+            raise ValueError("Invalid history version map.")
+        return value
+
+
+class WebsiteHistorySyncResponse(BaseModel):
+    entries: list[WebsiteHistoryEntry]
+    ids: list[str]
