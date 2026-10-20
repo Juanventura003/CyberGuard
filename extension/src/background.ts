@@ -1,3 +1,11 @@
+import {
+	ORGANIZATION_RULE_START,
+	getOrganizationBlockInfo,
+	handleProtection,
+	startProtection,
+	withRuleLock,
+	type ProtectionMessage,
+} from "./organization-protection.js";
 import { RedirectTracker, type NavigationRequest } from "./redirect-tracker.js";
 
 const redirects = new RedirectTracker();
@@ -22,6 +30,8 @@ function trackRedirect(change: () => void) {
 }
 
 type RuntimeMessage =
+	| ProtectionMessage
+	| { type: "organizationBlockInfo"; domain: string }
 	| { type: "getState" }
 	| { type: "getBlockedSites" }
 	| { type: "setSiteBlocked"; domain: string; blocked: boolean }
@@ -104,6 +114,7 @@ declare const chrome: {
 		}): Promise<void>;
 	};
 	runtime: {
+		getURL(path: string): string;
 		onInstalled: { addListener(listener: () => void): void };
 		onMessage: {
 			addListener(
@@ -132,11 +143,13 @@ declare const chrome: {
 		onActivated: { addListener(listener: () => void): void };
 		query: (queryInfo: {
 			active: boolean;
-			currentWindow: boolean;
-		}) => Promise<{ url?: string }[]>;
+			lastFocusedWindow?: boolean;
+			currentWindow?: boolean;
+		}) => Promise<{ id?: number; url?: string }[]>;
 		create: (createProperties: { url: string }) => Promise<unknown>;
 	};
 	windows: {
+		getLastFocused(): Promise<{ focused: boolean }>;
 		onFocusChanged: {
 			addListener(listener: (windowId: number) => void): void;
 		};
@@ -174,6 +187,8 @@ const MAX_ANALYSIS_CACHE_ITEMS = 100;
 const ANALYSIS_TIMEOUT_MS = 12_000;
 const inFlightRecords = new Map<string, Promise<void>>();
 let storageQueue: Promise<unknown> = Promise.resolve();
+let historyGeneration = 0;
+let historyWrites: Promise<unknown> = Promise.resolve();
 
 function updateStorage<T>(task: () => Promise<T>): Promise<T> {
 	const next = storageQueue.then(task, task);
@@ -214,7 +229,7 @@ type CachedAnalysis = WebsiteActivity & { cachedAt: string };
 
 chrome.runtime.onInstalled.addListener(async () => {
 	await ensureStorageDefaults();
-	await refreshActiveTab();
+	await refreshActiveTab(false, false);
 });
 
 void ensureStorageDefaults();
@@ -266,8 +281,10 @@ function withRedirectNote(result: WebsiteActivity, tabId: number) {
 }
 
 async function annotateRedirect(event: NavigationRequest) {
+	const generation = historyGeneration;
 	await redirectQueue;
 	if (!redirects.note(event.tabId, event.url)) return;
+	if (!(await isForegroundTab(event.tabId))) return;
 	await recordWebsite(event.url);
 	const stored = await chrome.storage.local.get([
 		ACTIVITY_KEY,
@@ -287,7 +304,8 @@ async function annotateRedirect(event: NavigationRequest) {
 		stored[HISTORY_ENABLED_KEY] === true &&
 		typeof stored[AUTH_TOKEN_KEY] === "string"
 	)
-		await saveWebsiteHistory(updated, stored[AUTH_TOKEN_KEY]);
+		await saveWebsiteHistory(updated, stored[AUTH_TOKEN_KEY], generation);
+	if (generation !== historyGeneration) return;
 	await updateStorage(async () => {
 		const latest = await chrome.storage.local.get([ACTIVITY_KEY]);
 		const items = Array.isArray(latest[ACTIVITY_KEY])
@@ -301,9 +319,10 @@ async function annotateRedirect(event: NavigationRequest) {
 	});
 }
 
-chrome.tabs.onUpdated.addListener(async (_tabId, changeInfo, tab) => {
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 	if (changeInfo.status !== "complete" && !changeInfo.url) return;
 	if (typeof tab.url !== "string") return;
+	if (!(await isForegroundTab(tabId))) return;
 	await recordWebsite(tab.url);
 });
 
@@ -311,18 +330,51 @@ chrome.tabs.onActivated.addListener(async () => {
 	await refreshActiveTab();
 });
 
-chrome.windows.onFocusChanged.addListener(async () => {
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+	if (windowId < 0) return;
 	await refreshActiveTab();
 });
 
+startProtection();
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	(async () => {
+		if (message.type === "organizationBlockInfo") {
+			const source = new URL(_sender.url ?? "https://invalid.example");
+			const expected = new URL(chrome.runtime.getURL("blocked.html"));
+			if (
+				source.protocol !== expected.protocol ||
+				source.host !== expected.host ||
+				source.pathname !== "/blocked.html" ||
+				source.searchParams.get("domain") !== message.domain
+			)
+				throw new Error("Untrusted blocked-page request.");
+			sendResponse(await getOrganizationBlockInfo(message.domain));
+			return;
+		}
+		if (message.type === "organizationProtection") {
+			const origin = new URL(
+				_sender.url ?? _sender.tab?.url ?? "https://invalid.example",
+			).origin;
+			if (!["http://localhost:5173", "http://127.0.0.1:5173"].includes(origin))
+				throw new Error("Untrusted organization request.");
+			sendResponse(await handleProtection(message));
+			return;
+		}
 		if (message.type === "getBlockedSites") {
 			const rules = await chrome.declarativeNetRequest.getDynamicRules();
 			const stored = await chrome.storage.local.get([MONITORING_KEY]);
 			sendResponse({
 				monitoringEnabled: stored[MONITORING_KEY] !== false,
-				domains: rules.flatMap((rule) => rule.condition.requestDomains ?? []),
+				domains: rules
+					.filter((rule) => rule.id < ORGANIZATION_RULE_START)
+					.flatMap((rule) => rule.condition.requestDomains ?? []),
+				organizationDomains: [
+					...new Set(
+						rules
+							.filter((rule) => rule.id >= ORGANIZATION_RULE_START)
+							.flatMap((rule) => rule.condition.requestDomains ?? []),
+					),
+				],
 			});
 			return;
 		}
@@ -340,13 +392,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 			return;
 		}
 		if (message.type === "getPageAnalysis") {
+			if (
+				_sender.tab?.id === undefined ||
+				!(await isForegroundTab(_sender.tab.id))
+			) {
+				sendResponse({ result: null });
+				return;
+			}
+			const generation = historyGeneration;
 			await redirectQueue;
 			const url = _sender.tab?.url;
 			if (!url || !parseWebsiteUrl(url)) {
 				sendResponse({ result: null });
 				return;
 			}
-			await recordWebsite(url);
+			// Background banner refreshes analyze pages but never create a saved visit.
+			await recordWebsite(url, false, false);
 			const stored = await chrome.storage.local.get([
 				ACTIVITY_KEY,
 				MONITORING_KEY,
@@ -425,6 +486,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				}
 				result = withRedirectNote(result, _sender.tab?.id ?? -1);
 				if (
+					visit?.historyId &&
+					generation === historyGeneration &&
 					stored[HISTORY_ENABLED_KEY] === true &&
 					typeof stored[AUTH_TOKEN_KEY] === "string" &&
 					result.riskScore !== null
@@ -432,11 +495,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 					const historyId = await saveWebsiteHistory(
 						result,
 						stored[AUTH_TOKEN_KEY],
+						generation,
 					);
 					if (historyId) result = { ...result, historyId };
 				}
 				await updateBadge(result.riskLevel);
-				await storeActivity(result);
+				if (visit && generation === historyGeneration)
+					await storeActivity(result);
 			}
 			if (result) result = withRedirectNote(result, _sender.tab?.id ?? -1);
 			sendResponse({ result });
@@ -534,52 +599,78 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		}
 
 		if (message.type === "suppressUrl") {
-			const stored = await chrome.storage.local.get([
-				ACTIVITY_KEY,
-				ANALYSIS_CACHE_KEY,
-			]);
-			const activity = Array.isArray(stored[ACTIVITY_KEY])
-				? (stored[ACTIVITY_KEY] as WebsiteActivity[]).filter(
-						(entry) => entry.url !== message.url,
-					)
-				: [];
-			const cache = isAnalysisCache(stored[ANALYSIS_CACHE_KEY])
-				? stored[ANALYSIS_CACHE_KEY]
-				: {};
-			delete cache[message.url];
-			await chrome.storage.local.set({
-				[SUPPRESSED_URL_KEY]: message.url,
-				[SUPPRESSED_AT_KEY]: Date.now(),
-				[ACTIVITY_KEY]: activity,
-				[ANALYSIS_CACHE_KEY]: cache,
+			historyGeneration++;
+			await historyWrites;
+			await updateStorage(async () => {
+				const stored = await chrome.storage.local.get([
+					ACTIVITY_KEY,
+					ANALYSIS_CACHE_KEY,
+				]);
+				const activity = Array.isArray(stored[ACTIVITY_KEY])
+					? (stored[ACTIVITY_KEY] as WebsiteActivity[]).filter(
+							(entry) => entry.url !== message.url,
+						)
+					: [];
+				const cache = isAnalysisCache(stored[ANALYSIS_CACHE_KEY])
+					? stored[ANALYSIS_CACHE_KEY]
+					: {};
+				delete cache[message.url];
+				await chrome.storage.local.set({
+					[SUPPRESSED_URL_KEY]: message.url,
+					[SUPPRESSED_AT_KEY]: Date.now(),
+					[ACTIVITY_KEY]: activity,
+					[ANALYSIS_CACHE_KEY]: cache,
+				});
 			});
 			sendResponse({ ok: true });
 			return;
 		}
 
 		if (message.type === "clearHistory") {
-			await chrome.storage.local.set({
-				[ACTIVITY_KEY]: [],
-				[ANALYSIS_CACHE_KEY]: {},
+			historyGeneration++;
+			await historyWrites;
+			await updateStorage(async () => {
+				await chrome.storage.local.set({
+					[ACTIVITY_KEY]: [],
+					[ANALYSIS_CACHE_KEY]: {},
+				});
+				await chrome.storage.local.remove([
+					SUPPRESSED_URL_KEY,
+					SUPPRESSED_AT_KEY,
+				]);
 			});
-			await chrome.storage.local.remove([
-				SUPPRESSED_URL_KEY,
-				SUPPRESSED_AT_KEY,
-			]);
 			sendResponse({ ok: true });
 		}
 	})().catch((error) => {
 		console.error("CyberGuard extension message failed", error);
-		sendResponse({ error: "Could not update extension state." });
+		sendResponse({
+			error:
+				message.type === "organizationProtection" && error instanceof Error
+					? error.message
+					: "Could not update extension state.",
+		});
 	});
 	return true;
 });
 
-async function refreshActiveTab(force = false) {
-	const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+async function isForegroundTab(tabId: number): Promise<boolean> {
+	if (!(await chrome.windows.getLastFocused()).focused) return false;
+	const tabs = await chrome.tabs.query({
+		active: true,
+		lastFocusedWindow: true,
+	});
+	return tabs[0]?.id === tabId;
+}
+
+async function refreshActiveTab(force = false, saveVisit = true) {
+	if (!(await chrome.windows.getLastFocused()).focused) return;
+	const tabs = await chrome.tabs.query({
+		active: true,
+		lastFocusedWindow: true,
+	});
 	const activeTab = tabs[0];
 	if (activeTab?.url) {
-		await recordWebsite(activeTab.url, force);
+		await recordWebsite(activeTab.url, force, saveVisit);
 	}
 }
 
@@ -608,25 +699,31 @@ async function ensureStorageDefaults() {
 	});
 }
 
-async function recordWebsite(url: string, force = false) {
-	const existingRequest = inFlightRecords.get(url);
+async function recordWebsite(url: string, force = false, saveVisit = true) {
+	const key = `${saveVisit ? "visit" : "analysis"}:${url}`;
+	const existingRequest = inFlightRecords.get(key);
 	if (existingRequest) {
 		await existingRequest;
 		return;
 	}
 
-	const request = recordWebsiteInternal(url, force);
-	inFlightRecords.set(url, request);
+	const request = recordWebsiteInternal(url, force, saveVisit);
+	inFlightRecords.set(key, request);
 	try {
 		await request;
 	} finally {
-		if (inFlightRecords.get(url) === request) {
-			inFlightRecords.delete(url);
+		if (inFlightRecords.get(key) === request) {
+			inFlightRecords.delete(key);
 		}
 	}
 }
 
-async function recordWebsiteInternal(url: string, force = false) {
+async function recordWebsiteInternal(
+	url: string,
+	force = false,
+	saveVisit = true,
+) {
+	const generation = historyGeneration;
 	const parsedUrl = parseWebsiteUrl(url);
 	if (!parsedUrl) return;
 
@@ -728,6 +825,7 @@ async function recordWebsiteInternal(url: string, force = false) {
 				cachedAt: new Date().toISOString(),
 			};
 			await updateStorage(async () => {
+				if (generation !== historyGeneration) return;
 				const latest = await chrome.storage.local.get([ANALYSIS_CACHE_KEY]);
 				const cache = pruneAnalysisCache(latest[ANALYSIS_CACHE_KEY]);
 				cache[url] = freshAnalysis;
@@ -772,15 +870,21 @@ async function recordWebsiteInternal(url: string, force = false) {
 			}
 		}
 	}
-	await storeActivity(result);
+	if (generation !== historyGeneration) return;
+	if (saveVisit) await storeActivity(result);
 	if (
-		!hasFreshCache &&
+		saveVisit &&
+		(!hasFreshCache || !currentVisit?.historyId) &&
 		stored[HISTORY_ENABLED_KEY] === true &&
 		typeof stored[AUTH_TOKEN_KEY] === "string" &&
 		result.riskScore !== null
 	) {
-		const historyId = await saveWebsiteHistory(result, stored[AUTH_TOKEN_KEY]);
-		if (historyId) {
+		const historyId = await saveWebsiteHistory(
+			result,
+			stored[AUTH_TOKEN_KEY],
+			generation,
+		);
+		if (historyId && generation === historyGeneration) {
 			result = { ...result, historyId };
 			await storeActivity(result);
 		}
@@ -788,7 +892,21 @@ async function recordWebsiteInternal(url: string, force = false) {
 	await updateBadge(result.riskLevel);
 }
 
-async function saveWebsiteHistory(
+function saveWebsiteHistory(
+	result: WebsiteActivity,
+	accessToken: string,
+	generation: number,
+) {
+	const pending = historyWrites.then(() =>
+		generation === historyGeneration
+			? writeWebsiteHistory(result, accessToken)
+			: undefined,
+	);
+	historyWrites = pending.catch(() => undefined);
+	return pending;
+}
+
+async function writeWebsiteHistory(
 	result: WebsiteActivity,
 	accessToken: string,
 ) {
@@ -801,6 +919,7 @@ async function saveWebsiteHistory(
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${accessToken}`,
 				},
+				signal: AbortSignal.timeout(15000),
 				body: JSON.stringify({
 					url: result.url,
 					domain: result.domain,
@@ -874,43 +993,42 @@ async function updateBadge(riskLevel: string) {
 	}
 }
 
-let blockingQueue = Promise.resolve();
 function setSiteBlocked(domain: string, blocked: boolean) {
-	const task = blockingQueue
-		.catch(() => undefined)
-		.then(async () => {
-			const host = domain.toLowerCase().replace(/\.$/, "");
-			if (
-				host.length > 253 ||
-				!/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(host) ||
-				host.includes("..")
-			)
-				throw new Error("Invalid hostname");
-			const rules = await chrome.declarativeNetRequest.getDynamicRules();
-			const existing = rules.filter((rule) =>
+	return withRuleLock(async () => {
+		const host = domain.toLowerCase().replace(/\.$/, "");
+		if (
+			host.length > 253 ||
+			!/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(host) ||
+			host.includes("..")
+		)
+			throw new Error("Invalid hostname");
+		const rules = await chrome.declarativeNetRequest.getDynamicRules();
+		const existing = rules.filter(
+			(rule) =>
+				rule.id < ORGANIZATION_RULE_START &&
 				rule.condition.requestDomains?.includes(host),
-			);
-			if (blocked && existing.length) return;
-			const used = new Set(rules.map((rule) => rule.id));
-			let id = 1;
-			while (used.has(id)) id++;
-			await chrome.declarativeNetRequest.updateDynamicRules({
-				removeRuleIds: blocked ? [] : existing.map((rule) => rule.id),
-				addRules: blocked
-					? [
-							{
-								id,
-								priority: 1,
-								action: { type: "block" },
-								condition: {
-									requestDomains: [host],
-									resourceTypes: ["main_frame"],
-								},
+		);
+		if (blocked && existing.length) return;
+		const used = new Set(rules.map((rule) => rule.id));
+		let id = 1;
+		while (used.has(id)) id++;
+		if (id >= ORGANIZATION_RULE_START)
+			throw new Error("Personal rule limit reached.");
+		await chrome.declarativeNetRequest.updateDynamicRules({
+			removeRuleIds: blocked ? [] : existing.map((rule) => rule.id),
+			addRules: blocked
+				? [
+						{
+							id,
+							priority: 1,
+							action: { type: "block" },
+							condition: {
+								requestDomains: [host],
+								resourceTypes: ["main_frame"],
 							},
-						]
-					: [],
-			});
+						},
+					]
+				: [],
 		});
-	blockingQueue = task;
-	return task;
+	});
 }

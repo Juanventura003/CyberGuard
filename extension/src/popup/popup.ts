@@ -32,7 +32,11 @@ declare const chrome: {
 	runtime: {
 		sendMessage(message: {
 			type: "getBlockedSites";
-		}): Promise<{ domains: string[]; error?: string }>;
+		}): Promise<{
+			domains: string[];
+			organizationDomains?: string[];
+			error?: string;
+		}>;
 		sendMessage(message: {
 			type: "setSiteBlocked";
 			domain: string;
@@ -246,24 +250,38 @@ async function renderBlockedSites() {
 		} catch {
 			/* Restricted page. */
 		}
+		const organizationDomains = state.organizationDomains ?? [];
+		const managed = organizationDomains.find(
+			(host) => domain === host || domain.endsWith(`.${host}`),
+		);
 		const covering = state.domains.find(
 			(host) => domain === host || domain.endsWith(`.${host}`),
 		);
 		document.querySelector("#blocking-domain")!.textContent =
 			domain || "Open a website to block it";
 		document.querySelector("#blocked-count")!.textContent = String(
-			state.domains.length,
+			state.domains.length + organizationDomains.length,
 		);
-		blockButton.classList.toggle("is-blocked", Boolean(covering));
-		blockButton.disabled = !domain;
-		blockButton.textContent = covering ? "Unblock" : "Block website";
+		blockButton.classList.toggle("is-blocked", Boolean(covering || managed));
+		blockButton.disabled = !domain || Boolean(managed);
+		blockButton.textContent = managed
+			? "Blocked by organization"
+			: covering
+				? "Unblock"
+				: "Block website";
 		blockButton.setAttribute(
 			"aria-label",
-			covering ? `Unblock ${covering}` : `Block ${domain || "website"}`,
+			managed
+				? `Blocked by organization: ${managed}`
+				: covering
+					? `Unblock ${covering}`
+					: `Block ${domain || "website"}`,
 		);
-		blockButton.title = covering
-			? `Unblock ${covering} and its subdomains`
-			: `Block ${domain || "this website"} and its subdomains`;
+		blockButton.title = managed
+			? "Managed in Team Security by your organization"
+			: covering
+				? `Unblock ${covering} and its subdomains`
+				: `Block ${domain || "this website"} and its subdomains`;
 		blockButton.onclick = () => {
 			void changeBlock(covering ?? domain, !covering);
 		};
@@ -283,7 +301,13 @@ async function renderBlockedSites() {
 			row.append(name, button);
 			list.append(row);
 		}
-		if (!state.domains.length) list.textContent = "No websites blocked.";
+		for (const host of organizationDomains) {
+			const row = document.createElement("li");
+			row.textContent = `${host} · Organization rule`;
+			list.append(row);
+		}
+		if (!state.domains.length && !organizationDomains.length)
+			list.textContent = "No websites blocked.";
 	} catch {
 		blockButton.disabled = true;
 		setStatus("Could not load blocked websites. Reload the extension.");
