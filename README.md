@@ -95,7 +95,7 @@ Keep all backend credentials in `src/backend/.env`; never copy them into the fro
 
 The Chrome extension combines Google Web Risk, OpenPhish Community and URL/page rules. It checks for embedded URL credentials, brand impersonation and spelling/Unicode lookalikes, insecure password forms, GET submissions, misleading links and labeled recovery-secret fields. Page checks send bounded facts, never passwords, entered values, raw page text or HTML.
 
-Scores describe evidence strength, not phishing probability. Strong rules can produce suspicious warnings at 35; reputation matches produce high-risk results. Weak page signals alone are capped at 25. Missing enabled providers produce incomplete checks. Blocking is always manual through the popup or Website Tracker.
+Scores describe evidence strength, not phishing probability. Strong rules can produce suspicious warnings at 35; reputation matches produce high-risk results. Weak page signals alone are capped at 25. Missing enabled providers produce incomplete checks. Personal blocking is manual through the popup or Website Tracker. Organization admins can also publish shared website rules to connected extensions.
 
 #### Setup and use
 
@@ -132,3 +132,7 @@ Sign in to save articles and track what you’ve read. Your saved articles and r
 - **Google says `redirect_uri_mismatch`**: the redirect URI in Google Cloud must match `GOOGLE_REDIRECT_URI` exactly.
 - **Google says the app isn't verified or access is blocked**: add your account as a test user.
 - **Port already in use**: stop the other process, or use a different `--port` and update `GOOGLE_REDIRECT_URI` / `VITE_API_BASE_URL` to match.
+
+### Team security
+
+CyberGuard supports organizations, invitations, optional app presence/device categories, shared extension website rules, and findings that admins can turn into team protection. Members can share email/website scan evidence, track responses, and request review of a blocked website.
