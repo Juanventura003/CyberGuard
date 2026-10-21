@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import "./Settings.css";
 
 const NOT_CONFIGURED = "Supabase is not configured, so this action is unavailable.";
+const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
 
 interface Profile {
   first_name: string | null;
@@ -22,16 +23,30 @@ interface FormMessage {
   text: string;
 }
 
-interface NameFormProps {
+interface ProfileValues {
+  firstName: string;
+  lastName: string;
+  username: string;
+}
+
+interface ProfileFormProps {
   userId: string;
   initialFirstName: string;
   initialLastName: string;
-  onSaved: (firstName: string, lastName: string) => void;
+  initialUsername: string;
+  onSaved: (values: ProfileValues) => void;
 }
 
-function NameForm({ userId, initialFirstName, initialLastName, onSaved }: NameFormProps) {
+function ProfileForm({
+  userId,
+  initialFirstName,
+  initialLastName,
+  initialUsername,
+  onSaved,
+}: ProfileFormProps) {
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
+  const [username, setUsername] = useState(initialUsername);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<FormMessage | null>(null);
 
@@ -45,21 +60,40 @@ function NameForm({ userId, initialFirstName, initialLastName, onSaved }: NameFo
       return;
     }
 
-    setSaving(true);
+    const values: ProfileValues = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      username: username.trim(),
+    };
 
-    const first = firstName.trim();
-    const last = lastName.trim();
+    if (!USERNAME_PATTERN.test(values.username)) {
+      setMessage({
+        type: "error",
+        text: "Usernames must be 3 to 20 characters and use only letters, numbers and underscores.",
+      });
+      return;
+    }
+
+    setSaving(true);
 
     const { data, error } = await client
       .from("profiles")
-      .update({ first_name: first, last_name: last })
+      .update({
+        first_name: values.firstName,
+        last_name: values.lastName,
+        username: values.username,
+      })
       .eq("id", userId)
       .select("id");
 
     setSaving(false);
 
     if (error) {
-      setMessage({ type: "error", text: error.message });
+      if (error.code === "23505") {
+        setMessage({ type: "error", text: "That username is already taken. Please choose another." });
+      } else {
+        setMessage({ type: "error", text: error.message });
+      }
       return;
     }
 
@@ -68,8 +102,8 @@ function NameForm({ userId, initialFirstName, initialLastName, onSaved }: NameFo
       return;
     }
 
-    onSaved(first, last);
-    setMessage({ type: "success", text: "Your name was updated." });
+    onSaved(values);
+    setMessage({ type: "success", text: "Your profile was updated." });
   };
 
   return (
@@ -102,8 +136,20 @@ function NameForm({ userId, initialFirstName, initialLastName, onSaved }: NameFo
         </label>
       </div>
 
+      <label className="settings-field">
+        <span>Username</span>
+        <input
+          type="text"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          maxLength={20}
+          required
+        />
+        <span className="settings-hint">3 to 20 characters: letters, numbers and underscores.</span>
+      </label>
+
       <button className="settings-button" type="submit" disabled={saving}>
-        {saving ? "Saving..." : "Save name"}
+        {saving ? "Saving..." : "Save profile"}
       </button>
     </form>
   );
@@ -347,15 +393,15 @@ function Settings() {
     };
   }, [user]);
 
-  const handleNameSaved = (firstName: string, lastName: string) => {
+  const handleProfileSaved = (values: ProfileValues) => {
     setResult((previous) =>
       previous
         ? {
             ...previous,
             profile: {
-              username: previous.profile?.username ?? null,
-              first_name: firstName,
-              last_name: lastName,
+              first_name: values.firstName,
+              last_name: values.lastName,
+              username: values.username,
             },
           }
         : previous
@@ -435,13 +481,14 @@ function Settings() {
       {!loadingProfile && !result?.error && profile && (
         <section className="settings-card">
           <h2>Profile</h2>
-          <p className="settings-card-desc">Update the name shown on your account.</p>
-          <NameForm
+          <p className="settings-card-desc">Update your name and username.</p>
+          <ProfileForm
             key={user.id}
             userId={user.id}
             initialFirstName={profile.first_name ?? ""}
             initialLastName={profile.last_name ?? ""}
-            onSaved={handleNameSaved}
+            initialUsername={profile.username ?? ""}
+            onSaved={handleProfileSaved}
           />
         </section>
       )}

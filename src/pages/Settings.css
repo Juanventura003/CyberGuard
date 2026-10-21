@@ -17,6 +17,12 @@
     font-size: 28px;
     font-weight: 700;
   }
+
+  .settings-hint {
+    color: var(--s-muted);
+    font-size: 13px;
+    font-weight: 400;
+  }
   
   .settings-subtitle {
     margin: 4px 0 24px;
