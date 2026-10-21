@@ -7,6 +7,9 @@ import os
 import re
 import httpx
 import asyncio
+import dns.resolver
+import dns.exception
+from email_validator import validate_email, EmailNotValidError
 from pathlib import Path as FilePath
 from dotenv import load_dotenv
 from fastapi import HTTPException
@@ -42,6 +45,8 @@ from . import threat_feeds
 
 load_dotenv(FilePath(__file__).resolve().parents[1] / ".env")
 
+from difflib import SequenceMatcher
+import re
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,6 +78,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+class EmailCheckRequest(BaseModel):
+    email: str
 
 class PhoneReputationRequest(BaseModel):
     phone_number: str
@@ -146,6 +155,408 @@ async def check_phone_reputation(request: PhoneReputationRequest):
         "carrier": data.get("carrier"),
         "line_type": data.get("line_type"),
         "valid": data.get("valid")
+    }
+
+#email address checker
+DISPOSABLE_EMAIL_DOMAINS = {
+    "mailinator.com",
+    "guerrillamail.com",
+    "10minutemail.com",
+    "tempmail.com",
+    "yopmail.com",
+    "trashmail.com",
+}
+
+
+@app.post("/api/security/email-check")
+async def check_email_address(request: EmailCheckRequest):
+    email = request.email.strip()
+
+    if not email or len(email) > 254:
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid email address."
+        )
+
+    try:
+        validated = validate_email(
+            email,
+            check_deliverability=False
+        )
+    except EmailNotValidError as exc:
+        return {
+            "valid_format": False,
+            "email": email,
+            "domain": None,
+            "domain_exists": None,
+            "has_mx_records": None,
+            "mx_records": [],
+            "disposable": None,
+            "recommendations": [
+                str(exc)
+            ],
+        }
+
+    domain = validated.domain.lower()
+
+    def lookup_dns():
+        resolver = dns.resolver.Resolver()
+        resolver.timeout = 2
+        resolver.lifetime = 5
+
+        domain_exists = None
+        has_mx_records = None
+        mx_records = []
+        dns_error = None
+
+        try:
+            mx_answers = resolver.resolve(domain, "MX")
+
+            mx_records = [
+                str(record.exchange).rstrip(".")
+                for record in mx_answers
+                if str(record.exchange) != "."
+            ]
+
+            domain_exists = True
+            has_mx_records = len(mx_records) > 0
+
+        except dns.resolver.NXDOMAIN:
+            domain_exists = False
+            has_mx_records = False
+
+        except dns.resolver.NoAnswer:
+            domain_exists = True
+            has_mx_records = False
+
+        except (dns.exception.Timeout, dns.resolver.NoNameservers):
+            dns_error = "DNS lookup could not be completed."
+
+        return domain_exists, has_mx_records, mx_records, dns_error
+
+    domain_exists, has_mx_records, mx_records, dns_error = (
+        await asyncio.to_thread(lookup_dns)
+    )
+
+    disposable = domain in DISPOSABLE_EMAIL_DOMAINS
+
+    recommendations = []
+
+    if domain_exists is False:
+        recommendations.append(
+            "The email domain could not be found in DNS."
+        )
+
+    if has_mx_records is False:
+        recommendations.append(
+            "No mail exchange (MX) records were found. "
+            "Some domains can receive mail through address-record fallback."
+        )
+
+    if disposable:
+        recommendations.append(
+            "This domain is commonly associated with temporary email services."
+        )
+
+    if dns_error:
+        recommendations.append(dns_error)
+
+    if not recommendations:
+        recommendations.append(
+            "No obvious email formatting or domain configuration issues were detected."
+        )
+
+    return {
+        "valid_format": True,
+        "email": validated.normalized,
+        "domain": domain,
+        "domain_exists": domain_exists,
+        "has_mx_records": has_mx_records,
+        "mx_records": mx_records,
+        "disposable": disposable,
+        "recommendations": recommendations,
+    }
+
+class EmailReputationRequest(BaseModel):
+    email: str
+
+PROTECTED_BRANDS = {
+    "Google": {"google.com", "gmail.com"},
+    "Microsoft": {"microsoft.com", "outlook.com", "office.com"},
+    "PayPal": {"paypal.com"},
+    "Amazon": {"amazon.com"},
+    "Apple": {"apple.com", "icloud.com"},
+    "Handshake": {"joinhandshake.com"},
+}
+
+def detect_email_impersonation(email: str) -> dict:
+    domain = email.rsplit("@", 1)[-1].lower().rstrip(".")
+
+    try:
+        ascii_domain = domain.encode("idna").decode("ascii")
+    except UnicodeError:
+        ascii_domain = domain
+
+    for brand, domains in PROTECTED_BRANDS.items():
+        for official in domains:
+            if ascii_domain == official or ascii_domain.endswith("." + official):
+                return {
+                    "status": "recognized_domain",
+                    "brand": brand,
+                    "details": (
+                        f"The domain matches a listed {brand} domain "
+                        "or one of its subdomains. This does not "
+                        "authenticate the sender."
+                    ),
+                }
+
+    parts = ascii_domain.split(".")
+    if len(parts) < 2:
+        return {
+            "status": "not_detected",
+            "brand": None,
+            "details": "No lookalike pattern detected.",
+        }
+
+    domain_name = parts[-2]
+    normalized_name = re.sub(r"[-_]", "", domain_name)
+
+    for brand, domains in PROTECTED_BRANDS.items():
+        for official in domains:
+            official_name = official.split(".")[0]
+
+            similarity = SequenceMatcher(
+                None, normalized_name, official_name
+            ).ratio()
+
+            substitutions = str.maketrans({
+                "0": "o",
+                "1": "l",
+                "3": "e",
+                "5": "s",
+            })
+            decoded_name = normalized_name.translate(substitutions)
+
+            suspicious = (
+                decoded_name == official_name
+                or (
+                    similarity >= 0.82
+                    and normalized_name != official_name
+                )
+            )
+
+            if suspicious:
+                return {
+                    "status": "possible_impersonation",
+                    "brand": brand,
+                    "details": (
+                        f"This domain resembles {brand}'s "
+                        f"listed domain ({official}). "
+                        "It may be an impersonation attempt."
+                    ),
+                }
+
+    return {
+        "status": "not_detected",
+        "brand": None,
+        "details": (
+            "No lookalike pattern was detected against "
+            "the configured brand list."
+        ),
+    }
+
+@app.post("/api/security/email-reputation")
+async def check_email_reputation(request: EmailReputationRequest):
+    api_key = os.getenv("IPQS_API_KEY")
+
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Email reputation API is not configured."
+        )
+
+    try:
+        validated = validate_email(
+            request.email.strip(),
+            check_deliverability=False
+        )
+    except EmailNotValidError:
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a valid email address."
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                "https://www.ipqualityscore.com/api/json/email/"
+                + api_key + "/"
+                + validated.normalized,
+                params={
+                    "fast": "true",
+                    "abuse_strictness": 0,
+                },
+            )
+
+            response.raise_for_status()
+            data = response.json()
+
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(
+            status_code=502,
+            detail="Email reputation service is unavailable."
+        )
+
+    if data.get("success") is not True:
+        raise HTTPException(
+            status_code=502,
+            detail="Email reputation lookup failed. Check API access or credits."
+        )
+
+    score = data.get("fraud_score")
+
+    if (
+        isinstance(score, bool)
+        or not isinstance(score, (int, float))
+        or not 0 <= score <= 100
+    ):
+        score = None
+
+    recent_abuse = data.get("recent_abuse")
+    disposable = data.get("disposable")
+    honeypot = data.get("honeypot")
+    leaked = data.get("leaked")
+
+    impersonation = detect_email_impersonation(validated.normalized)
+
+    warnings = []
+    positive_signals = []
+    unavailable_checks = []
+
+    if recent_abuse is True:
+        warnings.append("Recent abusive activity was reported.")
+    elif recent_abuse is False:
+        positive_signals.append("No recent abuse was reported.")
+    else:
+        unavailable_checks.append("Recent abuse information")
+
+    if disposable is True:
+        warnings.append("The address uses a disposable email service.")
+    elif disposable is False:
+        positive_signals.append("Not identified as a disposable address.")
+    else:
+        unavailable_checks.append("Disposable email detection")
+
+    if honeypot is True:
+        warnings.append("The address was identified as a potential spam trap.")
+    elif honeypot is False:
+        positive_signals.append("No spam-trap indicator was reported.")
+    else:
+        unavailable_checks.append("Spam-trap detection")
+
+    if leaked is True:
+        warnings.append(
+            "The provider reported a possible data leak association. "
+            "This does not mean the owner is a scammer."
+        )
+    elif leaked is False:
+        positive_signals.append("No data leak indicator was reported.")
+    else:
+        unavailable_checks.append("Data leak information")
+
+    if impersonation["status"] == "possible_impersonation":
+        warnings.append(impersonation["details"])
+    elif impersonation["status"] == "recognized_domain":
+        positive_signals.append(impersonation["details"])
+
+    if score is None:
+        unavailable_checks.append("Email reputation score")
+
+    has_impersonation = (
+        impersonation["status"] == "possible_impersonation"
+    )
+
+    has_security_signal = (
+        has_impersonation
+        or recent_abuse is True
+        or honeypot is True
+        or disposable is True
+    )
+
+    if score is None and not has_security_signal:
+        cyberguard_score = None
+    else:
+        cyberguard_score = 0.0
+
+        if score is not None:
+            cyberguard_score += score * 0.60
+
+        if has_impersonation:
+            cyberguard_score += 75
+
+        if recent_abuse is True:
+            cyberguard_score += 35
+
+        if honeypot is True:
+            cyberguard_score += 35
+
+        if disposable is True:
+            cyberguard_score += 15
+
+        cyberguard_score = min(100, round(cyberguard_score))
+
+    if cyberguard_score is None:
+        risk_level = "Unknown"
+        risk_label = "Insufficient Reputation Data"
+    elif cyberguard_score >= 75:
+        risk_level = "High"
+        risk_label = "High-Risk Indicators Detected"
+    elif cyberguard_score >= 40:
+        risk_level = "Medium"
+        risk_label = "Elevated Risk Indicators"
+    else:
+        risk_level = "Low"
+        risk_label = "Low Reported Risk"
+
+    if not warnings:
+        warnings.append(
+            "No elevated warning indicators were detected by "
+            "the available checks. This does not guarantee safety."
+        )
+
+    findings = warnings
+
+    first_seen_data = data.get("first_seen")
+
+    if isinstance(first_seen_data, dict):
+        first_seen = first_seen_data.get("human")
+    else:
+        first_seen = None
+
+    if not isinstance(first_seen, str) or not first_seen.strip():
+        first_seen = None
+    elif "from now" in first_seen.lower():
+        first_seen = None
+
+    
+    return {
+        "email": validated.normalized,
+        "fraud_score": score,
+        "cyberguard_score": cyberguard_score,
+        "risk_level": risk_level,
+        "risk_label": risk_label,
+        "recent_abuse": recent_abuse,
+        "disposable": disposable,
+        "honeypot": honeypot,
+        "leaked": leaked,
+        "spam_trap_score": data.get("spam_trap_score"),
+        "domain_trust": data.get("domain_trust"),
+        "first_seen": first_seen,
+        "findings": findings,
+        "impersonation": impersonation,
+        "warnings": warnings,
+        "positive_signals": positive_signals,
+        "unavailable_checks": unavailable_checks,
     }
 
 app.add_middleware(

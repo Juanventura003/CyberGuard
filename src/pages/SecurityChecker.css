@@ -1009,6 +1009,164 @@
   line-height: 1.6;
 }
 
+/* Email Address Checker */
+.email-checker-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.email-checker-form > label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.email-checker-form > input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+.email-checker-form > input:focus {
+  outline: none;
+  border-color: #4169e1;
+}
+
+/* Email Sender Reputation */
+.email-reputation-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #dce3ed;
+}
+
+.email-reputation-section > p {
+  color: #64748b;
+  margin: 10px 0 18px;
+}
+
+.email-reputation-results {
+  margin-top: 24px;
+}
+
+.email-reputation-summary {
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px solid #dce3ed;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.email-reputation-summary h3 {
+  margin: 0 0 12px;
+}
+
+.email-reputation-summary strong {
+  font-size: 22px;
+}
+
+.email-risk-low {
+  color: #198754;
+}
+
+.email-risk-medium {
+  color: #d99a00;
+}
+
+.email-risk-high {
+  color: #dc3545;
+}
+
+.email-risk-unknown {
+  color: #64748b;
+}
+
+.email-fraud-score {
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.email-reputation-findings {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #dce3ed;
+  border-radius: 12px;
+}
+
+.email-reputation-findings h3 {
+  margin-top: 0;
+}
+
+.email-reputation-findings li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+
+/* CyberGuard Email Risk Score */
+.email-risk-score-section {
+  margin-top: 24px;
+}
+
+.email-risk-score-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.email-risk-score-heading strong {
+  font-size: 24px;
+}
+
+.email-risk-score-track {
+  width: 100%;
+  height: 16px;
+  background-color: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.email-risk-score-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+/* Risk-based colors */
+.email-score-low {
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.email-score-medium {
+  background: linear-gradient(90deg, #facc15, #f97316);
+}
+
+.email-score-high {
+  background: linear-gradient(90deg, #fb7185, #dc2626);
+}
+
+.email-score-unknown {
+  background: #94a3b8;
+}
+
+.email-ipqs-score {
+  margin-top: 18px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.email-ipqs-score strong {
+  color: #334155;
+}
+
 @media (max-width: 600px) {
   .phone-details {
     grid-template-columns: 1fr;

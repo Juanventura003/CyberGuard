@@ -210,6 +210,59 @@ function SecurityChecker() {
     valid: boolean | null;
   };
 
+  type EmailCheckResult = {
+    valid_format: boolean;
+    email: string;
+    domain: string | null;
+    domain_exists: boolean | null;
+    has_mx_records: boolean | null;
+    mx_records: string[];
+    disposable: boolean | null;
+    recommendations: string[];
+  };
+
+  type EmailReputationResult = {
+    email: string;
+    fraud_score: number | null;
+    risk_level: "Low" | "Medium" | "High" | "Unknown";
+    risk_label: string;
+    cyberguard_score: number | null;
+
+    recent_abuse: boolean | null;
+    disposable: boolean | null;
+    honeypot: boolean | null;
+    leaked: boolean | null;
+
+    spam_trap_score: string | null;
+    domain_trust: string | null;
+    first_seen: string | null;
+
+    findings: string[];
+
+    impersonation: {
+      status:
+        | "recognized_domain"
+        | "possible_impersonation"
+        | "not_detected";
+      brand: string | null;
+      details: string;
+    };
+
+    warnings: string[];
+    positive_signals: string[];
+    unavailable_checks: string[];
+  };
+
+
+  const [emailInput, setEmailInput] = useState("");
+  const [emailResult, setEmailResult] = useState<EmailCheckResult | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailReputation, setEmailReputation] =
+    useState<EmailReputationResult | null>(null);
+
+  const [emailReputationLoading, setEmailReputationLoading] = useState(false);
+  const [emailReputationError, setEmailReputationError] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneReputation, setPhoneReputation] =
     useState<PhoneReputationResult | null>(null);
@@ -310,6 +363,99 @@ function SecurityChecker() {
     setPhoneResult(null);
     setPhoneReputation(null);
     setPhoneReputationError("");
+  };
+  const handleCheckEmail = async () => {
+    if (!emailInput.trim()) {
+      setEmailError("Please enter an email address.");
+      return;
+    }
+
+    setEmailLoading(true);
+    setEmailError("");
+    setEmailResult(null);
+    setEmailReputation(null);
+    setEmailReputationError("");
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/security/email-check`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: emailInput.trim(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || "Unable to check email address.");
+      }
+
+      const data: EmailCheckResult = await response.json();
+      setEmailResult(data);
+    } catch (error) {
+      setEmailError(
+        error instanceof Error
+          ? error.message
+          : "Unable to check email address."
+      );
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleCheckEmailReputation = async () => {
+    if (!emailResult?.valid_format) return;
+
+    setEmailReputationLoading(true);
+    setEmailReputationError("");
+    setEmailReputation(null);
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/security/email-reputation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: emailResult.email,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+
+        throw new Error(
+          error.detail || "Unable to check sender reputation."
+        );
+      }
+
+      const data: EmailReputationResult = await response.json();
+
+      setEmailReputation(data);
+    } catch (error) {
+      setEmailReputationError(
+        error instanceof Error
+          ? error.message
+          : "Unable to check sender reputation."
+      );
+    } finally {
+      setEmailReputationLoading(false);
+    }
+  };
+  const handleResetEmail = () => {
+    setEmailInput("");
+    setEmailResult(null);
+    setEmailError("");
+    setEmailReputation(null);
+    setEmailReputationError("");
   };
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -1039,7 +1185,6 @@ function SecurityChecker() {
                   </p>
                 )}
               </div>
-
               {/* Reset Password Checker */}
               <button
                 type="button"
@@ -1261,6 +1406,316 @@ function SecurityChecker() {
                 onClick={handleResetPhone}
               >
                 Check Another Number
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    {/* email address checker */}
+    {activeChecker === "email" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <Mail size={22} />
+          </div>
+          <div>
+            <h2>Email Address Checker</h2>
+            <p>Validate an email address and check its domain configuration.</p>
+          </div>
+        </div>
+
+        <div className="email-checker-form">
+          <label htmlFor="email-check-input">EMAIL ADDRESS</label>
+
+          <input
+            id="email-check-input"
+            type="email"
+            value={emailInput}
+            onChange={(e) => {
+              setEmailInput(e.target.value);
+              setEmailResult(null);
+              setEmailError("");
+              setEmailReputation(null);
+              setEmailReputationError("");
+            }}
+            placeholder="Enter an email address"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={emailLoading}
+          />
+
+          <button
+            type="button"
+            className="check-phone-button"
+            onClick={handleCheckEmail}
+            disabled={emailLoading}
+          >
+            {emailLoading ? "Checking Email..." : "Check Email Address"}
+          </button>
+
+          {emailError && (
+            <p className="phone-error-message">{emailError}</p>
+          )}
+
+          {emailResult && (
+            <div className="phone-analysis">
+              <div className="phone-result-heading">
+                {emailResult.valid_format ? (
+                  <CheckCircle size={26} color="#198754" />
+                ) : (
+                  <AlertTriangle size={26} color="#d99a00" />
+                )}
+
+                <div>
+                  <h3>
+                    {emailResult.valid_format
+                      ? "Valid Email Format"
+                      : "Invalid Email Format"}
+                  </h3>
+                  <p>
+                    {emailResult.valid_format
+                      ? "The address passed email format validation."
+                      : "The address does not meet email formatting requirements."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="phone-details">
+                <div className="phone-detail-item">
+                  <span>Email Address</span>
+                  <strong>{emailResult.email}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Domain</span>
+                  <strong>{emailResult.domain || "Not Available"}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Domain Exists</span>
+                  <strong>
+                    {emailResult.domain_exists === null
+                      ? "Unknown"
+                      : emailResult.domain_exists
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>MX Records Found</span>
+                  <strong>
+                    {emailResult.has_mx_records === null
+                      ? "Unknown"
+                      : emailResult.has_mx_records
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Disposable Email Domain</span>
+                  <strong>
+                    {emailResult.disposable === null
+                      ? "Unknown"
+                      : emailResult.disposable
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+              </div>
+
+              {emailResult.mx_records.length > 0 && (
+                <div className="phone-reputation-section">
+                  <h3>Mail Servers (MX Records)</h3>
+                  <ul>
+                    {emailResult.mx_records.map((record, index) => (
+                      <li key={index}>{record}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="phone-reputation-section">
+                <h3>Security Analysis</h3>
+                <ul>
+                  {emailResult.recommendations.map((recommendation, index) => (
+                    <li key={index}>{recommendation}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              {emailResult.valid_format && (
+                <div className="email-reputation-section">
+                  <h3>Sender Reputation & Scam Detection</h3>
+
+                  <p>
+                    Check whether this email address has reputation signals
+                    associated with fraud, spam, or abusive activity.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="check-phone-button"
+                    onClick={handleCheckEmailReputation}
+                    disabled={emailReputationLoading}
+                  >
+                    {emailReputationLoading
+                      ? "Checking Sender Reputation..."
+                      : "Check Scam & Fraud Risk"}
+                  </button>
+
+                  {emailReputationError && (
+                    <p className="phone-error-message">
+                      {emailReputationError}
+                    </p>
+                  )}
+
+                  {emailReputation && (
+                    <div className="email-reputation-results">
+
+                      <div className="email-reputation-summary">
+                        <h3>Sender Risk Assessment</h3>
+
+                        <strong
+                          className={`email-risk-${emailReputation.risk_level.toLowerCase()}`}
+                        >
+                          {emailReputation.risk_label}
+                        </strong>
+                                                
+                        <div className="risk-score-section">
+                          <div className="risk-score-heading">
+                            <span>CyberGuard Risk Score</span>
+
+                            <strong>
+                              {emailReputation.cyberguard_score == null
+                                ? "N/A"
+                                : `${emailReputation.cyberguard_score} / 100`}
+                            </strong>
+                          </div>
+
+                          <div className="risk-score-track">
+                            <div
+                              className="risk-score-fill"
+                              style={{
+                                width: `${
+                                  emailReputation.cyberguard_score == null
+                                    ? 0
+                                    : Math.max(
+                                        0,
+                                        Math.min(100, emailReputation.cyberguard_score)
+                                      )
+                                }%`,
+                                backgroundColor:
+                                  emailReputation.risk_level === "High"
+                                    ? "#dc3545"
+                                    : emailReputation.risk_level === "Medium"
+                                    ? "#d99a00"
+                                    : emailReputation.risk_level === "Low"
+                                    ? "#198754"
+                                    : "#94a3b8",
+                              }}
+                            />
+                          </div>
+                        </div>
+
+
+                      </div>
+
+                      <div className="phone-details">
+                        {[
+                          ["Recent Abuse", emailReputation.recent_abuse],
+                          ["Disposable Email", emailReputation.disposable],
+                          ["Spam Trap / Honeypot", emailReputation.honeypot],
+                          ["Data Leak Indicator", emailReputation.leaked],
+                        ].map(([label, value]) => (
+                          <div
+                            className="phone-detail-item"
+                            key={String(label)}
+                          >
+                            <span>{String(label)}</span>
+                            <strong>
+                              {value === null
+                                ? "Unknown"
+                                : value === true
+                                ? "Yes"
+                                : "No"}
+                            </strong>
+                          </div>
+                        ))}
+
+                        
+
+                        <div className="phone-detail-item">
+                          <span>First Seen</span>
+                          <strong>
+                            {emailReputation.first_seen || "Unknown"}
+                          </strong>
+                        </div>
+                      </div>
+                      
+                      <div className="email-reputation-findings">
+                        <h3>Domain Impersonation Check</h3>
+
+                        <p>
+                          {emailReputation.impersonation.details}
+                        </p>
+
+                        {emailReputation.impersonation.status === "possible_impersonation" && (
+                          <p style={{ color: "#dc3545", fontWeight: 600 }}>
+                            Warning: Possible brand impersonation detected.
+                          </p>
+                        )}
+                      </div>
+                      <div className="email-reputation-findings">
+                        <h3>Security Findings</h3>
+
+                        <h4>Warnings & Risk Indicators</h4>
+                          <ul>
+                            {emailReputation.warnings.map((finding, index) => (
+                              <li key={index}>{finding}</li>
+                            ))}
+                          </ul>
+
+                          <h4>Checks Without Reported Warnings</h4>
+                          <ul>
+                            {emailReputation.positive_signals.length > 0 ? (
+                              emailReputation.positive_signals.map((finding, index) => (
+                                <li key={index}>{finding}</li>
+                              ))
+                            ) : (
+                              <li>No additional positive indicators were available.</li>
+                            )}
+                          </ul>
+
+                          {emailReputation.unavailable_checks.length > 0 && (
+                            <>
+                              <h4>Unavailable Information</h4>
+                              <ul>
+                                {emailReputation.unavailable_checks.map((item, index) => (
+                                  <li key={index}>{item}</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                      </div>
+
+                      <p className="phone-reputation-disclaimer">
+                        Reputation scores are indicators, not proof of fraud.
+                        A low score does not guarantee safety. Sender addresses
+                        can be spoofed, and legitimate accounts can be compromised.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={handleResetEmail}
+              >
+                Check Another Email
               </button>
             </div>
           )}
