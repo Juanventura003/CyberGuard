@@ -96,6 +96,11 @@ const requestBlocking = (domain?: string, blocked?: boolean) =>
   );
 
 function WebsiteTracker() {
+  const { session } = useAuth();
+  return <WebsiteTrackerContent key={session?.user.id ?? "guest"} />;
+}
+
+function WebsiteTrackerContent() {
   const [blockedDomains, setBlockedDomains] = useState<string[] | null>(null);
   const [blockingConnecting, setBlockingConnecting] = useState(true);
   const [blockingError, setBlockingError] = useState("");
@@ -174,12 +179,6 @@ function WebsiteTracker() {
   const [urlTooltip, setUrlTooltip] = useState<UrlTooltip>(null);
   const { session } = useAuth();
   const historyMutation = useRef(0);
-
-  useEffect(() => {
-    setWebsites([]);
-    setSelectedFinding(null);
-    setHistoryError("");
-  }, [session?.user.id]);
 
   useEffect(() => {
     let ignore = false;

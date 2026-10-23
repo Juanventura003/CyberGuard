@@ -147,7 +147,6 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
       // eslint-disable-next-line react-hooks/set-state-in-effect
       disconnectGmail();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, session, gmailSession]);
 
   const resetManual = () => {

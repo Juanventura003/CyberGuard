@@ -56,20 +56,24 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 function SecurityChecker() {
   const { session, loading } = useAuth();
   const isLoggedIn = !loading && !!session;
+  const [gmailCallback] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { session: params.get("gmail_session"), error: params.get("gmail_error") };
+  });
   const [activeChecker, setActiveChecker] = useState<CheckerType>("file");
 
   const [selectedFile, setSelectedFile] =
     useState<File | null>(null);
-  const [fileError, setFileError] = useState("");
+  const [fileError, setFileError] = useState(gmailCallback.error ? `Gmail connection failed: ${gmailCallback.error}` : "");
   const [isFileScanning, setIsFileScanning] = useState(false);
   const [fileScanResult, setFileScanResult] =
     useState<FileScanResult | null>(null);
 
-  const [fileSource, setFileSource] = useState<"device" | "gmail">("device");
+  const [fileSource, setFileSource] = useState<"device" | "gmail">(gmailCallback.session || gmailCallback.error ? "gmail" : "device");
   const [gmailSession, setGmailSession] = useState(
-    () => loadGmailSession() || ""
+    () => gmailCallback.session || loadGmailSession() || ""
   );
-  const [gmailPickerOpen, setGmailPickerOpen] = useState(false);
+  const [gmailPickerOpen, setGmailPickerOpen] = useState(Boolean(gmailCallback.session));
 
 
   useEffect(() => {
@@ -98,21 +102,8 @@ function SecurityChecker() {
     const error = params.get("gmail_error");
     const checker = params.get("checker");
 
-    if (checker === "file" || session) {
-      setActiveChecker("file");
-    }
-
     if (session) {
       saveGmailSession(session);
-      setGmailSession(session);
-      setActiveChecker("file");
-      setFileSource("gmail");
-      setGmailPickerOpen(true);
-    }
-
-    if (error) {
-      setFileSource("gmail");
-      setFileError(`Gmail connection failed: ${error}`);
     }
 
     if (session || error || checker) {

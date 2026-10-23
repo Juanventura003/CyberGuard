@@ -404,10 +404,15 @@ function download(
 
 export default function Reports() {
   const { session } = useAuth();
+  return <ReportsContent key={session?.user.id ?? "guest"} />;
+}
+
+function ReportsContent() {
+  const { session } = useAuth();
 
   const [live, setLive] = useState<ReportItem[]>([]);
   const [loadError, setLoadError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(session?.access_token));
 
   // Keep temporary records enabled until other report APIs exist.
   const showDemo = true;
@@ -424,11 +429,7 @@ export default function Reports() {
 
   // Load actual Website Tracker history.
   useEffect(() => {
-    if (!session?.access_token) {
-      setLive([]);
-      setLoading(false);
-      return;
-    }
+    if (!session?.access_token) return;
     let cancelled = false;
 
     async function load() {
@@ -505,7 +506,7 @@ export default function Reports() {
             Date.parse(b.occurredAt) -
             Date.parse(a.occurredAt)
         ),
-    [live, range, start, end]
+    [live, range, start, end, showDemo]
   );
 
   const flagged = items.filter(

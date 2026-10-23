@@ -94,8 +94,10 @@ function CyberAssistant() {
   const isReplyingRef = useRef(isReplying);
   const prefillHandled = useRef(false);
 
-  messagesRef.current = messages;
-  isReplyingRef.current = isReplying;
+  useEffect(() => {
+    messagesRef.current = messages;
+    isReplyingRef.current = isReplying;
+  }, [messages, isReplying]);
 
   useEffect(() => {
     const el = threadRef.current;
