@@ -107,10 +107,10 @@ def analyze_url(url: str) -> dict:
                 "Google Web Risk returned no match for malware, social engineering, "
                 "or unwanted software for this URL."
             )
-    except WebRiskLookupError:
+    except WebRiskLookupError as exc:
         lookup_failed = True
         reasons.append(
-            "Google Web Risk could not be checked. Other available checks still ran."
+            f"Google Web Risk could not be checked ({exc}). Other available checks still ran."
         )
     feed_matches, feed_status, feed_incomplete = threat_feeds.lookup(url)
     reasons.extend(feed_status)

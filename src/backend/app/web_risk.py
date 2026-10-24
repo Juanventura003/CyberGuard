@@ -13,6 +13,17 @@ class WebRiskLookupError(RuntimeError):
     pass
 
 
+def _google_error_message(exc: HTTPError) -> str:
+    """Google's own explanation from an error response (never includes the key)."""
+    try:
+        body = json.loads(exc.read().decode("utf-8", errors="replace"))
+        message = body.get("error", {}).get("message", "")
+    except Exception:  # noqa: BLE001 - best effort only
+        message = ""
+    message = " ".join(str(message).split())[:300]
+    return message or (exc.reason if isinstance(exc.reason, str) else "no details")
+
+
 def lookup_url(url: str) -> dict:
     if not settings.GOOGLE_WEB_RISK_API_KEY:
         raise WebRiskLookupError("Google Web Risk API key is not configured.")
@@ -29,13 +40,21 @@ def lookup_url(url: str) -> dict:
         with urlopen(request, timeout=5) as response:
             payload = json.load(response)
     except HTTPError as exc:
-        if exc.code in {401, 403}:
+        reason = _google_error_message(exc)
+        if exc.code in {400, 401, 403}:
+            # 400 = invalid API key; 403 = API not enabled, billing, or key restrictions.
             raise WebRiskLookupError(
-                "Google Web Risk rejected the request. Verify the API key, API enablement, and billing."
+                f"Google rejected the request (HTTP {exc.code}: {reason}). "
+                "Verify the API key, that the Web Risk API is enabled, and billing."
             ) from exc
-        raise WebRiskLookupError("Google Web Risk lookup failed.") from exc
-    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise WebRiskLookupError("Google Web Risk lookup failed.") from exc
+        raise WebRiskLookupError(f"Google Web Risk lookup failed (HTTP {exc.code}: {reason}).") from exc
+    except URLError as exc:
+        # Network, DNS, proxy or certificate problems reaching Google.
+        raise WebRiskLookupError(f"Could not reach Google Web Risk: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise WebRiskLookupError("Google Web Risk did not respond within 5 seconds.") from exc
+    except json.JSONDecodeError as exc:
+        raise WebRiskLookupError("Google Web Risk returned an unreadable response.") from exc
 
     threat = payload.get("threat", {})
     return {
