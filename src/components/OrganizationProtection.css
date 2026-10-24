@@ -85,6 +85,21 @@
   color: #315dd6;
   font-weight: 600;
 }
+.org-rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.org-access-list {
+  margin-top: 24px;
+  border-top: 1px solid #dce5f1;
+  padding-top: 18px;
+}
+.org-access-list > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #244d9a;
+}
 @media (max-width: 1150px) {
   .org-protection.org-protection-admin {
     grid-template-rows: none;

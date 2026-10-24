@@ -1,6 +1,8 @@
 import {
 	ORGANIZATION_RULE_START,
 	getOrganizationBlockInfo,
+	getOrganizationWebsiteRules,
+	continueOrganizationNavigation,
 	handleProtection,
 	startProtection,
 	withRuleLock,
@@ -31,7 +33,8 @@ function trackRedirect(change: () => void) {
 
 type RuntimeMessage =
 	| ProtectionMessage
-	| { type: "organizationBlockInfo"; domain: string }
+	| { type: "organizationBlockInfo"; domain: string; target?: string }
+	| { type: "organizationContinue"; domain: string; target: string }
 	| { type: "getState" }
 	| { type: "getBlockedSites" }
 	| { type: "setSiteBlocked"; domain: string; blocked: boolean }
@@ -338,7 +341,10 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 startProtection();
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	(async () => {
-		if (message.type === "organizationBlockInfo") {
+		if (
+			message.type === "organizationBlockInfo" ||
+			message.type === "organizationContinue"
+		) {
 			const source = new URL(_sender.url ?? "https://invalid.example");
 			const expected = new URL(chrome.runtime.getURL("blocked.html"));
 			if (
@@ -348,7 +354,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				source.searchParams.get("domain") !== message.domain
 			)
 				throw new Error("Untrusted blocked-page request.");
-			sendResponse(await getOrganizationBlockInfo(message.domain));
+			if (
+				message.target !== undefined &&
+				source.hash.slice(1) !== message.target
+			)
+				throw new Error("Website does not match this notice.");
+			sendResponse(
+				message.type === "organizationContinue"
+					? await continueOrganizationNavigation(message.domain, message.target)
+					: await getOrganizationBlockInfo(message.domain, message.target),
+			);
 			return;
 		}
 		if (message.type === "organizationProtection") {
@@ -363,18 +378,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		if (message.type === "getBlockedSites") {
 			const rules = await chrome.declarativeNetRequest.getDynamicRules();
 			const stored = await chrome.storage.local.get([MONITORING_KEY]);
+			const organizationDomains = [
+				...new Set(
+					rules
+						.filter((rule) => rule.id >= ORGANIZATION_RULE_START)
+						.flatMap((rule) => rule.condition.requestDomains ?? []),
+				),
+			];
+			const organizationRules =
+				await getOrganizationWebsiteRules(organizationDomains);
 			sendResponse({
 				monitoringEnabled: stored[MONITORING_KEY] !== false,
 				domains: rules
 					.filter((rule) => rule.id < ORGANIZATION_RULE_START)
 					.flatMap((rule) => rule.condition.requestDomains ?? []),
-				organizationDomains: [
-					...new Set(
-						rules
-							.filter((rule) => rule.id >= ORGANIZATION_RULE_START)
-							.flatMap((rule) => rule.condition.requestDomains ?? []),
-					),
-				],
+				organizationDomains: organizationRules.map((rule) => rule.domain),
+				organizationRules,
 			});
 			return;
 		}

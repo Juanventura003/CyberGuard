@@ -35,17 +35,14 @@
 			</header>
 
 			<label class="banner-setting"
-				><input id="banner-toggle" type="checkbox" /> Show draggable
-				website notification</label
+				><input id="banner-toggle" type="checkbox" /> Show draggable website
+				notification</label
 			>
 			<p id="status" class="status">Loading activity...</p>
 			<section id="latest" class="latest" aria-live="polite"></section>
-			<section
-				class="blocking-settings"
-				aria-label="Website blocking"
-			>
+			<section class="blocking-settings" aria-label="Website protection">
 				<div class="blocking-heading">
-					<h2>Website blocking</h2>
+					<h2>Website protection</h2>
 					<span>Personal &amp; organization</span>
 				</div>
 				<div class="blocking-current">
@@ -56,11 +53,13 @@
 				</div>
 				<details>
 					<summary>
-						Manage blocked websites
+						Manage website rules
 						<span id="blocked-count">0</span>
 					</summary>
 					<p class="blocking-help">
-						Blocks cover a hostname and its subdomains. Personal blocks can be removed here; organization rules are managed in Team Security.
+						Rules cover a hostname and its subdomains. Warnings let you continue
+						with caution; blocks restrict access. Personal blocks can be removed
+						here; organization rules are managed in Team Security.
 					</p>
 					<ul id="blocked-sites"></ul>
 				</details>

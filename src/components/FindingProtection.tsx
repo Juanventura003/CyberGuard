@@ -9,6 +9,8 @@ type Snapshot = {
   revision: number;
   total: number;
   received: number;
+  action?: "warn" | "block" | null;
+  access_expires_at?: string | null;
 };
 export default function FindingProtection({
   finding,
@@ -46,11 +48,15 @@ export default function FindingProtection({
   const response =
     finding.response_action === "blocked"
       ? "Admin published a website block"
-      : finding.response_action === "unblocked"
-        ? "Admin removed the website rule"
-        : finding.response_action === "kept_blocked"
-          ? "Admin kept the website blocked"
-          : "No website action recorded";
+      : finding.response_action === "warned"
+        ? "Admin published a website warning"
+        : finding.response_action === "temporary_access"
+          ? "Admin granted temporary access to the requesting member"
+          : finding.response_action === "unblocked"
+            ? "Admin removed the website rule"
+            : finding.response_action === "kept_blocked"
+              ? "Admin kept the website restriction"
+              : "No website action recorded";
   return (
     <section className="finding-protection">
       <h3>
@@ -82,8 +88,19 @@ export default function FindingProtection({
               >
                 {snapshot.blocked
                   ? "Currently blocked by team rules"
-                  : "No current team block"}
+                  : snapshot.action === "warn"
+                    ? "Team warning · Continue with caution"
+                    : "No current team rule"}
               </span>
+            </p>
+          )}
+          {finding.response_action === "temporary_access" && (
+            <p>
+              {snapshot.access_expires_at
+                ? `Current approval expires ${new Date(snapshot.access_expires_at).toLocaleString()}. Sync the member’s extension to receive it.`
+                : `This approval has expired, was revoked, or its rule changed.${finding.access_expires_at ? ` Original expiry: ${new Date(finding.access_expires_at).toLocaleString()}.` : ""}`}{" "}
+              Other members remain restricted. Personal blocks and other
+              matching rules still apply.
             </p>
           )}
           {finding.response_action && finding.response_action !== "none" && (

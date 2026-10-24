@@ -9,12 +9,21 @@
 	<body>
 		<main>
 			<span class="brand">CYBERGUARD · TEAM PROTECTION</span>
-			<h1>This website is blocked.</h1>
-			<p>Your organization has a website rule that prevented this visit.</p>
+			<h1 id="heading">This website is blocked.</h1>
+			<p id="explanation">
+				Your organization has a website rule that prevented this visit.
+			</p>
 			<strong id="domain"></strong>
 			<p id="organization" role="status">Managed by your organization</p>
+			<p id="reason"></p>
+			<p id="approval"></p>
+			<p id="error" role="alert"></p>
+			<button id="continue" hidden>Continue to website</button>
 			<p id="sharing">This visit is not reported to your organization.</p>
-			<p>Need this website? Ask your admin to review the rule.</p>
+			<p>
+				Need a different restriction? Ask your admin to review the rule. A
+				warning or approval does not mean a website is safe.
+			</p>
 			<a
 				id="request-review"
 				href="http://localhost:5173/organization"

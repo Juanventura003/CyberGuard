@@ -32,7 +32,13 @@ type Browser = {
   browser_family: string;
   os_family: string;
 };
-type Rule = { domain: string; reason: string };
+type Rule = { domain: string; reason: string; action: "warn" | "block" };
+type Approval = {
+  user_id: string;
+  domain: string;
+  expires_at: string;
+  reason: string;
+};
 
 export default function OrganizationProtection({
   organizationId,
@@ -53,6 +59,7 @@ export default function OrganizationProtection({
 }) {
   const [browsers, setBrowsers] = useState<Browser[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
   const [revision, setRevision] = useState(0);
   const [local, setLocal] = useState<LocalState | null>(null);
   const [error, setError] = useState("");
@@ -97,7 +104,7 @@ export default function OrganizationProtection({
     const client = supabase!;
     void (async () => {
       try {
-        const [devices, domains, versions] = await Promise.all([
+        const [devices, domains, versions, access] = await Promise.all([
           collectOrganizationPages<Browser>((from, to) =>
             client
               .from("cg_browser_enrollments")
@@ -112,7 +119,7 @@ export default function OrganizationProtection({
           collectOrganizationPages<Rule>((from, to) =>
             client
               .from("cg_domain_rules")
-              .select("domain,reason", { count: "exact" })
+              .select("domain,reason,action", { count: "exact" })
               .eq("organization_id", organizationId)
               .order("domain")
               .range(from, to),
@@ -122,6 +129,15 @@ export default function OrganizationProtection({
             .select("protection_revision")
             .eq("id", organizationId)
             .maybeSingle(),
+          collectOrganizationPages<Approval>((from, to) =>
+            client
+              .from("cg_temporary_access")
+              .select("user_id,domain,expires_at,reason", { count: "exact" })
+              .eq("organization_id", organizationId)
+              .order("domain")
+              .order("user_id")
+              .range(from, to),
+          ),
         ]);
         if (versions.error) throw versions.error;
         if (!versions.data)
@@ -131,6 +147,7 @@ export default function OrganizationProtection({
         if (active) {
           setBrowsers(devices);
           setRules(domains);
+          setApprovals(access);
           setRevision(versions.data.protection_revision);
           setError("");
           setReady(true);
@@ -181,10 +198,10 @@ export default function OrganizationProtection({
               ? "Extension detected. Review its connection details below."
               : "Extension detected. Connect it below to receive your team's protection."
             : action === "disconnect"
-            ? "Extension disconnected. Your personal website blocks are unchanged."
-            : !state.enrolled
-              ? "This extension is no longer connected to a team."
-              : "Your extension has checked for the latest protection rules.",
+              ? "Extension disconnected. Your personal website blocks are unchanged."
+              : !state.enrolled
+                ? "This extension is no longer connected to a team."
+                : "Your extension has checked for the latest protection rules.",
         );
     } catch (cause) {
       if (action === "status") setExtensionAvailable(false);
@@ -221,13 +238,13 @@ export default function OrganizationProtection({
     const values = new FormData(form);
     void mutate(
       () =>
-        supabase!.rpc("cg_set_domain_rule", {
+        supabase!.rpc("cg_set_website_rule", {
           org: organizationId,
           host: values.get("domain"),
           explanation: values.get("reason"),
-          blocked: true,
+          rule_action: values.get("action"),
         }),
-      "Website block published. Connected extensions usually apply it within a minute.",
+      "Website rule published. Connected extensions usually apply it within a minute.",
       form,
     );
   }
@@ -480,10 +497,7 @@ export default function OrganizationProtection({
                 name, browser/OS, version, last contact, and update status.
               </span>
             </label>
-            <button
-              disabled={busy || !ready || extensionAvailable !== true}
-              className="org-primary"
-            >
+            <button disabled={busy || !ready} className="org-primary">
               Connect to {organizationName}
             </button>
             <div className="org-inline-help">
@@ -666,12 +680,14 @@ export default function OrganizationProtection({
         )}
         <section className="org-card org-protection-rules">
           <h2>
-            <Globe size={21} /> Blocked websites
+            <Globe size={21} /> Website rules
             <HelpTip label="website blocking">
-              Blocks cover a domain and all subdomains for new visits.
-              Already-open pages stay open. Personal blocks remain separate.
-              Connected extensions usually apply changes within a minute.
-              Removing a shared block does not remove a personal block.
+              Rules cover a domain and all subdomains for new visits. Warnings
+              let members continue; continuing does not mean the site is safe.
+              Blocks require an approval or rule change. Already-open pages stay
+              open. Personal blocks remain separate. Connected extensions
+              usually apply changes within a minute. Removing a shared block
+              does not remove a personal block.
             </HelpTip>
           </h2>
           {isAdmin && (
@@ -686,36 +702,40 @@ export default function OrganizationProtection({
                 />
               </label>
               <label>
+                Action
+                <select name="action" defaultValue="block" disabled={busy}>
+                  <option value="block">Block — approval required</option>
+                  <option value="warn">Warn — member can continue</option>
+                </select>
+              </label>
+              <label>
                 Reason
                 <input
                   name="reason"
                   required
                   maxLength={1000}
-                  placeholder="Why should the team block it?"
+                  placeholder="Explain this restriction to your team"
                 />
               </label>
-              <button
-                className="org-primary"
-                disabled={busy || !ready || extensionAvailable !== true}
-              >
-                Block website
+              <button className="org-primary" disabled={busy || !ready}>
+                Publish rule
               </button>
             </form>
           )}
           {ready && !rules.length && (
             <div className="org-blocks-empty">
               <Shield size={26} />
-              <strong>No shared blocks yet</strong>
+              <strong>No shared website rules yet</strong>
               <span>
                 {isAdmin
                   ? "Add a website above to protect your team."
-                  : "Your admin’s shared blocks will appear here."}
+                  : "Your admin’s website rules will appear here."}
               </span>
             </div>
           )}
           {rules.length > 10 && (
             <label className="org-search-label">
-              Find a blocked website
+              Find a website rule
               <input
                 type="search"
                 value={ruleSearch}
@@ -737,26 +757,66 @@ export default function OrganizationProtection({
                 <div className="org-row" key={rule.domain}>
                   <span>
                     <strong>{rule.domain}</strong>
+                    <small>
+                      {rule.action === "warn"
+                        ? "Warning · You may continue with caution"
+                        : "Blocked · Approval required"}
+                    </small>
                     <small>{rule.reason}</small>
+                    {!isAdmin &&
+                      approvals
+                        .filter(
+                          (access) =>
+                            access.user_id === userId &&
+                            access.domain === rule.domain &&
+                            Date.parse(access.expires_at) > now,
+                        )
+                        .map((access) => (
+                          <small key={access.domain}>
+                            Your temporary access expires{" "}
+                            {new Date(access.expires_at).toLocaleString()}. Sync
+                            your extension to receive it.
+                          </small>
+                        ))}
                   </span>
                   {isAdmin && (
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate(
-                          () =>
-                            supabase!.rpc("cg_set_domain_rule", {
-                              org: organizationId,
-                              host: rule.domain,
-                              explanation: "",
-                              blocked: false,
-                            }),
-                          "Rule revoked. Browsers restore access after syncing unless a personal block also applies.",
-                        )
-                      }
-                    >
-                      Remove block
-                    </button>
+                    <div className="org-rule-actions">
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void mutate(
+                            () =>
+                              supabase!.rpc("cg_set_website_rule", {
+                                org: organizationId,
+                                host: rule.domain,
+                                explanation: rule.reason,
+                                rule_action:
+                                  rule.action === "block" ? "warn" : "block",
+                              }),
+                            "Rule action updated. Existing temporary approvals for this rule were revoked.",
+                          )
+                        }
+                      >
+                        Change to {rule.action === "block" ? "Warn" : "Block"}
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void mutate(
+                            () =>
+                              supabase!.rpc("cg_set_domain_rule", {
+                                org: organizationId,
+                                host: rule.domain,
+                                explanation: "",
+                                blocked: false,
+                              }),
+                            "Rule revoked. Browsers restore access after syncing unless a personal block also applies.",
+                          )
+                        }
+                      >
+                        Remove rule
+                      </button>
+                    </div>
                   )}
                   {!isAdmin && (
                     <button
@@ -768,6 +828,54 @@ export default function OrganizationProtection({
                   )}
                 </div>
               ))}
+          {approvals.some((access) => Date.parse(access.expires_at) > now) && (
+            <details className="org-access-list">
+              <summary>
+                {isAdmin
+                  ? "Active temporary approvals"
+                  : "Your active temporary approvals"}
+              </summary>
+              {approvals
+                .filter((access) => Date.parse(access.expires_at) > now)
+                .map((access) => (
+                  <div
+                    className="org-row"
+                    key={`${access.user_id}:${access.domain}`}
+                  >
+                    <span>
+                      <strong>{access.domain}</strong>
+                      {isAdmin && (
+                        <small>
+                          {memberEmails.get(access.user_id) ?? "Member"}
+                        </small>
+                      )}
+                      <small>
+                        Expires {new Date(access.expires_at).toLocaleString()}
+                      </small>
+                      <small>{access.reason}</small>
+                    </span>
+                    {isAdmin && (
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void mutate(
+                            () =>
+                              supabase!.rpc("cg_revoke_temporary_access", {
+                                org: organizationId,
+                                member: access.user_id,
+                                host: access.domain,
+                              }),
+                            "Approval revoked. Connected browsers apply the restriction on their next successful sync.",
+                          )
+                        }
+                      >
+                        Revoke access
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </details>
+          )}
           <ListPagination
             label="website rules"
             page={currentRulePage}

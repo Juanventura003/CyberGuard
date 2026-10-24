@@ -30,11 +30,14 @@ declare const chrome: {
 		};
 	};
 	runtime: {
-		sendMessage(message: {
-			type: "getBlockedSites";
-		}): Promise<{
+		sendMessage(message: { type: "getBlockedSites" }): Promise<{
 			domains: string[];
 			organizationDomains?: string[];
+			organizationRules?: {
+				domain: string;
+				action: "warn" | "block";
+				accessExpiresAt?: string;
+			}[];
 			error?: string;
 		}>;
 		sendMessage(message: {
@@ -69,6 +72,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 	if (area === "local" && changes.bannerEnabled && bannerToggle) {
 		bannerToggle.checked = changes.bannerEnabled.newValue === true;
 	}
+	if (area === "local" && changes.organizationProtection)
+		void renderBlockedSites();
 });
 bannerToggle?.addEventListener("change", async () => {
 	try {
@@ -233,7 +238,24 @@ function escapeHtml(value: string) {
 }
 
 const blockButton = document.querySelector<HTMLButtonElement>("#block-site")!;
-async function renderBlockedSites() {
+let rulesRefresh: Promise<void> | null = null;
+let rulesRefreshAgain = false;
+function renderBlockedSites(): Promise<void> {
+	if (rulesRefresh) {
+		rulesRefreshAgain = true;
+		return rulesRefresh;
+	}
+	rulesRefresh = (async () => {
+		do {
+			rulesRefreshAgain = false;
+			await renderBlockedSitesOnce();
+		} while (rulesRefreshAgain);
+	})().finally(() => {
+		rulesRefresh = null;
+	});
+	return rulesRefresh;
+}
+async function renderBlockedSitesOnce() {
 	try {
 		const state = await chrome.runtime.sendMessage({
 			type: "getBlockedSites",
@@ -251,8 +273,18 @@ async function renderBlockedSites() {
 			/* Restricted page. */
 		}
 		const organizationDomains = state.organizationDomains ?? [];
-		const managed = organizationDomains.find(
-			(host) => domain === host || domain.endsWith(`.${host}`),
+		const organizationRules =
+			state.organizationRules ??
+			organizationDomains.map((domain) => ({
+				domain,
+				action: "block" as const,
+				accessExpiresAt: undefined,
+			}));
+		const managed = organizationRules.find(
+			(rule) =>
+				rule.action === "block" &&
+				!rule.accessExpiresAt &&
+				(domain === rule.domain || domain.endsWith(`.${rule.domain}`)),
 		);
 		const covering = state.domains.find(
 			(host) => domain === host || domain.endsWith(`.${host}`),
@@ -272,7 +304,7 @@ async function renderBlockedSites() {
 		blockButton.setAttribute(
 			"aria-label",
 			managed
-				? `Blocked by organization: ${managed}`
+				? `Blocked by organization: ${managed.domain}`
 				: covering
 					? `Unblock ${covering}`
 					: `Block ${domain || "website"}`,
@@ -290,7 +322,7 @@ async function renderBlockedSites() {
 		for (const host of state.domains) {
 			const row = document.createElement("li");
 			const name = document.createElement("span");
-			name.textContent = host;
+			name.textContent = `${host} · Personal · Blocked`;
 			const button = document.createElement("button");
 			button.textContent = "Unblock";
 			button.type = "button";
@@ -301,16 +333,16 @@ async function renderBlockedSites() {
 			row.append(name, button);
 			list.append(row);
 		}
-		for (const host of organizationDomains) {
+		for (const rule of organizationRules) {
 			const row = document.createElement("li");
-			row.textContent = `${host} · Organization rule`;
+			row.textContent = `${rule.domain} · Organization · ${rule.action === "warn" ? "Warning" : rule.accessExpiresAt ? `Temporary access until ${new Date(rule.accessExpiresAt).toLocaleString()}` : "Blocked"}`;
 			list.append(row);
 		}
 		if (!state.domains.length && !organizationDomains.length)
-			list.textContent = "No websites blocked.";
+			list.textContent = "No website rules.";
 	} catch {
 		blockButton.disabled = true;
-		setStatus("Could not load blocked websites. Reload the extension.");
+		setStatus("Could not load website rules. Reload the extension.");
 	}
 }
 async function changeBlock(domain: string, blocked: boolean) {
