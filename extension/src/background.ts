@@ -1065,6 +1065,7 @@ export function buildRiskNotification(result: {
 }
 
 async function notifyRiskySite(result: WebsiteActivity) {
+	if (!chrome.notifications) return; // permission missing from manifest.json
 	const notification = buildRiskNotification(result);
 	if (!notification) return;
 	try {
@@ -1098,11 +1099,20 @@ async function notifyRiskySite(result: WebsiteActivity) {
 	}
 }
 
-chrome.notifications.onClicked.addListener((notificationId) => {
-	if (!notificationId.startsWith(NOTIFICATION_PREFIX)) return;
-	void chrome.notifications.clear(notificationId);
-	void chrome.tabs.create({ url: DASHBOARD_URL });
-});
+// chrome.notifications only exists when manifest.json lists the
+// "notifications" permission. Check first, so a manifest without it disables
+// pop-ups instead of crashing the whole extension at startup.
+if (chrome.notifications) {
+	chrome.notifications.onClicked.addListener((notificationId) => {
+		if (!notificationId.startsWith(NOTIFICATION_PREFIX)) return;
+		void chrome.notifications.clear(notificationId);
+		void chrome.tabs.create({ url: DASHBOARD_URL });
+	});
+} else {
+	console.warn(
+		'CyberGuard desktop notifications are off: add "notifications" to manifest.json permissions.',
+	);
+}
 
 async function updateBadge(riskLevel: string) {
 	const badge =
