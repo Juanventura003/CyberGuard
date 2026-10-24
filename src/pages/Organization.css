@@ -194,7 +194,11 @@
   background: #f5f8fd;
   font-weight: 600;
 }
-.org-toolbar > button {
+.org-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-left: auto;
 }
 .org-role {
@@ -204,24 +208,6 @@
   color: #294f88;
   font-size: 12px;
   font-weight: 600;
-}
-.org-page .org-create {
-  padding: 14px 18px;
-  border-color: #c3d3f1;
-  background: #eaf1ff;
-  box-shadow: none;
-}
-.org-create > summary {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #244d9a;
-  font-weight: 600;
-}
-.org-create form {
-  padding-top: 18px;
 }
 .org-inline-help {
   display: flex;
@@ -250,6 +236,16 @@
   color: #244dbe;
   border-color: #dfe6f1;
   box-shadow: 0 2px 5px #20395e0a;
+}
+.org-review-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: #fff1d6;
+  color: #79520e;
+  font-size: 11px;
+  font-weight: 600;
 }
 .org-list-heading {
   display: flex;
@@ -672,7 +668,7 @@
     min-width: 0;
     width: 100%;
   }
-  .org-toolbar > button {
+  .org-toolbar-actions {
     margin-left: 0;
   }
   .org-tabs button {
@@ -760,4 +756,78 @@
 .org-heading-line h2 {
   flex: 1;
   min-width: 0;
+}
+
+.org-invitations {
+  width: 100%;
+  padding: 16px 20px;
+}
+.org-invitations h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.org-invitations .org-row {
+  gap: 24px;
+  padding: 8px 0;
+}
+.org-invitations .org-row:last-child {
+  padding-bottom: 0;
+}
+.org-invitations .org-row small {
+  font-size: 12px;
+  margin-top: 4px;
+}
+@media (max-width: 480px) {
+  .org-invitations {
+    width: 100%;
+    padding: 16px;
+  }
+  .org-invitations .org-row {
+    gap: 12px;
+  }
+}
+
+.org-members-heading {
+  margin-top: 24px;
+  align-items: flex-end;
+}
+.org-members-heading h3 {
+  margin: 0;
+  padding-bottom: 11px;
+}
+.org-members-heading .org-search-label {
+  width: 280px;
+  max-width: 100%;
+  gap: 6px;
+}
+.org-members-heading input {
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .org-members-heading {
+    align-items: stretch;
+  }
+  .org-members-heading h3 {
+    width: 100%;
+    padding-bottom: 0;
+  }
+  .org-members-heading .org-search-label {
+    width: 100%;
+  }
+}
+
+.org-team-empty {
+  text-align: center;
+  padding: 28px 20px;
+}
+.org-team-empty > svg {
+  color: #315dd6;
+  margin-bottom: 12px;
+}
+.org-team-empty h2 {
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.org-team-empty p {
+  margin: 0 0 18px;
 }

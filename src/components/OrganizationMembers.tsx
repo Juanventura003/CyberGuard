@@ -72,7 +72,7 @@ export default function OrganizationMembers({
           Invite member
         </button>
       </form>
-      <div className="org-list-heading">
+      <div className="org-list-heading org-members-heading">
         <h3>Team members · {members.length}</h3>
         <label className="org-search-label">
           Find a member
