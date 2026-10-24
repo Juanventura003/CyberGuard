@@ -467,6 +467,8 @@
 	document.addEventListener("visibilitychange", () => {
 		if (!document.hidden) void checkPage();
 	});
-	window.addEventListener("focus", () => { void checkPage(); });
+	window.addEventListener("focus", () => {
+		void checkPage();
+	});
 	void checkPage();
 })();

@@ -21,10 +21,7 @@ type Website = {
   url: string;
   riskScore: number;
   riskLevel:
-    | "No Known Threat"
-    | "Suspicious"
-    | "High Risk"
-    | "Unable to Verify";
+    "No Known Threat" | "Suspicious" | "High Risk" | "Unable to Verify";
   visitedAt: string;
   timeVisited: string;
   explanation: string[];

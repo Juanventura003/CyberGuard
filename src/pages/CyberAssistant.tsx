@@ -35,7 +35,11 @@ function renderInline(text: string): ReactNode[] {
       nodes.push(text.slice(lastIndex, match.index));
     }
     nodes.push(
-      <Link key={`${match.index}-${match[2]}`} className="assistant-inline-link" to={match[2]}>
+      <Link
+        key={`${match.index}-${match[2]}`}
+        className="assistant-inline-link"
+        to={match[2]}
+      >
         {match[1]}
       </Link>,
     );
@@ -56,7 +60,11 @@ function formatReply(content: string) {
       return <br key={index} />;
     }
 
-    if (trimmed.startsWith("**") && trimmed.endsWith("**") && !trimmed.slice(2, -2).includes("**")) {
+    if (
+      trimmed.startsWith("**") &&
+      trimmed.endsWith("**") &&
+      !trimmed.slice(2, -2).includes("**")
+    ) {
       return (
         <p key={index} className="assistant-msg-heading">
           {trimmed.slice(2, -2)}
@@ -188,7 +196,9 @@ function CyberAssistant() {
           </div>
           <div>
             <h1>Cyber Assistant</h1>
-            <p>Ask cybersecurity questions and get clear, practical guidance.</p>
+            <p>
+              Ask cybersecurity questions and get clear, practical guidance.
+            </p>
           </div>
         </div>
       </header>
@@ -212,7 +222,10 @@ function CyberAssistant() {
 
           {isReplying && (
             <div className="assistant-bubble assistant-bubble-assistant">
-              <div className="assistant-typing" aria-label="Assistant is typing">
+              <div
+                className="assistant-typing"
+                aria-label="Assistant is typing"
+              >
                 <span />
                 <span />
                 <span />
