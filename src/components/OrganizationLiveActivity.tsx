@@ -32,12 +32,13 @@ export default function OrganizationLiveActivity({
     presenceRevision,
     sharing,
     setSharing,
+    reviewRequirement,
+    accepted,
     busy: presenceBusy,
     loading: presenceLoading,
     error: presenceError,
   } = useOrganizationPresence(organizationId);
   const now = useOrganizationClock();
-  const [pendingSharing, setPendingSharing] = useState<boolean | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [presence, setPresence] = useState<Presence[]>([]);
@@ -99,32 +100,42 @@ export default function OrganizationLiveActivity({
             a computer is online. Focus and recent interaction determine active
             or away; no keystrokes or click contents are recorded. Device type
             and OS are inferred from the browser and may be approximate or
-            Unknown. Exact hardware models are not identified. Your choice is
-            saved for this organization across tabs and sign-ins. Turning
-            sharing off removes your current presence across sessions. Stale
-            sessions expire after 75 seconds.
+            Unknown. Sharing is required for members after acceptance; admins
+            can choose whether to share. It stops when you leave. Stale sessions
+            expire after 75 seconds.
           </HelpTip>
         </h2>
-        <label className="org-presence-consent">
-          <input
-            type="checkbox"
-            checked={pendingSharing ?? sharing}
-            disabled={presenceBusy || presenceLoading}
-            onChange={(event) => {
-              const desired = event.target.checked;
-              setPendingSharing(desired);
-              void setSharing(organizationId, desired).finally(() =>
-                setPendingSharing(null),
-              );
-            }}
-          />{" "}
-          Share my active / away status and device type with admins while I use
-          CyberGuard.
-        </label>
-        {presenceBusy && (
-          <p className="org-help" role="status">
-            Saving sharing preference…
-          </p>
+        {isAdmin ? (
+          <label className="org-presence-consent">
+            <input
+              type="checkbox"
+              checked={sharing}
+              disabled={presenceBusy || presenceLoading}
+              onChange={(event) =>
+                void setSharing(organizationId, event.target.checked)
+              }
+            />
+            Share my Active/Away status and approximate device type and OS.
+            Optional for admins.
+          </label>
+        ) : (
+          <>
+            <p className="org-help">
+              {sharing
+                ? "Presence sharing is required for your membership."
+                : presenceLoading
+                  ? "Loading presence requirement…"
+                  : "Review the presence agreement to continue."}
+            </p>
+            {!accepted && !presenceLoading && (
+              <button
+                disabled={presenceBusy}
+                onClick={() => reviewRequirement(organizationId)}
+              >
+                Review presence agreement
+              </button>
+            )}
+          </>
         )}
         {presenceError && <p role="alert">{presenceError}</p>}
         {error && (

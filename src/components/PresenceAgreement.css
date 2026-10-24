@@ -1,0 +1,151 @@
+.presence-agreement {
+  box-sizing: border-box;
+  width: min(500px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid #e3e8ef;
+  border-radius: 20px;
+  padding: 28px;
+  text-align: left;
+  color: #172b4d;
+  background: #fff;
+  box-shadow: 0 24px 80px #15294a30;
+}
+.presence-agreement::backdrop {
+  background: #12213d70;
+  backdrop-filter: blur(3px);
+}
+.presence-agreement form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  margin: 0;
+}
+.presence-agreement-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.presence-agreement-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  color: #315dd6;
+  background: #edf2ff;
+}
+.presence-agreement .presence-agreement-close {
+  border: 0;
+  background: transparent;
+  padding: 8px;
+  color: #61718a;
+  cursor: pointer;
+}
+.presence-agreement-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #627491;
+  margin: 0;
+}
+.presence-agreement h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.presence-agreement p {
+  line-height: 1.6;
+}
+.presence-agreement-intro {
+  margin: 0;
+  color: #58677d;
+  font-size: 14px;
+}
+.presence-agreement-fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.presence-agreement-fact > svg {
+  color: #315dd6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.presence-agreement-fact strong {
+  font-size: 14px;
+}
+.presence-agreement-fact p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 3px 0 0;
+}
+.presence-agreement-note {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+}
+.presence-agreement-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  background: #f4f7fc;
+  border: 1px solid #e1e8f3;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.presence-agreement-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #315dd6;
+  flex-shrink: 0;
+  margin: 2px 0 0;
+}
+.presence-agreement-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+.presence-agreement-actions button {
+  border: 1px solid #d7dfeb;
+  border-radius: 9px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  color: #43536c;
+}
+.presence-agreement-actions button[type="submit"] {
+  background: #315dd6;
+  border-color: #315dd6;
+  color: white;
+}
+.presence-agreement button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.presence-agreement button:focus-visible,
+.presence-agreement input:focus-visible {
+  outline: 3px solid #8ea9fa;
+  outline-offset: 3px;
+}
+.presence-agreement-error {
+  font-size: 13px;
+  color: #b42318;
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .presence-agreement {
+    padding: 20px;
+  }
+  .presence-agreement-actions button {
+    flex: 1;
+  }
+}

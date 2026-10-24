@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import PresenceAgreement from "../components/PresenceAgreement";
 import { describePresenceDevice } from "../lib/presenceDevice";
 import { supabase } from "../lib/supabase";
 import {
   OrganizationPresenceContext as Context,
   type Preference,
 } from "./organizationPresence";
+
+const AWAY_DELAY_MS = 2000;
 
 export function OrganizationPresenceProvider({
   userId,
@@ -19,6 +22,7 @@ export function OrganizationPresenceProvider({
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [presenceRevision, setPresenceRevision] = useState(0);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const changing = useRef(false);
   const generation = useRef(0);
   const lastInteraction = useRef(0);
@@ -26,12 +30,14 @@ export function OrganizationPresenceProvider({
     if (!userId || !supabase) return;
     let active = true;
     const epoch = generation.current;
-    void Promise.resolve(supabase.rpc("cg_get_device_presence_preferences"))
+    void Promise.resolve(supabase.rpc("cg_get_required_presence_memberships"))
       .then(({ data, error }) => {
         if (!active || changing.current || generation.current !== epoch) return;
         if (error) {
           setPreferences([]);
-          setError("Could not load your sharing preference. Please try again.");
+          setError(
+            "Could not load organization presence requirements. Please try again.",
+          );
         } else {
           setPreferences(data ?? []);
           setError("");
@@ -77,6 +83,11 @@ export function OrganizationPresenceProvider({
     let queue: Promise<unknown> = Promise.resolve();
     let sending = false;
     let sendAgain = false;
+    let awayTimer: number | undefined;
+    let unfocusedAt: number | null =
+      document.hidden || !document.hasFocus()
+        ? Date.now() - AWAY_DELAY_MS
+        : null;
     lastInteraction.current = Date.now();
     const heartbeat = () => {
       if (sending) {
@@ -85,8 +96,8 @@ export function OrganizationPresenceProvider({
       }
       sending = true;
       const isActive =
-        !document.hidden &&
-        document.hasFocus() &&
+        ((!document.hidden && document.hasFocus()) ||
+          (unfocusedAt !== null && Date.now() - unfocusedAt < AWAY_DELAY_MS)) &&
         Date.now() - lastInteraction.current < 120000;
       queue = queue
         .then(async () => {
@@ -134,19 +145,36 @@ export function OrganizationPresenceProvider({
     };
     for (const event of ["pointerdown", "keydown", "scroll", "touchstart"])
       document.addEventListener(event, interact, { passive: true });
-    window.addEventListener("focus", heartbeat);
-    window.addEventListener("blur", heartbeat);
-    document.addEventListener("visibilitychange", heartbeat);
+    const focusChanged = () => {
+      if (!document.hidden && document.hasFocus()) {
+        clearTimeout(awayTimer);
+        awayTimer = undefined;
+        unfocusedAt = null;
+        lastInteraction.current = Date.now();
+        heartbeat();
+      } else if (unfocusedAt === null) {
+        unfocusedAt = Date.now();
+        // Blur and visibilitychange often arrive together: start one grace period.
+        awayTimer = window.setTimeout(() => {
+          awayTimer = undefined;
+          heartbeat();
+        }, AWAY_DELAY_MS);
+      }
+    };
+    window.addEventListener("focus", focusChanged);
+    window.addEventListener("blur", focusChanged);
+    document.addEventListener("visibilitychange", focusChanged);
     heartbeat();
     const timer = window.setInterval(heartbeat, 20000);
     return () => {
       active = false;
       clearInterval(timer);
+      clearTimeout(awayTimer);
       for (const event of ["pointerdown", "keydown", "scroll", "touchstart"])
         document.removeEventListener(event, interact);
-      window.removeEventListener("focus", heartbeat);
-      window.removeEventListener("blur", heartbeat);
-      document.removeEventListener("visibilitychange", heartbeat);
+      window.removeEventListener("focus", focusChanged);
+      window.removeEventListener("blur", focusChanged);
+      document.removeEventListener("visibilitychange", focusChanged);
       void queue
         .then(() =>
           Promise.all(
@@ -170,6 +198,41 @@ export function OrganizationPresenceProvider({
     );
     setReload((value) => value + 1);
   }
+  async function acceptRequirement(org: string) {
+    if (!supabase || !userId || changing.current) return;
+    changing.current = true;
+    const epoch = ++generation.current;
+    setBusy(true);
+    setError("");
+    try {
+      const { error } = await supabase.rpc("cg_accept_presence_requirement", {
+        org,
+        accepted: true,
+      });
+      if (error) throw new Error(error.message);
+      if (generation.current !== epoch) return;
+      setPreferences((previous) => [
+        ...previous.filter((pref) => pref.organization_id !== org),
+        {
+          organization_id: org,
+          organization_name:
+            previous.find((pref) => pref.organization_id === org)
+              ?.organization_name ?? "Organization",
+          enabled: true,
+          accepted: true,
+        },
+      ]);
+      // Refresh the roster after the first heartbeat.
+      setPresenceRevision((value) => value + 1);
+    } catch {
+      setError("Could not accept the presence requirement. Please retry.");
+    } finally {
+      changing.current = false;
+      setBusy(false);
+      setLoading(false);
+      setReload((value) => value + 1);
+    }
+  }
   async function setSharing(org: string, enabled: boolean) {
     if (!supabase || !userId || changing.current) return;
     changing.current = true;
@@ -181,25 +244,25 @@ export function OrganizationPresenceProvider({
         org,
         sharing: enabled,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw error;
       if (generation.current !== epoch) return;
-      setPreferences((previous) => [
-        ...previous.filter((pref) => pref.organization_id !== org),
-        { organization_id: org, enabled },
-      ]);
-      // Off removes server rows in the consent RPC. On refreshes again after the first heartbeat.
+      setPreferences((previous) =>
+        previous.map((pref) =>
+          pref.organization_id === org ? { ...pref, enabled } : pref,
+        ),
+      );
       setPresenceRevision((value) => value + 1);
     } catch {
-      setError(
-        "Could not save presence sharing. Your preference was not changed.",
-      );
+      setError("Could not save your presence setting. Please retry.");
     } finally {
       changing.current = false;
       setBusy(false);
-      setLoading(false);
       setReload((value) => value + 1);
     }
   }
+  const pending = preferences.find(
+    (pref) => !pref.accepted && !dismissed.includes(pref.organization_id),
+  );
   return (
     <Context.Provider
       value={{
@@ -210,8 +273,23 @@ export function OrganizationPresenceProvider({
         busy,
         error,
         setSharing,
+        reviewRequirement: (org) =>
+          setDismissed((previous) => previous.filter((id) => id !== org)),
+        refreshPreferences: () => setReload((value) => value + 1),
       }}
     >
+      {pending && (
+        <PresenceAgreement
+          key={pending.organization_id}
+          organizationName={pending.organization_name}
+          busy={busy}
+          error={error}
+          onConfirm={() => void acceptRequirement(pending.organization_id)}
+          onClose={() =>
+            setDismissed((previous) => [...previous, pending.organization_id])
+          }
+        />
+      )}
       {children}
     </Context.Provider>
   );
