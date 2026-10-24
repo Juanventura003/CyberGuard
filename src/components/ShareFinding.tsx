@@ -84,6 +84,7 @@ function ReportForm({
             client
               .from("cg_organizations")
               .select("id,name", { count: "exact" })
+              .is("archived_at", null)
               .order("id")
               .range(from, to),
           );

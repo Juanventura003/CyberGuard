@@ -21,10 +21,7 @@ type Website = {
   url: string;
   riskScore: number;
   riskLevel:
-    | "No Known Threat"
-    | "Suspicious"
-    | "High Risk"
-    | "Unable to Verify";
+    "No Known Threat" | "Suspicious" | "High Risk" | "Unable to Verify";
   visitedAt: string;
   timeVisited: string;
   explanation: string[];
@@ -96,6 +93,11 @@ const requestBlocking = (domain?: string, blocked?: boolean) =>
   );
 
 function WebsiteTracker() {
+  const { session } = useAuth();
+  return <WebsiteTrackerContent key={session?.user.id ?? "guest"} />;
+}
+
+function WebsiteTrackerContent() {
   const [blockedDomains, setBlockedDomains] = useState<string[] | null>(null);
   const [blockingConnecting, setBlockingConnecting] = useState(true);
   const [blockingError, setBlockingError] = useState("");
@@ -174,12 +176,6 @@ function WebsiteTracker() {
   const [urlTooltip, setUrlTooltip] = useState<UrlTooltip>(null);
   const { session } = useAuth();
   const historyMutation = useRef(0);
-
-  useEffect(() => {
-    setWebsites([]);
-    setSelectedFinding(null);
-    setHistoryError("");
-  }, [session?.user.id]);
 
   useEffect(() => {
     let ignore = false;

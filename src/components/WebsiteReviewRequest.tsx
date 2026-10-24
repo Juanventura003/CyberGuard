@@ -46,7 +46,7 @@ export default function WebsiteReviewRequest({
       </p>
       <form onSubmit={submit}>
         <label>
-          Why should your admin review this block?
+          Why should your admin review this restriction?
           <textarea
             required
             minLength={3}
@@ -60,7 +60,9 @@ export default function WebsiteReviewRequest({
         </label>
         <p className="org-consent-summary">
           Only this rule domain and your explanation will be shared with your
-          admins. Sending this request does not unblock the website.
+          admins. Sending this request does not unblock the website. Your admin
+          can keep the restriction, remove the rule for everyone, or approve
+          temporary access to a blocked website just for you.
         </p>
         {error && (
           <p className="org-error" role="alert">

@@ -17,6 +17,7 @@ export interface NewsResponse {
   fetched_at: string;
   source_url: string;
   stale: boolean;
+  storage?: "persistent" | "memory";
 }
 
 export async function fetchNews(signal: AbortSignal): Promise<NewsResponse> {

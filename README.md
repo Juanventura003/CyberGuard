@@ -93,25 +93,19 @@ Keep all backend credentials in `src/backend/.env`; never copy them into the fro
 
 ### Browser extension and Website Tracker
 
-The Chrome extension combines Google Web Risk, OpenPhish Community and URL/page rules. It checks for embedded URL credentials, brand impersonation and spelling/Unicode lookalikes, insecure password forms, GET submissions, misleading links and labeled recovery-secret fields. Page checks send bounded facts, never passwords, entered values, raw page text or HTML.
-
-Scores describe evidence strength, not phishing probability. Strong rules can produce suspicious warnings at 35; reputation matches produce high-risk results. Weak page signals alone are capped at 25. Missing enabled providers produce incomplete checks. Personal blocking is manual through the popup or Website Tracker. Organization admins can also publish shared website rules to connected extensions.
-
-#### Setup and use
+The extension checks websites using Google Web Risk, OpenPhish, and URL/page signals. Website Tracker shows saved visits, risk scores, and explanations, with search, filters, personal blocking, and history deletion. Scores indicate evidence strength, not a probability that a site is unsafe.
 
 ```bash
 npm run build:extension
 ```
 
-In `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose `extension/dist`. Keep the backend running. To save history, sign in to the frontend and open Website Tracker once to connect the extension. Combined URL/page results update the saved visit.
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Choose **Load unpacked** and select `extension/dist`.
+3. Keep the backend running. Sign in to CyberGuard and open **Website Tracker** to connect history saving.
 
-Enable **Show draggable website notification** in the popup to display the banner. Drag its header to move it; × disables notifications across tabs. Page checks continue while the banner is hidden if monitoring is enabled. Chrome internal and restricted pages cannot display it.
+Use the popup to control monitoring, floating notifications, and personal website blocks. Organization rules show Warn, Block, or temporary-access status. Page checks do not collect entered values or raw page contents.
 
-After extension changes, rebuild, reload the extension and refresh website tabs. Backend changes require a backend restart. URL results are cached for five minutes, up to 100 entries; **Refresh** forces a new check. Tracker loads up to 1,000 history records, pauses polling while hidden and retains loaded rows if refreshing fails.
-
-#### Threat feed
-
-OpenPhish Community is enabled by default (`OPENPHISH_ENABLED=true`), needs no key and refreshes every 12 hours. Cached feeds older than 24 hours are unavailable. Exact URL matching preserves paths and queries; browsing URLs are not sent to OpenPhish. See [OpenPhish terms](https://openphish.com/terms.html).
+After extension changes, rebuild, reload the extension, and refresh website tabs. Restart the backend after backend changes. OpenPhish needs no API key; Google Web Risk uses `GOOGLE_WEB_RISK_API_KEY`.
 
 ### Cyber Assistant
 The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
@@ -120,9 +114,9 @@ Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like
 
 ### CyberTech News
 
-Open **News** (`/news`) to search and filter BleepingComputer articles, read summaries, and open full stories. The backend updates the feed every five minutes while running; no news API key is needed. Recent news covers available articles from the past seven days, while Saved includes any date. The feed may cover less than a full week.
+News collects BleepingComputer RSS articles every five minutes while the backend runs. Search, filter by topic, read summaries, and open original articles. Recent news retains collected articles for seven days after publication; signed-in users can keep private saved copies until they unsave them.
 
-Sign in to save articles and track what you’ve read. Your saved articles and read status are private to your account.
+Supabase preserves the retained feed across restarts, and its scheduled cleanup removes expired articles without deleting saved copies or team notices. A new feed may cover less than a week. Source or storage failures are shown in the app.
 
 ## Troubleshooting
 
@@ -133,6 +127,17 @@ Sign in to save articles and track what you’ve read. Your saved articles and r
 - **Google says the app isn't verified or access is blocked**: add your account as a test user.
 - **Port already in use**: stop the other process, or use a different `--port` and update `GOOGLE_REDIRECT_URI` / `VITE_API_BASE_URL` to match.
 
-### Team security
+## Team Security
 
-CyberGuard supports organizations, invitations, optional app presence/device categories, shared extension website rules, and findings that admins can turn into team protection. Members can share email/website scan evidence, track responses, and request review of a blocked website.
+Create an organization from the team toolbar, invite verified accounts inside CyberGuard, and manage members. Each organization has its own admins and data; admins do not receive members’ complete browsing history or inbox access.
+
+- **Website protection:** Admins publish Warn or Block rules for enrolled browser profiles. Members can continue past warnings or request review of a block.
+- **Temporary access:** Admins can approve one member for 15 minutes, 1 hour, 4 hours, or 24 hours. Normal website use is allowed; personal blocks and other matching restrictions still apply. Expiry is handled locally, although Chrome can delay it during sleep. Early revocation requires synchronization.
+- **Security inbox:** Members explicitly share selected findings. Admins respond with guidance or website actions and can archive handled findings without changing protection.
+- **Team notices:** Admins share News articles with guidance. Members acknowledge notices; admins see receipt counts and can pin, expire, or archive notices.
+- **Presence:** Members explicitly accept required Active/Away and approximate device/OS sharing. Admins retain optional sharing. Presence covers CyberGuard activity only, with a two-second Away grace period.
+- **Organization lifecycle:** Owners can archive, restore, or delete a team. Archive preserves read-only records but revokes browser connections and temporary approvals; members reconnect after restoration.
+
+Protection applies only to connected browser profiles and remains after CyberGuard sign-out. Offline browsers keep cached restrictions until they successfully sync. Personal blocks remain separate.
+
+Use the team’s configured Supabase project for Team Security and persistent News. A separate project needs the organization/news database setup and scheduled cleanup; obtain that setup from the team. Keep `SUPABASE_SERVICE_ROLE_KEY` in the backend environment only.

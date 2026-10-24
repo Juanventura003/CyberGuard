@@ -15,10 +15,18 @@ export type OrganizationFinding = {
   admin_note: string;
   created_at: string;
   updated_at: string;
+  archived_at?: string | null;
   purpose?: "finding" | "unblock_request";
   domain?: string | null;
   scan_evidence?: ScanEvidence;
-  response_action?: "none" | "blocked" | "unblocked" | "kept_blocked";
+  response_action?:
+    | "none"
+    | "blocked"
+    | "warned"
+    | "unblocked"
+    | "kept_blocked"
+    | "temporary_access";
+  access_expires_at?: string | null;
   action_domain?: string | null;
   action_revision?: number | null;
 };

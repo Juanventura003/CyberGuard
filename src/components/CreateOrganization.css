@@ -1,0 +1,104 @@
+.create-organization-dialog {
+  box-sizing: border-box;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid #e0e7f1;
+  border-radius: 18px;
+  padding: 26px;
+  background: #fff;
+  color: #172e4c;
+  text-align: left;
+  box-shadow: 0 24px 80px #15294a30;
+}
+.create-organization-dialog::backdrop {
+  background: #12213d70;
+  backdrop-filter: blur(3px);
+}
+.create-organization-dialog form {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+}
+.create-organization-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #315dd6;
+}
+.create-organization-heading button {
+  border: 0;
+  background: transparent;
+  color: #61718a;
+  padding: 6px;
+  cursor: pointer;
+}
+.create-organization-dialog h2 {
+  margin: 0;
+  font-size: 23px;
+}
+.create-organization-dialog p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #58677d;
+}
+.create-organization-dialog label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.create-organization-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #bdcde4;
+  border-radius: 9px;
+  padding: 11px 12px;
+  color: #203140;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+.create-organization-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.create-organization-actions button {
+  border: 1px solid #d7dfeb;
+  border-radius: 9px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  color: #43536c;
+}
+.create-organization-actions button[type="submit"] {
+  background: #315dd6;
+  border-color: #315dd6;
+  color: white;
+}
+.create-organization-dialog button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.create-organization-dialog :focus-visible {
+  outline: 3px solid #8ea9fa;
+  outline-offset: 3px;
+}
+.create-organization-dialog p.create-organization-error {
+  color: #b42318;
+  font-size: 13px;
+}
+@media (max-width: 480px) {
+  .create-organization-dialog {
+    padding: 20px;
+  }
+  .create-organization-actions button {
+    flex: 1;
+  }
+}

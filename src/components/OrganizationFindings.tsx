@@ -42,6 +42,8 @@ export default function OrganizationFindings({
   const [filter, setFilter] = useState("all");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
   const [page, setPage] = useState(0);
   const [result, setResult] = useState<{
     key: string;
@@ -53,7 +55,7 @@ export default function OrganizationFindings({
   const [loadError, setLoadError] = useState("");
   const [retry, setRetry] = useState(0);
   const pageSize = 25;
-  const listKey = `${organization.id}:${page}:${filter}`;
+  const listKey = `${organization.id}:${isAdmin}:${page}:${filter}`;
   const queryKey = `${listKey}:${selected}`;
   const loading = result?.key !== listKey;
   const visible = loading ? [] : result.rows;
@@ -73,6 +75,12 @@ export default function OrganizationFindings({
           .from("cg_incidents")
           .select("*", { count: "exact" })
           .eq("organization_id", organization.id);
+        if (isAdmin) {
+          list =
+            filter === "archived"
+              ? list.not("archived_at", "is", null)
+              : list.is("archived_at", null);
+        }
         if (filter === "requests") list = list.eq("purpose", "unblock_request");
         if (filter === "open")
           list = list.in("status", ["new", "under_review", "confirmed"]);
@@ -96,11 +104,20 @@ export default function OrganizationFindings({
             .from("cg_incidents")
             .select("id", { count: "exact", head: true })
             .eq("organization_id", organization.id)
+            .is("archived_at", null)
             .in("status", ["new", "under_review", "confirmed"]),
         ]);
         const failure = items.error ?? detail.error ?? outstanding.error;
         if (failure) throw failure;
         if (active) {
+          if (
+            page > 0 &&
+            !items.data?.length &&
+            (items.count ?? 0) <= page * pageSize
+          ) {
+            setPage(Math.max(0, Math.ceil((items.count ?? 0) / pageSize) - 1));
+            return;
+          }
           setResult({
             key: listKey,
             rows: items.data ?? [],
@@ -120,6 +137,7 @@ export default function OrganizationFindings({
     };
   }, [
     organization.id,
+    isAdmin,
     page,
     filter,
     selected,
@@ -176,6 +194,35 @@ export default function OrganizationFindings({
         .slice(0, 6)
     : [];
   const hasResponse = !!finding?.admin_note;
+  async function archiveFinding() {
+    if (!finding || archiveBusy) return;
+    setArchiveBusy(true);
+    setArchiveError("");
+    try {
+      const restoring = !!finding.archived_at;
+      const { error } = await supabase!.rpc("cg_archive_finding", {
+        incident: finding.id,
+        archive: !restoring,
+        expected_updated_at: finding.updated_at,
+      });
+      if (error) throw error;
+      setSelected("");
+      onRefresh(
+        restoring
+          ? "Finding restored to the inbox. Its review status and protection are unchanged."
+          : "Finding archived. Website rules and temporary approvals remain in effect.",
+      );
+    } catch (cause) {
+      setArchiveError(
+        organizationError(
+          cause,
+          "Could not update this finding. Please refresh and retry.",
+        ),
+      );
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
   return (
     <div className="org-findings">
       {reviewDomain && (
@@ -232,11 +279,15 @@ export default function OrganizationFindings({
                 setFilter(event.target.value);
                 setPage(0);
                 setSelected("");
+                setArchiveError("");
               }}
             >
-              <option value="all">All findings</option>
+              <option value="all">
+                {isAdmin ? "Inbox findings" : "All findings"}
+              </option>
               <option value="open">Needs resolution</option>
               <option value="requests">Website review requests</option>
+              {isAdmin && <option value="archived">Archived</option>}
             </select>
           </div>
           {loadError && (
@@ -251,10 +302,15 @@ export default function OrganizationFindings({
           {!loading && !visible.length && (
             <div className="org-empty">
               <Shield size={28} />
-              <h3>No findings here yet</h3>
+              <h3>
+                {filter === "archived"
+                  ? "No archived findings"
+                  : "No findings here yet"}
+              </h3>
               <p>
-                Share an email or website scan, or request a review of a blocked
-                website.
+                {filter === "archived"
+                  ? "Resolved or dismissed findings you archive will appear here."
+                  : "Share an email or website scan, or request a review of a blocked website."}
               </p>
               <Link to="/website-tracker">Open Website Tracker</Link>
             </div>
@@ -266,6 +322,7 @@ export default function OrganizationFindings({
                 key={item.id}
                 onClick={() => {
                   setSelected(item.id);
+                  setArchiveError("");
                   if (window.innerWidth <= 1000)
                     requestAnimationFrame(() => {
                       const detail =
@@ -276,6 +333,7 @@ export default function OrganizationFindings({
                 }}
               >
                 <strong>{item.title}</strong>
+                {item.archived_at && <small>Archived</small>}
                 <span className={`org-status ${item.status}`}>
                   {label(item.status)}
                 </span>
@@ -312,6 +370,42 @@ export default function OrganizationFindings({
             <>
               <p className="org-eyebrow">{source(finding).toUpperCase()}</p>
               <h2>{finding.title}</h2>
+              {finding.archived_at && (
+                <p className="org-notice">
+                  Archived {new Date(finding.archived_at).toLocaleString()}.
+                  Evidence, the admin’s response, and protection remain
+                  available.
+                </p>
+              )}
+              {isAdmin && (
+                <div className="finding-archive-actions">
+                  <button
+                    disabled={
+                      archiveBusy ||
+                      (!finding.archived_at &&
+                        !["resolved", "dismissed"].includes(finding.status))
+                    }
+                    onClick={() => void archiveFinding()}
+                  >
+                    {archiveBusy
+                      ? "Saving…"
+                      : finding.archived_at
+                        ? "Restore to inbox"
+                        : "Archive finding"}
+                  </button>
+                  {!finding.archived_at && (
+                    <p className="org-help">
+                      Resolve or dismiss before archiving. Archiving keeps
+                      evidence, website rules, and temporary approvals.
+                    </p>
+                  )}
+                  {archiveError && (
+                    <p className="org-error" role="alert">
+                      {archiveError}
+                    </p>
+                  )}
+                </div>
+              )}
               <p className="org-help">
                 {members.find((item) => item.user_id === finding.reporter_id)
                   ?.email ??
@@ -332,13 +426,17 @@ export default function OrganizationFindings({
                 <li className={hasResponse ? "done" : ""}>
                   {finding.response_action === "blocked"
                     ? "Block published"
-                    : finding.response_action === "unblocked"
-                      ? "Rule removed"
-                      : finding.response_action === "kept_blocked"
-                        ? "Block retained"
-                        : hasResponse
-                          ? "Guidance sent"
-                          : "Response"}
+                    : finding.response_action === "warned"
+                      ? "Warning published"
+                      : finding.response_action === "temporary_access"
+                        ? "Temporary access granted"
+                        : finding.response_action === "unblocked"
+                          ? "Rule removed"
+                          : finding.response_action === "kept_blocked"
+                            ? "Restriction retained"
+                            : hasResponse
+                              ? "Guidance sent"
+                              : "Response"}
                 </li>
               </ol>
               {scanner?.verdict && typeof scanner.verdict === "string" && (
@@ -397,7 +495,7 @@ export default function OrganizationFindings({
                   refreshRevision={refreshRevision}
                 />
               )}
-              {isAdmin && (
+              {isAdmin && !finding.archived_at && (
                 <FindingResponse
                   key={`response:${finding.id}`}
                   finding={finding}

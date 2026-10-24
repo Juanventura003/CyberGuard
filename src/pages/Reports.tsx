@@ -24,10 +24,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 
-import {
-  listWebsiteHistory,
-  type WebsiteHistoryEntry,
-} from "../api/emailApi";
+import { listWebsiteHistory, type WebsiteHistoryEntry } from "../api/emailApi";
 import { useAuth } from "../context/AuthContext";
 import "./Reports.css";
 
@@ -139,11 +136,7 @@ const FINDINGS: Record<Finding, string> = {
   info: "Informational",
 };
 
-const RISK_CATEGORIES: RiskFinding[] = [
-  "safe",
-  "suspicious",
-  "high",
-];
+const RISK_CATEGORIES: RiskFinding[] = ["safe", "suspicious", "high"];
 
 const daysAgo = (days: number, hour: number, minute: number) => {
   const date = new Date();
@@ -174,9 +167,7 @@ const DEMO: ReportItem[] = [
     occurredAt: daysAgo(0, 10, 15),
     source: "demo",
     score: 92,
-    notes: [
-      "Illustrative high-risk detection.",
-    ],
+    notes: ["Illustrative high-risk detection."],
   },
   {
     id: "demo-w3",
@@ -322,9 +313,7 @@ const DEMO: ReportItem[] = [
   },
 ];
 
-const riskOf = (
-  risk: WebsiteHistoryEntry["risk_level"]
-): Finding => {
+const riskOf = (risk: WebsiteHistoryEntry["risk_level"]): Finding => {
   if (risk === "HIGH_RISK") return "high";
   if (risk === "SUSPICIOUS") return "suspicious";
   if (risk === "NO_KNOWN_THREAT") return "safe";
@@ -340,18 +329,9 @@ const dateText = (iso: string) =>
   });
 
 const dayStart = (date: Date) =>
-  new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  ).getTime();
+  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 
-const inRange = (
-  iso: string,
-  range: Range,
-  start: string,
-  end: string
-) => {
+const inRange = (iso: string, range: Range, start: string, end: string) => {
   const value = Date.parse(iso);
 
   if (!Number.isFinite(value)) return false;
@@ -386,11 +366,7 @@ const inRange = (
 const csvEscape = (value: unknown) =>
   `"${String(value ?? "").replaceAll('"', '""')}"`;
 
-function download(
-  filename: string,
-  content: string,
-  type: string
-) {
+function download(filename: string, content: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
 
@@ -404,10 +380,15 @@ function download(
 
 export default function Reports() {
   const { session } = useAuth();
+  return <ReportsContent key={session?.user.id ?? "guest"} />;
+}
+
+function ReportsContent() {
+  const { session } = useAuth();
 
   const [live, setLive] = useState<ReportItem[]>([]);
   const [loadError, setLoadError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(session?.access_token));
 
   // Keep temporary records enabled until other report APIs exist.
   const showDemo = true;
@@ -417,52 +398,43 @@ export default function Reports() {
   const [end, setEnd] = useState("");
   const [search, setSearch] = useState("");
 
-  const [selectedCategory, setSelectedCategory] =
-    useState<Category | "all">("all");
+  const [selectedCategory, setSelectedCategory] = useState<Category | "all">(
+    "all",
+  );
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
   // Load actual Website Tracker history.
   useEffect(() => {
-    if (!session?.access_token) {
-      setLive([]);
-      setLoading(false);
-      return;
-    }
+    if (!session?.access_token) return;
     let cancelled = false;
 
     async function load() {
       try {
-        const history = await listWebsiteHistory(
-          1000,
-          session?.access_token
-        );
+        const history = await listWebsiteHistory(1000, session?.access_token);
 
         if (cancelled) return;
 
         setLive(
-          history.map(
-            (entry): ReportItem => ({
-              id: `website-${entry.id}`,
-              category: "websites",
-              title: entry.domain || entry.url,
-              detail: entry.url,
-              finding: riskOf(entry.risk_level),
-              occurredAt: entry.visited_at,
-              source: "live",
-              score:
-                typeof entry.risk_score === "number"
-                  ? Math.round(entry.risk_score)
-                  : undefined,
-              notes: [
-                ...(entry.threat_types ?? []).map(
-                  (t) =>
-                    `Threat type: ${t.replaceAll("_", " ")}`
-                ),
-                ...(entry.explanation ?? []),
-              ],
-            })
-          )
+          history.map((entry): ReportItem => ({
+            id: `website-${entry.id}`,
+            category: "websites",
+            title: entry.domain || entry.url,
+            detail: entry.url,
+            finding: riskOf(entry.risk_level),
+            occurredAt: entry.visited_at,
+            source: "live",
+            score:
+              typeof entry.risk_score === "number"
+                ? Math.round(entry.risk_score)
+                : undefined,
+            notes: [
+              ...(entry.threat_types ?? []).map(
+                (t) => `Threat type: ${t.replaceAll("_", " ")}`,
+              ),
+              ...(entry.explanation ?? []),
+            ],
+          })),
         );
 
         setLoadError("");
@@ -471,7 +443,7 @@ export default function Reports() {
           setLoadError(
             error instanceof Error
               ? error.message
-              : "Unable to load website history."
+              : "Unable to load website history.",
           );
         }
       } finally {
@@ -483,10 +455,7 @@ export default function Reports() {
 
     void load();
 
-    const timer = window.setInterval(
-      () => void load(),
-      30000
-    );
+    const timer = window.setInterval(() => void load(), 30000);
 
     return () => {
       cancelled = true;
@@ -497,35 +466,24 @@ export default function Reports() {
   const items = useMemo(
     () =>
       [...live, ...(showDemo ? DEMO : [])]
-        .filter((item) =>
-          inRange(item.occurredAt, range, start, end)
-        )
-        .sort(
-          (a, b) =>
-            Date.parse(b.occurredAt) -
-            Date.parse(a.occurredAt)
-        ),
-    [live, range, start, end]
+        .filter((item) => inRange(item.occurredAt, range, start, end))
+        .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)),
+    [live, range, start, end, showDemo],
   );
 
   const flagged = items.filter(
-    (item) =>
-      item.finding === "high" ||
-      item.finding === "suspicious"
+    (item) => item.finding === "high" || item.finding === "suspicious",
   );
 
   // Unverified and informational records do not enter
   const riskTotal = items.filter((item) =>
-    RISK_CATEGORIES.includes(item.finding as RiskFinding)
+    RISK_CATEGORIES.includes(item.finding as RiskFinding),
   ).length;
 
   const shown = useMemo(
     () =>
       items.filter((item) => {
-        if (
-          selectedCategory !== "all" &&
-          item.category !== selectedCategory
-        ) {
+        if (selectedCategory !== "all" && item.category !== selectedCategory) {
           return false;
         }
 
@@ -538,12 +496,10 @@ export default function Reports() {
             item.detail,
             FINDINGS[item.finding],
             ...(item.notes ?? []),
-          ].some((value) =>
-            value.toLowerCase().includes(q)
-          )
+          ].some((value) => value.toLowerCase().includes(q))
         );
       }),
-    [items, selectedCategory, search]
+    [items, selectedCategory, search],
   );
 
   const periodLabel =
@@ -576,15 +532,13 @@ export default function Reports() {
       JSON.stringify(
         {
           period: periodLabel,
-          contains_demo_data: shown.some(
-            (item) => item.source === "demo"
-          ),
+          contains_demo_data: shown.some((item) => item.source === "demo"),
           activities: exportRows,
         },
         null,
-        2
+        2,
       ),
-      "application/json"
+      "application/json",
     );
 
   const exportCsv = () => {
@@ -604,12 +558,10 @@ export default function Reports() {
       [
         headers.join(","),
         ...exportRows.map((row) =>
-          headers
-            .map((key) => csvEscape(row[key]))
-            .join(",")
+          headers.map((key) => csvEscape(row[key])).join(","),
         ),
       ].join("\r\n"),
-      "text/csv;charset=utf-8"
+      "text/csv;charset=utf-8",
     );
   };
 
@@ -663,9 +615,8 @@ export default function Reports() {
           <h2>Sign in to view your security reports</h2>
 
           <p>
-            CyberGuard saves your security activity and scan history
-            to your account. Log in or create an account to view
-            your reports.
+            CyberGuard saves your security activity and scan history to your
+            account. Log in or create an account to view your reports.
           </p>
 
           <div className="report-guest-actions">
@@ -694,33 +645,21 @@ export default function Reports() {
       <header className="report-topbar no-print">
         <div>
           <h1>Security Activity Report</h1>
-          <p>
-            A complete record of your CyberGuard security
-            activity.
-          </p>
+          <p>A complete record of your CyberGuard security activity.</p>
         </div>
 
         <div className="report-top-actions">
-          <button
-            type="button"
-            onClick={() => window.print()}
-          >
+          <button type="button" onClick={() => window.print()}>
             <Printer size={16} />
             Print / Save PDF
           </button>
 
-          <button
-            type="button"
-            onClick={exportCsv}
-          >
+          <button type="button" onClick={exportCsv}>
             <Download size={16} />
             CSV
           </button>
 
-          <button
-            type="button"
-            onClick={exportJson}
-          >
+          <button type="button" onClick={exportJson}>
             <Download size={16} />
             JSON
           </button>
@@ -732,12 +671,9 @@ export default function Reports() {
         <label>
           <CalendarDays size={16} />
           Report period
-
           <select
             value={range}
-            onChange={(event) =>
-              setRange(event.target.value as Range)
-            }
+            onChange={(event) => setRange(event.target.value as Range)}
           >
             <option value="today">Today</option>
             <option value="yesterday">Yesterday</option>
@@ -755,9 +691,7 @@ export default function Reports() {
               <input
                 type="date"
                 value={start}
-                onChange={(event) =>
-                  setStart(event.target.value)
-                }
+                onChange={(event) => setStart(event.target.value)}
               />
             </label>
 
@@ -767,9 +701,7 @@ export default function Reports() {
                 type="date"
                 min={start || undefined}
                 value={end}
-                onChange={(event) =>
-                  setEnd(event.target.value)
-                }
+                onChange={(event) => setEnd(event.target.value)}
               />
             </label>
           </div>
@@ -787,9 +719,7 @@ export default function Reports() {
         <section className="report-document-header">
           <div>
             <h2>{periodLabel} — Security Summary</h2>
-            <p>
-              Generated {new Date().toLocaleString()}
-            </p>
+            <p>Generated {new Date().toLocaleString()}</p>
           </div>
 
           <div className="report-id">
@@ -797,9 +727,7 @@ export default function Reports() {
             <strong>Activity overview</strong>
 
             <span>STATUS</span>
-            <strong>
-              {loading ? "Loading" : "Generated"}
-            </strong>
+            <strong>{loading ? "Loading" : "Generated"}</strong>
           </div>
         </section>
 
@@ -811,16 +739,12 @@ export default function Reports() {
           </div>
 
           <p className="report-intro">
-            CyberGuard recorded{" "}
-            <strong>{items.length} activities</strong>{" "}
-            in the selected period across{" "}
+            CyberGuard recorded <strong>{items.length} activities</strong> in
+            the selected period across{" "}
             <strong>
               {
                 CATEGORIES.filter((category) =>
-                  items.some(
-                    (item) =>
-                      item.category === category.id
-                  )
+                  items.some((item) => item.category === category.id),
                 ).length
               }{" "}
               security categories
@@ -868,16 +792,13 @@ export default function Reports() {
           <div className="report-risk-overview">
             <div className="report-risk-head">
               <strong>Risk distribution</strong>
-              <span>
-                {riskTotal} classified security results
-              </span>
+              <span>{riskTotal} classified security results</span>
             </div>
 
             <div className="report-risk-track">
               {RISK_CATEGORIES.map((finding) => {
                 const count = items.filter(
-                  (item) =>
-                    item.finding === finding
+                  (item) => item.finding === finding,
                 ).length;
 
                 if (count === 0) return null;
@@ -887,11 +808,7 @@ export default function Reports() {
                     key={finding}
                     className={`report-risk-fill ${finding}`}
                     style={{
-                      width: `${
-                        (count /
-                          Math.max(riskTotal, 1)) *
-                        100
-                      }%`,
+                      width: `${(count / Math.max(riskTotal, 1)) * 100}%`,
                     }}
                   />
                 );
@@ -901,16 +818,9 @@ export default function Reports() {
             <div className="report-risk-legend">
               {RISK_CATEGORIES.map((finding) => (
                 <span key={finding}>
-                  <i
-                    className={`report-dot ${finding}`}
-                  />
+                  <i className={`report-dot ${finding}`} />
                   {FINDINGS[finding]}:{" "}
-                  {
-                    items.filter(
-                      (item) =>
-                        item.finding === finding
-                    ).length
-                  }
+                  {items.filter((item) => item.finding === finding).length}
                 </span>
               ))}
             </div>
@@ -925,78 +835,58 @@ export default function Reports() {
           </div>
 
           <p className="report-section-desc">
-            Every security feature is represented below.
-            Categories without recorded activity show zero.
+            Every security feature is represented below. Categories without
+            recorded activity show zero.
           </p>
 
           <div className="report-category-grid">
-            {CATEGORIES.map(
-              ({ id, label, icon: Icon }) => {
-                const group = items.filter(
-                  (item) => item.category === id
-                );
+            {CATEGORIES.map(({ id, label, icon: Icon }) => {
+              const group = items.filter((item) => item.category === id);
 
-                const warnings = group.filter(
-                  (item) =>
-                    item.finding === "high" ||
-                    item.finding === "suspicious"
-                ).length;
+              const warnings = group.filter(
+                (item) =>
+                  item.finding === "high" || item.finding === "suspicious",
+              ).length;
 
-                return (
-                  <button
-                    type="button"
-                    key={id}
-                    className={`report-category-card ${
-                      selectedCategory === id
-                        ? "selected"
-                        : ""
-                    }`}
-                    onClick={() => {
-                      setSelectedCategory(
-                        selectedCategory === id
-                          ? "all"
-                          : id
-                      );
+              return (
+                <button
+                  type="button"
+                  key={id}
+                  className={`report-category-card ${
+                    selectedCategory === id ? "selected" : ""
+                  }`}
+                  onClick={() => {
+                    setSelectedCategory(selectedCategory === id ? "all" : id);
 
-                      document
-                        .getElementById(
-                          "report-activity"
-                        )
-                        ?.scrollIntoView({
-                          behavior: "smooth",
-                          block: "start",
-                        });
-                    }}
-                  >
-                    <span className="report-category-icon">
-                      <Icon size={19} />
-                    </span>
+                    document.getElementById("report-activity")?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }}
+                >
+                  <span className="report-category-icon">
+                    <Icon size={19} />
+                  </span>
 
-                    <span className="report-category-name">
-                      {label}
-                    </span>
+                  <span className="report-category-name">{label}</span>
 
-                    <strong>{group.length}</strong>
+                  <strong>{group.length}</strong>
 
-                    <small>
-                      {warnings
-                        ? `${warnings} flagged`
-                        : group.length
-                          ? "No flagged findings"
-                          : "No activity"}
-                    </small>
-                  </button>
-                );
-              }
-            )}
+                  <small>
+                    {warnings
+                      ? `${warnings} flagged`
+                      : group.length
+                        ? "No flagged findings"
+                        : "No activity"}
+                  </small>
+                </button>
+              );
+            })}
           </div>
         </section>
 
         {/* SECTION 3: DETAILED ACTIVITY LOG */}
-        <section
-          className="report-section"
-          id="report-activity"
-        >
+        <section className="report-section" id="report-activity">
           <div className="report-section-title">
             <span>03</span>
             <h3>Detailed activity log</h3>
@@ -1008,9 +898,7 @@ export default function Reports() {
 
               <input
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search activity, domain, filename, or result..."
               />
 
@@ -1029,22 +917,13 @@ export default function Reports() {
               aria-label="Activity category"
               value={selectedCategory}
               onChange={(event) =>
-                setSelectedCategory(
-                  event.target.value as
-                    | Category
-                    | "all"
-                )
+                setSelectedCategory(event.target.value as Category | "all")
               }
             >
-              <option value="all">
-                All categories
-              </option>
+              <option value="all">All categories</option>
 
               {CATEGORIES.map((category) => (
-                <option
-                  key={category.id}
-                  value={category.id}
-                >
+                <option key={category.id} value={category.id}>
                   {category.label}
                 </option>
               ))}
@@ -1059,9 +938,7 @@ export default function Reports() {
             <span>Activity</span>
             <span>Category</span>
 
-            {selectedCategory !== "news" && (
-              <span>Finding</span>
-            )}
+            {selectedCategory !== "news" && <span>Finding</span>}
 
             <span>Time</span>
           </div>
@@ -1070,27 +947,19 @@ export default function Reports() {
             {shown.length ? (
               shown.map((item) => {
                 const category = CATEGORIES.find(
-                  (category) =>
-                    category.id === item.category
+                  (category) => category.id === item.category,
                 )!;
 
                 const open = expanded === item.id;
 
                 return (
-                  <div
-                    key={item.id}
-                    className="report-log-entry"
-                  >
+                  <div key={item.id} className="report-log-entry">
                     <button
                       type="button"
                       className={`report-log-row ${
                         selectedCategory === "news" ? "news-view" : ""
                       }`}
-                      onClick={() =>
-                        setExpanded(
-                          open ? null : item.id
-                        )
-                      }
+                      onClick={() => setExpanded(open ? null : item.id)}
                       aria-expanded={open}
                     >
                       <span className="report-log-main">
@@ -1101,32 +970,26 @@ export default function Reports() {
                         )}
 
                         <span>
-                          <strong>
-                            {item.title}
-                          </strong>
-                          <small>
-                            {item.detail}
-                          </small>
+                          <strong>{item.title}</strong>
+                          <small>{item.detail}</small>
                         </span>
                       </span>
 
-                      <span>
-                        {category.label}
-                      </span>
-                    {selectedCategory !== "news" && (
-                      <span>
-                        {item.category !== "news" && (
-                          <span className={`report-finding ${getResultClass(item)}`}>
-                            {getResultLabel(item)}
-                          </span>
+                      <span>{category.label}</span>
+                      {selectedCategory !== "news" && (
+                        <span>
+                          {item.category !== "news" && (
+                            <span
+                              className={`report-finding ${getResultClass(item)}`}
+                            >
+                              {getResultLabel(item)}
+                            </span>
                           )}
                         </span>
                       )}
 
                       <span className="report-log-time">
-                        {dateText(
-                          item.occurredAt
-                        )}
+                        {dateText(item.occurredAt)}
                       </span>
                     </button>
 
@@ -1137,66 +1000,64 @@ export default function Reports() {
                           {item.source === "demo"
                             ? "Sample data (not a real scan)"
                             : "Saved website history"}
+                        </div>
+
+                        {/* PASSWORD CHECKER DETAILS */}
+                        {item.category === "passwords" && (
+                          <div className="report-password-detail">
+                            <strong>Password checked:</strong>
+
+                            <div className="report-password-field">
+                              <span>••••••••••••</span>
+                              <span className="report-password-private">
+                                Hidden for security
+                              </span>
+                            </div>
+
+                            <p>
+                              <strong>Password strength:</strong>{" "}
+                              <span
+                                className={`report-finding ${getResultClass(item)}`}
+                              >
+                                {getResultLabel(item)}
+                              </span>
+                            </p>
+
+                            <small>
+                              The original password is not stored in the report
+                              and cannot be revealed.
+                            </small>
                           </div>
+                        )}
 
-                          {/* PASSWORD CHECKER DETAILS */}
-                          {item.category === "passwords" && (
-                            <div className="report-password-detail">
-                              <strong>Password checked:</strong>
-
-                              <div className="report-password-field">
-                                <span>••••••••••••</span>
-                                <span className="report-password-private">
-                                  Hidden for security
-                                </span>
-                              </div>
-
-                              <p>
-                                <strong>Password strength:</strong>{" "}
-                                <span
-                                  className={`report-finding ${getResultClass(item)}`}
-                                >
-                                  {getResultLabel(item)}
-                                </span>
-                              </p>
-
-                              <small>
-                                The original password is not stored in the report
-                                and cannot be revealed.
-                              </small>
+                        {/* RISK SCORE FOR OTHER SECURITY CHECKS */}
+                        {item.category !== "passwords" &&
+                          typeof item.score === "number" && (
+                            <div>
+                              <strong>Risk score:</strong> {item.score}/100
                             </div>
                           )}
 
-                          {/* RISK SCORE FOR OTHER SECURITY CHECKS */}
-                          {item.category !== "passwords" &&
-                            typeof item.score === "number" && (
-                              <div>
-                                <strong>Risk score:</strong> {item.score}/100
-                              </div>
-                            )}
-
-                          {/* ADDITIONAL SCAN DETAILS */}
-                          {item.notes?.length ? (
-                            <ul>
-                              {item.notes.map((note, index) => (
-                                <li key={index}>{note}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p>No additional details recorded.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
+                        {/* ADDITIONAL SCAN DETAILS */}
+                        {item.notes?.length ? (
+                          <ul>
+                            {item.notes.map((note, index) => (
+                              <li key={index}>{note}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p>No additional details recorded.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             ) : (
               <div className="report-empty">
                 <FileText size={25} />
 
-                <strong>
-                  No matching activities
-                </strong>
+                <strong>No matching activities</strong>
 
                 <p>
                   {loading
@@ -1208,14 +1069,12 @@ export default function Reports() {
           </div>
 
           <p className="report-footnote">
-            Showing {shown.length} of {items.length}{" "}
-            activities for{" "}
-            {periodLabel.toLowerCase()}.
-            {" "}
+            Showing {shown.length} of {items.length} activities for{" "}
+            {periodLabel.toLowerCase()}.{" "}
           </p>
         </section>
 
-        {/* REPORT FOOTER */}   
+        {/* REPORT FOOTER */}
         <footer className="report-footer">
           <span className="report-footer-brand">
             <img

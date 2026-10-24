@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Shield } from "lucide-react";
 import HelpTip from "./HelpTip";
 import { supabase } from "../lib/supabase";
@@ -21,6 +21,7 @@ export default function FindingResponse({
   const [version, setVersion] = useState(finding.updated_at);
   const stale = version !== finding.updated_at;
   const [decision, setDecision] = useState("guidance");
+  const [duration, setDuration] = useState(60);
   const [domain, setDomain] = useState(finding.domain ?? "");
   const [note, setNote] = useState(finding.admin_note);
   const [status, setStatus] = useState(
@@ -30,9 +31,27 @@ export default function FindingResponse({
     host: string;
     decision: string;
     note: string;
+    duration: number;
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [ruleAction, setRuleAction] = useState<string | null>(null);
+  useEffect(() => {
+    if (!request || !finding.domain) return;
+    let active = true;
+    void (async () => {
+      const { data, error } = await supabase!
+        .from("cg_domain_rules")
+        .select("action")
+        .eq("organization_id", finding.organization_id)
+        .eq("domain", finding.domain!)
+        .maybeSingle();
+      if (active) setRuleAction(error ? null : (data?.action ?? "removed"));
+    })();
+    return () => {
+      active = false;
+    };
+  }, [request, finding.organization_id, finding.domain, finding.updated_at]);
   const suggestions = [
     ...new Set(
       (finding.details.match(/https?:\/\/[^\s<>"']+/gi) ?? []).flatMap(
@@ -52,12 +71,14 @@ export default function FindingResponse({
     setError("");
     try {
       const { error } = preview
-        ? await supabase!.rpc("cg_act_on_incident", {
+        ? await supabase!.rpc("cg_act_on_incident_v2", {
             incident: finding.id,
             decision: preview.decision,
             host: preview.host,
             note: preview.note,
             expected_updated_at: version,
+            duration_minutes:
+              preview.decision === "temporary_access" ? preview.duration : null,
           })
         : await supabase!.rpc("cg_review_incident", {
             incident: finding.id,
@@ -93,6 +114,7 @@ export default function FindingResponse({
         host: normalizeFindingDomain(request ? (finding.domain ?? "") : domain),
         decision,
         note: note.trim(),
+        duration,
       });
     } catch (cause) {
       setError(
@@ -135,18 +157,24 @@ export default function FindingResponse({
           <strong>
             {preview.decision === "block"
               ? "Block"
-              : preview.decision === "unblock"
-                ? "Remove the block for"
-                : "Keep blocking"}{" "}
+              : preview.decision === "warn"
+                ? "Warn about"
+                : preview.decision === "temporary_access"
+                  ? "Grant temporary access to"
+                  : preview.decision === "unblock"
+                    ? "Remove the block for"
+                    : "Keep the restriction on"}{" "}
             {preview.host}
           </strong>
           <p>
-            {preview.decision === "keep_block"
-              ? "The existing website rule stays in place."
-              : `This changes the website rule for all extensions connected to ${organizationName}. Subdomains are included. Extensions apply changes on their next successful sync.`}
+            {preview.decision === "temporary_access"
+              ? `Only the member who submitted this request receives full website access for ${preview.duration < 60 ? `${preview.duration} minutes` : `${preview.duration / 60} hour(s)`}, starting when you confirm. Logins, forms, and normal navigation are allowed on this configured domain and its subdomains. Other members stay restricted; personal blocks and other matching restrictions still apply. The extension restores protection locally at expiry and redirects affected open tabs. Chrome may delay expiry handling during sleep or suspension. Other login or payment domains need their own approval if separately blocked.`
+              : preview.decision === "keep_block"
+                ? "The existing website rule stays in place."
+                : `This changes the website rule for all extensions connected to ${organizationName}. Subdomains are included. Extensions apply changes on their next successful sync.`}
           </p>
           <p>{preview.note}</p>
-          {preview.decision === "unblock" && (
+          {["unblock", "temporary_access"].includes(preview.decision) && (
             <p>Other shared or personal blocks may still prevent access.</p>
           )}
           <div className="finding-actions">
@@ -174,19 +202,52 @@ export default function FindingResponse({
               <option value="guidance">Send guidance / update review</option>
               {request ? (
                 <>
-                  <option value="unblock">
-                    Approve request — remove website block
+                  <option value="unblock">Remove this rule for everyone</option>
+                  <option
+                    value="temporary_access"
+                    disabled={ruleAction !== "block"}
+                  >
+                    Grant temporary access to this member
                   </option>
                   <option value="keep_block">
-                    Decline request — keep website blocked
+                    Decline request — keep restriction
                   </option>
                 </>
               ) : (
-                <option value="block">Block website for the team</option>
+                <>
+                  <option value="block">Block website for the team</option>
+                  <option value="warn">Warn about website for the team</option>
+                </>
               )}
             </select>
           </label>
-          {decision === "block" && (
+          {request && ruleAction === "warn" && (
+            <p className="org-help">
+              This rule is now a warning. Members can continue without temporary
+              approval.
+            </p>
+          )}
+          {request && ruleAction === "removed" && (
+            <p className="org-help">
+              This rule was removed. Send updated guidance to the member.
+            </p>
+          )}
+          {decision === "temporary_access" && (
+            <label>
+              Access duration (starts on approval)
+              <select
+                value={duration}
+                onChange={(event) => setDuration(Number(event.target.value))}
+                disabled={busy || stale}
+              >
+                <option value={15}>15 minutes</option>
+                <option value={60}>1 hour</option>
+                <option value={240}>4 hours</option>
+                <option value={1440}>24 hours</option>
+              </select>
+            </label>
+          )}
+          {["block", "warn"].includes(decision) && (
             <>
               <label>
                 Website domain

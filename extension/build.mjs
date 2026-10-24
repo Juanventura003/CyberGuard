@@ -38,6 +38,7 @@ for (const [source, output] of [
 	["background.ts", "background.js"],
 	["blocked.ts", "blocked.js"],
 	["organization-protection.ts", "organization-protection.js"],
+	["organization-policy.ts", "organization-policy.js"],
 	["redirect-tracker.ts", "redirect-tracker.js"],
 	["content.ts", "content.js"],
 	["banner.ts", "banner.js"],

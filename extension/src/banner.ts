@@ -239,8 +239,6 @@
 	const card = shadow.querySelector<HTMLElement>(".card")!;
 	let position = { x: Math.max(8, innerWidth - 270), y: 24 };
 	let stopped = false;
-	let pollTimer: ReturnType<typeof setInterval> | undefined;
-	let observer: ResizeObserver | undefined;
 	function stopBanner() {
 		stopped = true;
 		if (pollTimer !== undefined) clearInterval(pollTimer);
@@ -449,10 +447,10 @@
 	window.addEventListener("hashchange", () => {
 		void render();
 	});
-	observer = new ResizeObserver(place);
+	const observer = new ResizeObserver(place);
 	observer.observe(host);
 	// Apps can replace DOM nodes or change routes without a full page load.
-	pollTimer = setInterval(() => {
+	const pollTimer = setInterval(() => {
 		if (!hasContext()) return;
 		if (pageUrl !== location.href) {
 			pageUrl = location.href;
@@ -469,6 +467,8 @@
 	document.addEventListener("visibilitychange", () => {
 		if (!document.hidden) void checkPage();
 	});
-	window.addEventListener("focus", () => { void checkPage(); });
+	window.addEventListener("focus", () => {
+		void checkPage();
+	});
 	void checkPage();
 })();

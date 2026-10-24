@@ -78,3 +78,24 @@ h1 {
 	color: #315dd6;
 	border: 1px solid #c2d1eb;
 }
+
+#continue {
+	background: #315dd6;
+	color: white;
+	border: 0;
+	border-radius: 8px;
+	padding: 13px 20px;
+	margin-bottom: 12px;
+	font: inherit;
+	cursor: pointer;
+}
+#continue[hidden] {
+	display: none;
+}
+#continue:focus-visible {
+	outline: 3px solid #147c70;
+	outline-offset: 4px;
+}
+#error {
+	color: #b42318;
+}
