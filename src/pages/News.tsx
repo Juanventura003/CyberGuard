@@ -6,7 +6,14 @@ import {
   Newspaper,
   RefreshCw,
   Search,
+  Share2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import PublishTeamNotice from "../components/PublishTeamNotice";
+import {
+  adminNoticeOrganizations,
+  type NoticeOrganization,
+} from "../lib/teamNotices";
 import {
   fetchNews,
   fetchNewsActivity,
@@ -60,9 +67,31 @@ function NewsContent({ userId }: { userId?: string }) {
   const [activityLoading, setActivityLoading] = useState(Boolean(userId));
   const [activityReady, setActivityReady] = useState(!userId);
   const [pending, setPending] = useState<string[]>([]);
+  const [adminTeams, setAdminTeams] = useState<NoticeOrganization[]>([]);
+  const [sharingError, setSharingError] = useState("");
+  const [sharingReload, setSharingReload] = useState(0);
+  const [shareArticle, setShareArticle] = useState<NewsArticle | null>(null);
+  const [publishedOrg, setPublishedOrg] = useState("");
   const mounted = useRef(true);
   const pendingIds = useRef(new Set<string>());
   const request = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    void adminNoticeOrganizations(userId)
+      .then((teams) => {
+        if (active) {
+          setAdminTeams(teams);
+          setSharingError("");
+        }
+      })
+      .catch(() => {
+        if (active) setSharingError("Could not load organization sharing.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId, sharingReload]);
 
   const refresh = useCallback(async () => {
     if (request.current) return;
@@ -86,6 +115,20 @@ function NewsContent({ userId }: { userId?: string }) {
       if (request.current === controller) request.current = null;
     }
   }, []);
+
+  // Expire visible articles locally without waiting for another API refresh.
+  useEffect(() => {
+    const clock = Date.now();
+    const deadlines = (feed?.articles ?? [])
+      .map((article) => Date.parse(article.published_at) + 168 * 60 * 60 * 1000)
+      .filter((deadline) => Number.isFinite(deadline) && deadline > clock);
+    if (!deadlines.length) return;
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.min(...deadlines) - clock + 1,
+    );
+    return () => window.clearTimeout(timer);
+  }, [feed, now]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void refresh(), 0);
@@ -196,7 +239,7 @@ function NewsContent({ userId }: { userId?: string }) {
     .filter(
       (article) =>
         (view === "Saved" ||
-          (Date.parse(article.published_at) >= sevenDaysAgo &&
+          (Date.parse(article.published_at) > sevenDaysAgo &&
             Date.parse(article.published_at) <= now)) &&
         (category === "All" || article.category === category) &&
         (view !== "Unread" || !preferences.read.includes(article.id)) &&
@@ -228,7 +271,8 @@ function NewsContent({ userId }: { userId?: string }) {
         </button>
       </header>
       <p className="news-freshness">
-        The server checks for updates every 5 minutes while the backend is running.
+        The server checks for updates every 5 minutes while the backend is
+        running.
         {feed && <> Last fetched: {dateLabel(feed.fetched_at)}.</>}
       </p>
       {error && (
@@ -243,6 +287,12 @@ function NewsContent({ userId }: { userId?: string }) {
           last successful fetch.
         </p>
       )}
+      {feed?.storage === "memory" && (
+        <p role="status" className="news-notice">
+          Seven-day news storage is unavailable. Showing articles collected by
+          this running backend; some older news may be missing after a restart.
+        </p>
+      )}
       {activityError && (
         <p role="alert" className="news-notice">
           {activityError}
@@ -254,6 +304,22 @@ function NewsContent({ userId }: { userId?: string }) {
         </p>
       )}
       {activityLoading && <p role="status">Loading your news activity…</p>}
+      {sharingError && (
+        <p className="news-notice" role="alert">
+          {sharingError}{" "}
+          <button onClick={() => setSharingReload((value) => value + 1)}>
+            Retry
+          </button>
+        </p>
+      )}
+      {publishedOrg && (
+        <p className="news-notice" role="status">
+          Team notice published.{" "}
+          <Link to={`/organization?org=${publishedOrg}&view=notices`}>
+            View team notices
+          </Link>
+        </p>
+      )}
       <section className="news-controls" aria-label="Filter news">
         <label className="news-search">
           <Search size={18} />
@@ -346,6 +412,16 @@ function NewsContent({ userId }: { userId?: string }) {
                   </p>
                 </details>
                 <div className="news-card-actions">
+                  {!!adminTeams.length && (
+                    <button
+                      onClick={() => {
+                        setPublishedOrg("");
+                        setShareArticle(article);
+                      }}
+                    >
+                      <Share2 size={15} /> Share with organization
+                    </button>
+                  )}
                   <a
                     href={article.url}
                     target="_blank"
@@ -391,9 +467,22 @@ function NewsContent({ userId }: { userId?: string }) {
         </div>
       )}
       <p className="news-footnote">
-        Recent news includes available feed articles from the past seven days; Saved articles remain
-        available from any date.{" "}
+        Recent news keeps collected articles for seven days after publication.
+        Saved articles stay until you unsave them. Coverage starts with the
+        articles CyberGuard has collected.
       </p>
+      {shareArticle && (
+        <PublishTeamNotice
+          key={shareArticle.id}
+          article={shareArticle}
+          organizations={adminTeams}
+          onClose={() => setShareArticle(null)}
+          onPublished={(org) => {
+            setPublishedOrg(org);
+            setShareArticle(null);
+          }}
+        />
+      )}
     </div>
   );
 }

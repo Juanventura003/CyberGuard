@@ -1,5 +1,6 @@
 """Fetch publisher RSS metadata"""
-from datetime import datetime, timezone
+
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
 from html.parser import HTMLParser
@@ -10,10 +11,12 @@ from urllib.parse import urlparse
 from xml.etree import ElementTree
 
 import httpx
+from . import news_store
 
 FEED_URL = "https://www.bleepingcomputer.com/feed/"
 CACHE_SECONDS = 300
 _lock = Lock()
+_refresh_lock = Lock()
 _cached = None
 _expires = 0.0
 _logger = logging.getLogger(__name__)
@@ -54,7 +57,10 @@ def category_for(title, summary):
         ("Phishing", ("phishing", "smishing", "scam")),
         ("Breaches", ("breach", "data leak", "stolen data")),
         ("Malware", ("malware", "ransomware", "trojan", "botnet")),
-        ("Vulnerabilities", ("vulnerability", "vulnerabilities", "zero-day", "cve-", "security flaw")),
+        (
+            "Vulnerabilities",
+            ("vulnerability", "vulnerabilities", "zero-day", "cve-", "security flaw"),
+        ),
     ):
         if any(term in text for term in terms):
             return category
@@ -72,7 +78,18 @@ def parse_feed(content):
         title = plain_text(item.findtext("title", ""))
         url = item.findtext("link", "").strip()
         parsed = urlparse(url)
-        if not title or parsed.scheme != "https" or parsed.hostname not in {"www.bleepingcomputer.com", "bleepingcomputer.com"} or url in seen:
+        if (
+            not title
+            or len(url) > 2048
+            or parsed.scheme != "https"
+            or parsed.hostname
+            not in {"www.bleepingcomputer.com", "bleepingcomputer.com"}
+            or parsed.username
+            or parsed.password
+            or parsed.netloc not in {"www.bleepingcomputer.com", "bleepingcomputer.com"}
+            or parsed.fragment
+            or url in seen
+        ):
             continue
         try:
             published = parsedate_to_datetime(item.findtext("pubDate", ""))
@@ -82,37 +99,124 @@ def parse_feed(content):
             continue
         seen.add(url)
         summary = plain_text(item.findtext("description", ""))[:700]
-        articles.append(dict(id=sha256(url.encode()).hexdigest()[:24], title=title,
-                             url=url, summary=summary, source="BleepingComputer",
-                             published_at=published.astimezone(timezone.utc).isoformat(),
-                             category=category_for(title, summary)))
+        articles.append(
+            dict(
+                id=sha256(url.encode()).hexdigest()[:24],
+                title=title[:1000],
+                url=url,
+                summary=summary,
+                source="BleepingComputer",
+                published_at=published.astimezone(timezone.utc).isoformat(),
+                category=category_for(title, summary),
+            )
+        )
     if not articles:
         raise NewsFeedError("The news source returned no usable articles.")
-    return sorted(articles, key=lambda article: article["published_at"], reverse=True)[:100]
+    return sorted(articles, key=lambda article: article["published_at"], reverse=True)[
+        :1000
+    ]
+
+
+def retained_articles(articles, now=None):
+    """Enforce expiry even between refreshes, during outages, and after restarts."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=168)
+    retained = []
+    for article in articles:
+        try:
+            published = datetime.fromisoformat(
+                article["published_at"].replace("Z", "+00:00")
+            )
+            if cutoff < published <= now:
+                retained.append(article)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return sorted(
+        retained,
+        key=lambda article: (
+            datetime.fromisoformat(article["published_at"].replace("Z", "+00:00")),
+            article["id"],
+        ),
+        reverse=True,
+    )
+
+
+def merge_articles(previous, incoming):
+    merged = {article["id"]: article for article in previous}
+    for article in incoming:
+        existing = merged.get(article["id"])
+        # A later feed edit must not extend an article's original retention period.
+        if existing:
+            original = min(
+                (existing["published_at"], article["published_at"]),
+                key=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
+            )
+            merged[article["id"]] = {**article, "published_at": original}
+        else:
+            merged[article["id"]] = article
+    return retained_articles(merged.values())
 
 
 def refresh_news():
     global _cached, _expires
-    with _lock:
+    with _refresh_lock:
+        with _lock:
+            previous = _cached
+        fresh = None
+        fetched_at = previous["fetched_at"] if previous else None
         try:
             with httpx.Client(timeout=15, follow_redirects=True) as client:
-                with client.stream("GET", FEED_URL, headers={"User-Agent": "CyberGuard/1.0 RSS Reader"}) as response:
+                with client.stream(
+                    "GET", FEED_URL, headers={"User-Agent": "CyberGuard/1.0 RSS Reader"}
+                ) as response:
                     response.raise_for_status()
                     content = bytearray()
                     for chunk in response.iter_bytes():
                         content.extend(chunk)
                         if len(content) > 2_000_000:
-                            raise NewsFeedError("The news feed exceeded the size limit.")
-            articles = parse_feed(bytes(content))
-        except (httpx.HTTPError, ElementTree.ParseError, NewsFeedError, ValueError) as exc:
-            _expires = 0.0
-            if _cached is not None:
-                return {**_cached, "stale": True}
-            raise NewsFeedError("News is temporarily unavailable. Please try again shortly.") from exc
-        _cached = {"articles": articles, "fetched_at": datetime.now(timezone.utc).isoformat(),
-                   "source_url": FEED_URL}
-        _expires = monotonic() + CACHE_SECONDS
-        return {**_cached, "stale": False}
+                            raise NewsFeedError(
+                                "The news feed exceeded the size limit."
+                            )
+            fresh = parse_feed(bytes(content))
+            fetched_at = datetime.now(timezone.utc).isoformat()
+        except (httpx.HTTPError, ElementTree.ParseError, NewsFeedError, ValueError):
+            pass
+        candidates = merge_articles(
+            previous["articles"] if previous else [], fresh or []
+        )
+        persistent = True
+        try:
+            # Persist only publisher changes normally; replay the retained cache after
+            # a storage outage so articles collected in memory are not lost.
+            pending = (
+                candidates
+                if previous and previous.get("storage") == "memory"
+                else fresh
+            )
+            stored = news_store.sync_articles(pending, fetched_at)
+            articles = retained_articles(stored["articles"])
+            fetched_at = stored.get("fetched_at")
+        except news_store.NewsStorageError:
+            persistent = False
+            articles = candidates
+            _logger.warning(
+                "Persistent news storage unavailable; using the in-memory feed."
+            )
+        if not fetched_at:
+            raise NewsFeedError(
+                "News is temporarily unavailable. Please try again shortly."
+            )
+        stale = fresh is None
+        payload = {
+            "articles": articles,
+            "fetched_at": fetched_at,
+            "source_url": FEED_URL,
+            "storage": "persistent" if persistent else "memory",
+        }
+        with _lock:
+            _cached = payload
+            _expires = 0.0 if stale else monotonic() + CACHE_SECONDS
+        return {**payload, "stale": stale}
 
 
 def get_news():
@@ -120,7 +224,11 @@ def get_news():
     with _lock:
         if _cached is None:
             raise NewsFeedError("News is not available yet. Please try again shortly.")
-        return {**_cached, "stale": monotonic() >= _expires}
+        return {
+            **_cached,
+            "articles": retained_articles(_cached["articles"]),
+            "stale": monotonic() >= _expires,
+        }
 
 
 def run_refresh_loop(stop: Event):
@@ -130,7 +238,11 @@ def run_refresh_loop(stop: Event):
         try:
             result = refresh_news()
             if result["stale"]:
-                _logger.warning("News refresh failed; keeping the last successful feed.")
+                _logger.warning(
+                    "News refresh failed; keeping the last successful feed."
+                )
         except NewsFeedError:
-            _logger.warning("News source unavailable; will retry on the next scheduled refresh.")
+            _logger.warning(
+                "News source unavailable; will retry on the next scheduled refresh."
+            )
         stop.wait(max(0.0, CACHE_SECONDS - (monotonic() - started)))
