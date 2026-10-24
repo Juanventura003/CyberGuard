@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CyberGuard Website Monitor",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "description": "Monitors visited websites and checks their URLs with CyberGuard.",
   "permissions": [
     "tabs",

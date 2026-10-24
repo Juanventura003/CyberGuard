@@ -145,11 +145,13 @@ declare const chrome: {
 		};
 		onActivated: { addListener(listener: () => void): void };
 		query: (queryInfo: {
-			active: boolean;
+			active?: boolean;
 			lastFocusedWindow?: boolean;
 			currentWindow?: boolean;
+			url?: string | string[];
 		}) => Promise<{ id?: number; url?: string }[]>;
 		create: (createProperties: { url: string }) => Promise<unknown>;
+		sendMessage(tabId: number, message: unknown): Promise<unknown>;
 	};
 	windows: {
 		getLastFocused(): Promise<{ focused: boolean }>;
@@ -1025,9 +1027,14 @@ function parseWebsiteUrl(url: string): URL | null {
 // ---------------------------------------------------------------------------
 
 const NOTIFIED_SITES_KEY = "riskNotificationsShown";
-/** Don't repeat the same site + risk level within this window. */
-const NOTIFY_COOLDOWN_MS = 30 * 60 * 1000;
+/**
+ * Every risky visit pops up. The only guard: Chrome fires several events for
+ * one page load, so the same page within this window counts as one visit.
+ */
+const SAME_VISIT_MS = 15_000;
 const NOTIFICATION_PREFIX = "cyberguard-site:";
+/** Open CyberGuard tabs that should show an in-app card for risky visits. */
+const CYBERGUARD_APP_URLS = ["http://localhost:5173/*", "http://127.0.0.1:5173/*"];
 const DASHBOARD_URL = "http://localhost:5173/website-tracker";
 
 const RISK_LABELS: Record<string, { title: string; level: string }> = {
@@ -1065,9 +1072,9 @@ export function buildRiskNotification(result: {
 }
 
 async function notifyRiskySite(result: WebsiteActivity) {
-	if (!chrome.notifications) return; // permission missing from manifest.json
 	const notification = buildRiskNotification(result);
 	if (!notification) return;
+	const now = Date.now();
 	try {
 		// Session storage survives the service worker restarting but is
 		// cleared when the browser closes.
@@ -1076,26 +1083,67 @@ async function notifyRiskySite(result: WebsiteActivity) {
 			typeof stored[NOTIFIED_SITES_KEY] === "object" && stored[NOTIFIED_SITES_KEY]
 				? (stored[NOTIFIED_SITES_KEY] as Record<string, number>)
 				: {};
-		const now = Date.now();
-		if (now - (shown[notification.siteKey] ?? 0) < NOTIFY_COOLDOWN_MS) return;
+		if (now - (shown[result.url] ?? 0) < SAME_VISIT_MS) return;
+		const recent = Object.fromEntries(
+			Object.entries(shown).filter(([, at]) => now - at < SAME_VISIT_MS),
+		);
+		await chrome.storage.session.set({
+			[NOTIFIED_SITES_KEY]: { ...recent, [result.url]: now },
+		});
+	} catch (error) {
+		console.error("CyberGuard visit check failed", error);
+	}
 
+	await Promise.all([
+		showDesktopPopup(notification, now),
+		tellCyberGuardTabs(result),
+	]);
+}
+
+async function showDesktopPopup(
+	notification: NonNullable<ReturnType<typeof buildRiskNotification>>,
+	now: number,
+) {
+	if (!chrome.notifications) return; // permission missing from manifest.json
+	try {
 		// A new ID for every pop-up: reusing an ID makes Windows/macOS silently
 		// replace an older one still in the notification center.
 		await chrome.notifications.create(
 			`${NOTIFICATION_PREFIX}${notification.siteKey}:${now}`,
 			notification.options,
 		);
-
-		const recent = Object.fromEntries(
-			Object.entries(shown).filter(([, at]) => now - at < NOTIFY_COOLDOWN_MS),
-		);
-		await chrome.storage.session.set({
-			[NOTIFIED_SITES_KEY]: { ...recent, [notification.siteKey]: now },
-		});
 	} catch (error) {
 		// Notifications turned off in Windows/macOS, or not supported:
 		// the in-page banner and the badge still warn the user.
 		console.error("CyberGuard desktop notification failed", error);
+	}
+}
+
+/** Ask any open CyberGuard tab to show an in-app card for this visit. */
+async function tellCyberGuardTabs(result: WebsiteActivity) {
+	try {
+		const tabs = await chrome.tabs.query({ url: CYBERGUARD_APP_URLS });
+		const visit = {
+			url: result.url,
+			domain: result.domain,
+			riskLevel: result.riskLevel,
+			riskScore: result.riskScore,
+			threatTypes: result.threatTypes,
+			explanation: result.explanation.slice(0, 3),
+			visitedAt: result.visitedAt,
+		};
+		await Promise.all(
+			tabs.map((tab) =>
+				tab.id === undefined
+					? undefined
+					: chrome.tabs
+							.sendMessage(tab.id, { type: "cyberguardRiskyVisit", visit })
+							// The tab was opened before the extension loaded: no listener yet.
+							.catch(() => undefined),
+			),
+		);
+	} catch (error) {
+		console.error("CyberGuard could not notify the CyberGuard app", error);
 	}
 }
 

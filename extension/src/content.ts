@@ -3,6 +3,9 @@ const extensionChrome = (
 		chrome: {
 			runtime: {
 				id?: string;
+				onMessage?: {
+					addListener(listener: (message: unknown) => void): void;
+				};
 				sendMessage(
 					message:
 						| { type: "setAuthToken"; accessToken: string | null }
@@ -252,3 +255,18 @@ function handleDashboardMessage(event: MessageEvent) {
 
 window.addEventListener("message", handleDashboardMessage);
 window.dispatchEvent(new Event("cyberguard-auth-request"));
+
+// The extension reports each risky website visit so this CyberGuard tab can
+// show an in-app card for it. Pass it on to the page.
+try {
+	extensionChrome.runtime.onMessage?.addListener((message) => {
+		const data = message as { type?: unknown; visit?: unknown } | null;
+		if (data?.type !== "cyberguardRiskyVisit" || !data.visit) return;
+		window.postMessage(
+			{ type: "CYBERGUARD_RISKY_VISIT", visit: data.visit },
+			window.location.origin,
+		);
+	});
+} catch {
+	// Extension was reloaded; this tab needs a refresh to reconnect.
+}
