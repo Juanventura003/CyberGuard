@@ -172,6 +172,22 @@ declare const chrome: {
 		setBadgeText(details: { text: string }): Promise<void>;
 		setBadgeBackgroundColor(details: { color: string }): Promise<void>;
 	};
+	notifications: {
+		create(
+			notificationId: string,
+			options: {
+				type: "basic";
+				iconUrl: string;
+				title: string;
+				message: string;
+				contextMessage?: string;
+				priority?: number;
+				requireInteraction?: boolean;
+			},
+		): Promise<string>;
+		clear(notificationId: string): Promise<boolean>;
+		onClicked: { addListener(callback: (notificationId: string) => void): void };
+	};
 };
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -891,6 +907,8 @@ async function recordWebsiteInternal(
 	}
 	if (generation !== historyGeneration) return;
 	if (saveVisit) await storeActivity(result);
+	// Desktop pop-up on this computer only, as soon as a risky visit is known.
+	if (saveVisit) await notifyRiskySite(result);
 	if (
 		saveVisit &&
 		(!hasFreshCache || !currentVisit?.historyId) &&
@@ -1000,6 +1018,91 @@ function parseWebsiteUrl(url: string): URL | null {
 		return null;
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Desktop notifications for risky sites (Windows / macOS system pop-ups).
+// Shown by the extension on the computer where the site was visited.
+// ---------------------------------------------------------------------------
+
+const NOTIFIED_SITES_KEY = "riskNotificationsShown";
+/** Don't repeat the same site + risk level within this window. */
+const NOTIFY_COOLDOWN_MS = 30 * 60 * 1000;
+const NOTIFICATION_PREFIX = "cyberguard-site:";
+const DASHBOARD_URL = "http://localhost:5173/website-tracker";
+
+const RISK_LABELS: Record<string, { title: string; level: string }> = {
+	HIGH_RISK: { title: "⚠️ Dangerous website", level: "High risk" },
+	SUSPICIOUS: { title: "Suspicious website", level: "Suspicious" },
+};
+
+export function buildRiskNotification(result: {
+	domain: string;
+	riskLevel: string;
+	riskScore: number | null;
+	explanation: string[];
+}) {
+	const label = RISK_LABELS[result.riskLevel];
+	if (!label) return null;
+	const score =
+		typeof result.riskScore === "number"
+			? ` (score ${Math.round(result.riskScore)}/100)`
+			: "";
+	const reason = result.explanation.find(Boolean);
+	return {
+		// Repeat-check key: one pop-up per site + risk level per cooldown.
+		siteKey: `${result.domain}:${result.riskLevel}`,
+		options: {
+			type: "basic" as const,
+			iconUrl: chrome.runtime.getURL("icon.png"),
+			title: `${label.title}: ${result.domain}`,
+			message: `Risk level: ${label.level}${score}${reason ? `\n${reason.slice(0, 140)}` : ""}`,
+			contextMessage: "CyberGuard Website Monitor",
+			priority: result.riskLevel === "HIGH_RISK" ? 2 : 1,
+			// High-risk pop-ups stay on screen until dismissed.
+			requireInteraction: result.riskLevel === "HIGH_RISK",
+		},
+	};
+}
+
+async function notifyRiskySite(result: WebsiteActivity) {
+	const notification = buildRiskNotification(result);
+	if (!notification) return;
+	try {
+		// Session storage survives the service worker restarting but is
+		// cleared when the browser closes.
+		const stored = await chrome.storage.session.get([NOTIFIED_SITES_KEY]);
+		const shown =
+			typeof stored[NOTIFIED_SITES_KEY] === "object" && stored[NOTIFIED_SITES_KEY]
+				? (stored[NOTIFIED_SITES_KEY] as Record<string, number>)
+				: {};
+		const now = Date.now();
+		if (now - (shown[notification.siteKey] ?? 0) < NOTIFY_COOLDOWN_MS) return;
+
+		// A new ID for every pop-up: reusing an ID makes Windows/macOS silently
+		// replace an older one still in the notification center.
+		await chrome.notifications.create(
+			`${NOTIFICATION_PREFIX}${notification.siteKey}:${now}`,
+			notification.options,
+		);
+
+		const recent = Object.fromEntries(
+			Object.entries(shown).filter(([, at]) => now - at < NOTIFY_COOLDOWN_MS),
+		);
+		await chrome.storage.session.set({
+			[NOTIFIED_SITES_KEY]: { ...recent, [notification.siteKey]: now },
+		});
+	} catch (error) {
+		// Notifications turned off in Windows/macOS, or not supported:
+		// the in-page banner and the badge still warn the user.
+		console.error("CyberGuard desktop notification failed", error);
+	}
+}
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+	if (!notificationId.startsWith(NOTIFICATION_PREFIX)) return;
+	void chrome.notifications.clear(notificationId);
+	void chrome.tabs.create({ url: DASHBOARD_URL });
+});
 
 async function updateBadge(riskLevel: string) {
 	const badge =

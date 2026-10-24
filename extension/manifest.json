@@ -1,60 +1,75 @@
 {
-	"manifest_version": 3,
-	"name": "CyberGuard Website Monitor",
-	"version": "0.4.1",
-	"description": "Monitors visited websites and checks their URLs with CyberGuard.",
-	"permissions": [
-		"tabs",
-		"storage",
-		"declarativeNetRequest",
-		"webRequest",
-		"webNavigation",
-		"alarms"
-	],
-	"host_permissions": [
-		"http://localhost:5173/*",
-		"http://127.0.0.1:5173/*",
-		"http://localhost:8000/*",
-		"http://127.0.0.1:8000/*",
-		"http://*/*",
-		"https://*/*"
-	],
-	"content_scripts": [
-		{
-			"matches": ["http://localhost:5173/*", "http://127.0.0.1:5173/*"],
-			"js": ["content.js"],
-			"run_at": "document_idle"
-		},
-		{
-			"matches": ["http://*/*", "https://*/*"],
-			"js": ["banner.js"],
-			"run_at": "document_idle"
-		}
-	],
-	"background": {
-		"service_worker": "background.js",
-		"type": "module"
-	},
-	"action": {
-		"default_popup": "popup/popup.html",
-		"default_title": "CyberGuard Website Monitor",
-		"default_icon": {
-			"16": "icon.png",
-			"32": "icon.png",
-			"48": "icon.png",
-			"128": "icon.png"
-		}
-	},
-	"icons": {
-		"16": "icon.png",
-		"32": "icon.png",
-		"48": "icon.png",
-		"128": "icon.png"
-	},
-	"web_accessible_resources": [
-		{
-			"resources": ["blocked.html"],
-			"matches": ["http://*/*", "https://*/*"]
-		}
-	]
+  "manifest_version": 3,
+  "name": "CyberGuard Website Monitor",
+  "version": "0.3.7",
+  "description": "Monitors visited websites and checks their URLs with CyberGuard.",
+  "permissions": [
+    "tabs",
+    "storage",
+    "declarativeNetRequest",
+    "webRequest",
+    "webNavigation",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://localhost:5173/*",
+    "http://127.0.0.1:5173/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:5173/*",
+        "http://127.0.0.1:5173/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "banner.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "CyberGuard Website Monitor",
+    "default_icon": {
+      "16": "icon.png",
+      "32": "icon.png",
+      "48": "icon.png",
+      "128": "icon.png"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "blocked.html"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
 }

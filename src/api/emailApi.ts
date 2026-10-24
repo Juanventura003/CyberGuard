@@ -133,13 +133,23 @@ export function listGmailMessages(
   ).then((r) => asJson<GmailHeaderItem[]>(r));
 }
 
+/** JSON headers, plus the CyberGuard login token when signed in so the
+ * backend can create Security Alerts for the scan's risky findings. */
+function scanHeaders(accessToken?: string | null): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  };
+}
+
 export function analyzeGmailMessages(
   session: string,
   messageIds: string[],
+  accessToken?: string | null,
 ): Promise<EmailResult[]> {
   return fetch(`${API_BASE}/api/email/gmail/analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: scanHeaders(accessToken),
     body: JSON.stringify({ session, message_ids: messageIds }),
   }).then((r) => asJson<EmailResult[]>(r));
 }
@@ -163,10 +173,11 @@ export function trashGmailMessages(
 
 export function analyzeManualEmails(
   emails: ManualEmailInput[],
+  accessToken?: string | null,
 ): Promise<EmailResult[]> {
   return fetch(`${API_BASE}/api/email/batch-analyze`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: scanHeaders(accessToken),
     body: JSON.stringify({ emails }),
   }).then((r) => asJson<EmailResult[]>(r));
 }
