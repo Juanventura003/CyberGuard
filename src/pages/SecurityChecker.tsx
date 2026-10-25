@@ -4,15 +4,16 @@ import {
   KeyRound,
   Phone,
   Mail,
+  Database,
   CheckCircle,
   AlertTriangle,
   XCircle,
   UploadCloud,
-  Eye,
-  EyeOff,
-  ShieldCheck,
-  CircleCheck,
-  Circle,
+  Eye, 
+  EyeOff, 
+  ShieldCheck, 
+  CircleCheck, 
+  Circle
 } from "lucide-react";
 
 import "./SecurityChecker.css";
@@ -34,7 +35,12 @@ import {
   type CountryCode,
 } from "libphonenumber-js/max";
 
-type CheckerType = "file" | "password" | "phone" | "email" | "breach";
+type CheckerType =
+  | "file"
+  | "password"
+  | "phone"
+  | "email"
+  | "breach";
 
 type FileScanResult = {
   filename: string;
@@ -50,35 +56,21 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 function SecurityChecker() {
   const { session, loading } = useAuth();
   const isLoggedIn = !loading && !!session;
-  const [gmailCallback] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return {
-      session: params.get("gmail_session"),
-      error: params.get("gmail_error"),
-    };
-  });
   const [activeChecker, setActiveChecker] = useState<CheckerType>("file");
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileError, setFileError] = useState(
-    gmailCallback.error
-      ? `Gmail connection failed: ${gmailCallback.error}`
-      : "",
-  );
+  const [selectedFile, setSelectedFile] =
+    useState<File | null>(null);
+  const [fileError, setFileError] = useState("");
   const [isFileScanning, setIsFileScanning] = useState(false);
-  const [fileScanResult, setFileScanResult] = useState<FileScanResult | null>(
-    null,
-  );
+  const [fileScanResult, setFileScanResult] =
+    useState<FileScanResult | null>(null);
 
-  const [fileSource, setFileSource] = useState<"device" | "gmail">(
-    gmailCallback.session || gmailCallback.error ? "gmail" : "device",
-  );
+  const [fileSource, setFileSource] = useState<"device" | "gmail">("device");
   const [gmailSession, setGmailSession] = useState(
-    () => gmailCallback.session || loadGmailSession() || "",
+    () => loadGmailSession() || ""
   );
-  const [gmailPickerOpen, setGmailPickerOpen] = useState(
-    Boolean(gmailCallback.session),
-  );
+  const [gmailPickerOpen, setGmailPickerOpen] = useState(false);
+
 
   useEffect(() => {
     const syncGmailSession = () => {
@@ -106,8 +98,21 @@ function SecurityChecker() {
     const error = params.get("gmail_error");
     const checker = params.get("checker");
 
+    if (checker === "file" || session) {
+      setActiveChecker("file");
+    }
+
     if (session) {
       saveGmailSession(session);
+      setGmailSession(session);
+      setActiveChecker("file");
+      setFileSource("gmail");
+      setGmailPickerOpen(true);
+    }
+
+    if (error) {
+      setFileSource("gmail");
+      setFileError(`Gmail connection failed: ${error}`);
     }
 
     if (session || error || checker) {
@@ -120,7 +125,8 @@ function SecurityChecker() {
       window.history.replaceState(
         {},
         "",
-        window.location.pathname + (remaining ? `?${remaining}` : ""),
+        window.location.pathname +
+          (remaining ? `?${remaining}` : "")
       );
     }
   }, []);
@@ -128,15 +134,17 @@ function SecurityChecker() {
   const connectGmail = () => {
     if (!isLoggedIn) return;
 
-    const returnTo = `${window.location.origin}${window.location.pathname}?checker=file`;
+    const returnTo =
+      `${window.location.origin}${window.location.pathname}?checker=file`;
 
     startGmailConnect(returnTo);
   };
 
   const scanGmailAttachment = async (
     messageId: string,
-    attachmentIndex: number,
+    attachmentIndex: number
   ) => {
+
     if (!isLoggedIn) {
       throw new Error("Please log in to CyberGuard first.");
     }
@@ -153,7 +161,7 @@ function SecurityChecker() {
 
       const response = await fetch(
         `${API_BASE}/api/security/gmail/scan-attachment?${params}`,
-        { method: "POST" },
+        { method: "POST" }
       );
 
       if (!response.ok) {
@@ -165,7 +173,7 @@ function SecurityChecker() {
           setGmailPickerOpen(false);
 
           throw new Error(
-            "Your Gmail session expired. Please reconnect your Gmail account.",
+            "Your Gmail session expired. Please reconnect your Gmail account."
           );
         }
 
@@ -232,7 +240,10 @@ function SecurityChecker() {
     findings: string[];
 
     impersonation: {
-      status: "recognized_domain" | "possible_impersonation" | "not_detected";
+      status:
+        | "recognized_domain"
+        | "possible_impersonation"
+        | "not_detected";
       brand: string | null;
       details: string;
     };
@@ -241,6 +252,7 @@ function SecurityChecker() {
     positive_signals: string[];
     unavailable_checks: string[];
   };
+
 
   const [emailInput, setEmailInput] = useState("");
   const [emailResult, setEmailResult] = useState<EmailCheckResult | null>(null);
@@ -322,31 +334,28 @@ function SecurityChecker() {
           },
           body: JSON.stringify({
             phone_number: phoneResult.international,
-            country:
-              phoneResult.country !== "Unknown"
-                ? phoneResult.country
-                : phoneCountry,
+            country: phoneResult.country !== "Unknown"
+              ? phoneResult.country
+              : phoneCountry,
           }),
-        },
+        }
       );
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || "Phone reputation lookup failed.");
-      }
-
-      const data: PhoneReputationResult = await response.json();
-      setPhoneReputation(data);
-    } catch (error) {
-      setPhoneReputationError(
-        error instanceof Error
-          ? error.message
-          : "Unable to check phone reputation.",
-      );
-    } finally {
-      setPhoneReputationLoading(false);
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || "Phone reputation lookup failed.");
     }
-  };
+
+    const data: PhoneReputationResult = await response.json();
+    setPhoneReputation(data);
+  } catch (error) {
+    setPhoneReputationError(
+      error instanceof Error ? error.message : "Unable to check phone reputation."
+    );
+  } finally {
+    setPhoneReputationLoading(false);
+  }
+};
 
   const handleResetPhone = () => {
     setPhoneInput("");
@@ -368,15 +377,18 @@ function SecurityChecker() {
     setEmailReputationError("");
 
     try {
-      const response = await fetch(`${API_BASE}/api/security/email-check`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: emailInput.trim(),
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/api/security/email-check`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: emailInput.trim(),
+          }),
+        }
+      );
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -389,7 +401,7 @@ function SecurityChecker() {
       setEmailError(
         error instanceof Error
           ? error.message
-          : "Unable to check email address.",
+          : "Unable to check email address."
       );
     } finally {
       setEmailLoading(false);
@@ -414,13 +426,15 @@ function SecurityChecker() {
           body: JSON.stringify({
             email: emailResult.email,
           }),
-        },
+        }
       );
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
 
-        throw new Error(error.detail || "Unable to check sender reputation.");
+        throw new Error(
+          error.detail || "Unable to check sender reputation."
+        );
       }
 
       const data: EmailReputationResult = await response.json();
@@ -430,7 +444,7 @@ function SecurityChecker() {
       setEmailReputationError(
         error instanceof Error
           ? error.message
-          : "Unable to check sender reputation.",
+          : "Unable to check sender reputation."
       );
     } finally {
       setEmailReputationLoading(false);
@@ -485,7 +499,13 @@ function SecurityChecker() {
         ...passwordResult.feedback.suggestions,
       ]
     : [];
-  const strengthLabels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
+  const strengthLabels = [
+    "Very Weak",
+    "Weak",
+    "Fair",
+    "Good",
+    "Strong",
+  ];
 
   const strengthColors = [
     "#dc3545",
@@ -509,7 +529,9 @@ function SecurityChecker() {
   };
 
   // Choose file using file picker
-  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -521,7 +543,9 @@ function SecurityChecker() {
   };
 
   // Dragging a file over the upload area
-  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
     event.preventDefault();
 
     if (isFileScanning) {
@@ -534,16 +558,24 @@ function SecurityChecker() {
   };
 
   // Leaving the upload area
-  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
     event.preventDefault();
 
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+    if (
+      !event.currentTarget.contains(
+        event.relatedTarget as Node | null
+      )
+    ) {
       setIsDragging(false);
     }
   };
 
   // Dropping a file into the upload area
-  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+  const handleFileDrop = (
+    event: DragEvent<HTMLDivElement>
+  ) => {
     event.preventDefault();
     setIsDragging(false);
 
@@ -552,7 +584,9 @@ function SecurityChecker() {
     const files = event.dataTransfer.files;
 
     if (files.length === 0) {
-      setFileError("Please drop a file from your device.");
+      setFileError(
+        "Please drop a file from your device."
+      );
       return;
     }
 
@@ -595,7 +629,7 @@ function SecurityChecker() {
         {
           method: "POST",
           body: formData,
-        },
+        }
       );
 
       if (!response.ok) {
@@ -650,12 +684,15 @@ function SecurityChecker() {
     return <XCircle size={30} />;
   };
 
+
   return (
     <div className="security-checker-page">
       {/* Header */}
       <div className="security-checker-header">
         <h1>Security Checker</h1>
-        <p>Check suspicious content before interacting with it.</p>
+        <p>
+          Check suspicious content before interacting with it.
+        </p>
       </div>
 
       {/* Checker Options */}
@@ -727,6 +764,25 @@ function SecurityChecker() {
             <p>Check an unfamiliar email address.</p>
           </div>
         </button>
+
+        {/* Data Breach Checker */}
+        <button
+          className={`checker-option ${
+            activeChecker === "breach" ? "active" : ""
+          }`}
+          onClick={() => setActiveChecker("breach")}
+        >
+          <div className="checker-option-icon">
+            <Database size={24} />
+          </div>
+
+          <div>
+            <h3>Data Breach Checker</h3>
+            <p>
+              Check if your email appears in known data breaches.
+            </p>
+          </div>
+        </button>
       </div>
 
       {/* FILE CHECKER*/}
@@ -740,7 +796,9 @@ function SecurityChecker() {
 
             <div>
               <h2>File Checker</h2>
-              <p>Analyze a file for potential security threats.</p>
+              <p>
+                Analyze a file for potential security threats.
+              </p>
             </div>
           </div>
 
@@ -772,66 +830,70 @@ function SecurityChecker() {
             </div>
           )}
 
-          {!fileScanResult &&
-            fileSource === "gmail" &&
-            (!isLoggedIn ? (
-              <div
-                className="gmail-connect-card gmail-locked-card"
-                aria-disabled="true"
-                title="Log in to CyberGuard to use Gmail scanning"
+          
+        
+      {!fileScanResult && fileSource === "gmail" && (
+        !isLoggedIn ? (
+          <div
+            className="gmail-connect-card gmail-locked-card"
+            aria-disabled="true"
+            title="Log in to CyberGuard to use Gmail scanning"
+          >
+            <div className="gmail-connect-icon">
+              <Mail size={30} />
+            </div>
+
+            <h3>Connect Gmail account</h3>
+
+            <p className="gmail-connect-description">
+              Log in to your CyberGuard account to connect Gmail
+              and scan email attachments directly from your inbox.
+            </p>
+          </div>
+        ) : (
+          <div className="gmail-connect-card">
+            <div className="gmail-connect-icon">
+              <Mail size={30} />
+            </div>
+
+            <h3>Scan Gmail Attachments</h3>
+
+            <p className="gmail-connect-description">
+              Securely connect your Gmail account to select and
+              analyze email attachments for potential security threats.
+            </p>
+
+            <button
+              type="button"
+              className="gmail-connect-button"
+              disabled={isFileScanning}
+              onClick={() => {
+                if (gmailSession) {
+                  setGmailPickerOpen(true);
+                  } else {
+                    connectGmail();
+                  }
+                }}
               >
-                <div className="gmail-connect-icon">
-                  <Mail size={30} />
-                </div>
+                <Mail size={18} />
+                <span>
+                  {gmailSession
+                    ? "Browse Gmail Attachments"
+                    : "Connect to Gmail"}
+                </span>
+              </button>
 
-                <h3>Connect Gmail account</h3>
+            {fileError && (
+              <p className="file-error-message">{fileError}</p>
+            )}
 
-                <p className="gmail-connect-description">
-                  Log in to your CyberGuard account to connect Gmail and scan
-                  email attachments directly from your inbox.
-                </p>
-              </div>
-            ) : (
-              <div className="gmail-connect-card">
-                <div className="gmail-connect-icon">
-                  <Mail size={30} />
-                </div>
-
-                <h3>Scan Gmail Attachments</h3>
-
-                <p className="gmail-connect-description">
-                  Securely connect your Gmail account to select and analyze
-                  email attachments for potential security threats.
-                </p>
-
-                <button
-                  type="button"
-                  className="gmail-connect-button"
-                  disabled={isFileScanning}
-                  onClick={() => {
-                    if (gmailSession) {
-                      setGmailPickerOpen(true);
-                    } else {
-                      connectGmail();
-                    }
-                  }}
-                >
-                  <Mail size={18} />
-                  <span>
-                    {gmailSession
-                      ? "Browse Gmail Attachments"
-                      : "Connect to Gmail"}
-                  </span>
-                </button>
-
-                {fileError && <p className="file-error-message">{fileError}</p>}
-
-                <div className="gmail-connect-footer">
-                  <CheckCircle size={15} />
-                  <span>Maximum attachment size: 25 MB</span>
-                </div>
-              </div>
-            ))}
+            <div className="gmail-connect-footer">
+              <CheckCircle size={15} />
+              <span>Maximum attachment size: 25 MB</span>
+            </div>
+          </div>
+          )
+        )}
 
           {isLoggedIn && gmailPickerOpen && gmailSession && (
             <GmailAttachmentPicker
@@ -843,19 +905,26 @@ function SecurityChecker() {
 
           {!fileScanResult && fileSource === "device" && (
             <div className="file-checker-form">
-              <label htmlFor="file-upload">FILE</label>
+              <label htmlFor="file-upload">
+                FILE
+              </label>
 
               <div className="file-upload-section">
                 {/* Drag-and-Drop Area */}
                 <div
-                  className={`file-drop-zone ${isDragging ? "dragging" : ""} ${
+                  className={`file-drop-zone ${
+                    isDragging ? "dragging" : ""
+                  } ${
                     selectedFile ? "has-file" : ""
                   }`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleFileDrop}
                 >
-                  <UploadCloud size={42} className="file-upload-icon" />
+                  <UploadCloud
+                    size={42}
+                    className="file-upload-icon"
+                  />
 
                   <h3>
                     {selectedFile
@@ -905,13 +974,21 @@ function SecurityChecker() {
                   onClick={handleCheckFile}
                   disabled={!selectedFile || isFileScanning}
                 >
-                  {isFileScanning ? "Scanning..." : "Check File"}
+                  {isFileScanning
+                    ? "Scanning..."
+                    : "Check File"}
                 </button>
               </div>
 
-              {fileError && <p className="file-error-message">{fileError}</p>}
+              {fileError && (
+                <p className="file-error-message">
+                  {fileError}
+                </p>
+              )}
 
-              <p className="file-size-note">Maximum file size: 25 MB</p>
+              <p className="file-size-note">
+                Maximum file size: 25 MB
+              </p>
             </div>
           )}
 
@@ -923,7 +1000,9 @@ function SecurityChecker() {
                 .replace(" ", "-")}`}
             >
               <div className="result-status">
-                <div className="result-icon">{getFileResultIcon()}</div>
+                <div className="result-icon">
+                  {getFileResultIcon()}
+                </div>
 
                 <div>
                   <p className="result-label">Scan Result</p>
@@ -940,7 +1019,9 @@ function SecurityChecker() {
                 <div className="risk-score-heading">
                   <span>Risk Score</span>
 
-                  <strong>{fileScanResult.risk_score} / 100</strong>
+                  <strong>
+                    {fileScanResult.risk_score} / 100
+                  </strong>
                 </div>
 
                 <div className="risk-score-track">
@@ -957,8 +1038,15 @@ function SecurityChecker() {
                 <h3>File Information</h3>
 
                 <ul>
-                  <li>Size: {formatFileSize(fileScanResult.file_size)}</li>
-                  <li>SHA-256: {fileScanResult.sha256}</li>
+                  <li>
+                    Size:{" "}
+                    {formatFileSize(
+                      fileScanResult.file_size
+                    )}
+                  </li>
+                  <li>
+                    SHA-256: {fileScanResult.sha256}
+                  </li>
                 </ul>
               </div>
 
@@ -966,9 +1054,11 @@ function SecurityChecker() {
                 <h3>Analysis</h3>
 
                 <ul>
-                  {fileScanResult.reasons.map((reason, index) => (
-                    <li key={index}>{reason}</li>
-                  ))}
+                  {fileScanResult.reasons.map(
+                    (reason, index) => (
+                      <li key={index}>{reason}</li>
+                    )
+                  )}
                 </ul>
               </div>
 
@@ -983,612 +1073,605 @@ function SecurityChecker() {
         </div>
       )}
 
-      {/* PASSWORD CHECKER */}
-      {activeChecker === "password" && (
-        <div className="checker-panel">
-          <div className="checker-panel-title">
-            <div className="checker-panel-icon">
-              <KeyRound size={22} />
-            </div>
-            <div>
-              <h2>Password Strength Checker</h2>
-              <p>
-                Analyze your password strength and receive security
-                recommendations.
-              </p>
-            </div>
+    {/* PASSWORD CHECKER */}
+    {activeChecker === "password" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <KeyRound size={22} />
           </div>
-
-          <div className="password-checker-form">
-            <label htmlFor="password-input">PASSWORD</label>
-
-            <div className="password-input-row">
-              <input
-                id="password-input"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter a password to analyze"
-                autoComplete="off"
-                spellCheck={false}
-              />
-
-              <button
-                type="button"
-                className="password-visibility-button"
-                onClick={() => setShowPassword(!showPassword)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-
-            {passwordResult && (
-              <div className="password-analysis">
-                <div className="password-strength-heading">
-                  <span>Password Strength</span>
-                  <strong style={{ color: strengthColors[passwordScore] }}>
-                    {strengthLabels[passwordScore]}
-                  </strong>
-                </div>
-
-                <div className="password-strength-meter">
-                  {[0, 1, 2, 3, 4].map((index) => (
-                    <div
-                      key={index}
-                      className="password-strength-segment"
-                      style={{
-                        backgroundColor:
-                          index <= passwordScore
-                            ? strengthColors[passwordScore]
-                            : "#e1e5eb",
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* Password Checklist */}
-                <div className="password-checklist">
-                  <h3>Password Recommendations</h3>
-
-                  {passwordChecks.map((check) => (
-                    <div className="password-check-item" key={check.label}>
-                      {check.passed ? (
-                        <CircleCheck size={19} className="check-passed" />
-                      ) : (
-                        <Circle size={19} className="check-pending" />
-                      )}
-                      <span>{check.label}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Estimated Cracking Time */}
-                <div className="password-crack-time">
-                  <div className="password-crack-time-heading">
-                    <ShieldCheck size={20} />
-                    <h3>Estimated Cracking Time</h3>
-                  </div>
-
-                  <p className="crack-time-value">{estimatedCrackTime}</p>
-
-                  <p className="crack-time-description">
-                    Estimated time for an offline attack against a slow password
-                    hash. Actual cracking times may vary.
-                  </p>
-                </div>
-
-                {/* Security Analysis */}
-                <div className="password-feedback">
-                  <h3>Security Analysis</h3>
-
-                  {passwordSuggestions.length > 0 ? (
-                    <ul>
-                      {passwordSuggestions.map((suggestion, index) => (
-                        <li key={index}>{suggestion}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>
-                      <ShieldCheck size={18} />
-                      No obvious weaknesses detected. Use unique passwords for
-                      every account.
-                    </p>
-                  )}
-                </div>
-                {/* Reset Password Checker */}
-                <button
-                  type="button"
-                  className="scan-another-button"
-                  onClick={() => {
-                    setPassword("");
-                    setShowPassword(false);
-                  }}
-                >
-                  Check Another Password
-                </button>
-              </div>
-            )}
-
-            {/* Privacy Notice */}
-            <p className="password-privacy-note">
-              CyberGuard does not send or save the entered password.
-            </p>
+          <div>
+            <h2>Password Strength Checker</h2>
+            <p>Analyze your password strength and receive security recommendations.</p>
           </div>
         </div>
-      )}
 
-      {/* PHONE NUMBER CHECKER */}
-      {activeChecker === "phone" && (
-        <div className="checker-panel">
-          <div className="checker-panel-title">
-            <div className="checker-panel-icon">
-              <Phone size={22} />
-            </div>
-            <div>
-              <h2>Phone Number Checker</h2>
-              <p>Validate a phone number and view its information.</p>
-            </div>
-          </div>
+        <div className="password-checker-form">
+          <label htmlFor="password-input">PASSWORD</label>
 
-          <div className="phone-checker-form">
-            <label htmlFor="phone-input">PHONE NUMBER</label>
-
-            <div className="phone-input-row">
-              <select
-                className="phone-country-select"
-                value={phoneCountry}
-                onChange={(e) => {
-                  setPhoneCountry(e.target.value as CountryCode);
-                  setPhoneResult(null);
-                  setPhoneError("");
-                  setPhoneReputation(null);
-                  setPhoneReputationError("");
-                }}
-              >
-                <option value="US">United States (+1)</option>
-                <option value="CA">Canada (+1)</option>
-                <option value="GB">United Kingdom (+44)</option>
-                <option value="AU">Australia (+61)</option>
-                <option value="IN">India (+91)</option>
-                <option value="FR">France (+33)</option>
-                <option value="DE">Germany (+49)</option>
-                <option value="JP">Japan (+81)</option>
-                <option value="MX">Mexico (+52)</option>
-              </select>
-
-              <input
-                id="phone-input"
-                type="tel"
-                value={phoneInput}
-                onChange={(e) => {
-                  setPhoneInput(e.target.value);
-                  setPhoneResult(null);
-                  setPhoneError("");
-                  setPhoneReputation(null);
-                  setPhoneReputationError("");
-                }}
-                placeholder="Enter a phone number"
-              />
-            </div>
-
-            <button
-              type="button"
-              className="check-phone-button"
-              onClick={handleCheckPhone}
-            >
-              Check Phone Number
-            </button>
-
-            {phoneError && <p className="phone-error-message">{phoneError}</p>}
-
-            {phoneResult && (
-              <div className="phone-analysis">
-                <div className="phone-result-heading">
-                  {phoneResult.valid ? (
-                    <CheckCircle size={26} color="#198754" />
-                  ) : (
-                    <AlertTriangle size={26} color="#d99a00" />
-                  )}
-
-                  <div>
-                    <h3>
-                      {phoneResult.valid
-                        ? "Valid Phone Number"
-                        : "Invalid Phone Number"}
-                    </h3>
-                    <p>
-                      {phoneResult.valid
-                        ? "This number matches the numbering rules for its region."
-                        : "This number does not meet the numbering rules for its region."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="phone-details">
-                  <div className="phone-detail-item">
-                    <span>Country / Region</span>
-                    <strong>{phoneResult.country}</strong>
-                  </div>
-
-                  <div className="phone-detail-item">
-                    <span>Country Calling Code</span>
-                    <strong>{phoneResult.callingCode}</strong>
-                  </div>
-
-                  <div className="phone-detail-item">
-                    <span>International Format</span>
-                    <strong>{phoneResult.international}</strong>
-                  </div>
-
-                  <div className="phone-detail-item">
-                    <span>National Format</span>
-                    <strong>{phoneResult.national}</strong>
-                  </div>
-
-                  <div className="phone-detail-item">
-                    <span>Number Type</span>
-                    <strong>{phoneResult.type.replace(/_/g, " ")}</strong>
-                  </div>
-
-                  <div className="phone-detail-item">
-                    <span>Possible Number Length</span>
-                    <strong>{phoneResult.possible ? "Yes" : "No"}</strong>
-                  </div>
-                </div>
-
-                {phoneResult.valid && (
-                  <div className="phone-reputation-section">
-                    <h3>Spam & Scam Detection</h3>
-                    <p>
-                      Check whether this number has suspicious activity reported
-                      by our phone reputation provider.
-                    </p>
-
-                    <button
-                      type="button"
-                      className="check-phone-button"
-                      onClick={handleCheckPhoneReputation}
-                      disabled={phoneReputationLoading}
-                    >
-                      {phoneReputationLoading
-                        ? "Checking Reputation..."
-                        : "Check Spam & Scam Risk"}
-                    </button>
-
-                    {phoneReputationError && (
-                      <p className="phone-error-message">
-                        {phoneReputationError}
-                      </p>
-                    )}
-
-                    {phoneReputation && (
-                      <div className="phone-reputation-results">
-                        <div className="phone-reputation-score">
-                          <span>Fraud Score</span>
-                          <strong>
-                            {phoneReputation.fraud_score === null
-                              ? "Not Available"
-                              : `${phoneReputation.fraud_score}/100`}
-                          </strong>
-                        </div>
-
-                        <div className="phone-details">
-                          {[
-                            ["Spam Indicator", phoneReputation.spammer],
-                            ["Recent Abuse", phoneReputation.recent_abuse],
-                            ["Risk Flag", phoneReputation.risky],
-                            ["VoIP Number", phoneReputation.voip],
-                          ].map(([label, value]) => (
-                            <div
-                              className="phone-detail-item"
-                              key={String(label)}
-                            >
-                              <span>{String(label)}</span>
-                              <strong>
-                                {value === null
-                                  ? "Unknown"
-                                  : value === true
-                                    ? "Yes"
-                                    : "No"}
-                              </strong>
-                            </div>
-                          ))}
-
-                          <div className="phone-detail-item">
-                            <span>Carrier</span>
-                            <strong>
-                              {phoneReputation.carrier || "Unknown"}
-                            </strong>
-                          </div>
-
-                          <div className="phone-detail-item">
-                            <span>Line Type</span>
-                            <strong>
-                              {phoneReputation.line_type || "Unknown"}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <p className="phone-reputation-disclaimer">
-                          Reputation results are indicators, not proof that a
-                          caller is safe or malicious. Caller ID can be spoofed.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="scan-another-button"
-                  onClick={handleResetPhone}
-                >
-                  Check Another Number
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {/* email address checker */}
-      {activeChecker === "email" && (
-        <div className="checker-panel">
-          <div className="checker-panel-title">
-            <div className="checker-panel-icon">
-              <Mail size={22} />
-            </div>
-            <div>
-              <h2>Email Address Checker</h2>
-              <p>
-                Validate an email address and check its domain configuration.
-              </p>
-            </div>
-          </div>
-
-          <div className="email-checker-form">
-            <label htmlFor="email-check-input">EMAIL ADDRESS</label>
-
+          <div className="password-input-row">
             <input
-              id="email-check-input"
-              type="email"
-              value={emailInput}
-              onChange={(e) => {
-                setEmailInput(e.target.value);
-                setEmailResult(null);
-                setEmailError("");
-                setEmailReputation(null);
-                setEmailReputationError("");
-              }}
-              placeholder="Enter an email address"
+              id="password-input"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter a password to analyze"
               autoComplete="off"
               spellCheck={false}
-              disabled={emailLoading}
             />
 
             <button
               type="button"
-              className="check-phone-button"
-              onClick={handleCheckEmail}
-              disabled={emailLoading}
+              className="password-visibility-button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {emailLoading ? "Checking Email..." : "Check Email Address"}
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
+          </div>
 
-            {emailError && <p className="phone-error-message">{emailError}</p>}
+          {passwordResult && (
+            <div className="password-analysis">
+              <div className="password-strength-heading">
+                <span>Password Strength</span>
+                <strong style={{ color: strengthColors[passwordScore] }}>
+                  {strengthLabels[passwordScore]}
+                </strong>
+              </div>
 
-            {emailResult && (
-              <div className="phone-analysis">
-                <div className="phone-result-heading">
-                  {emailResult.valid_format ? (
-                    <CheckCircle size={26} color="#198754" />
-                  ) : (
-                    <AlertTriangle size={26} color="#d99a00" />
-                  )}
+              <div className="password-strength-meter">
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <div
+                    key={index}
+                    className="password-strength-segment"
+                    style={{
+                      backgroundColor:
+                        index <= passwordScore
+                          ? strengthColors[passwordScore]
+                          : "#e1e5eb",
+                    }}
+                  />
+                ))}
+              </div>
+                
+              {/* Password Checklist */}
+              <div className="password-checklist">
+                <h3>Password Recommendations</h3>
 
-                  <div>
-                    <h3>
-                      {emailResult.valid_format
-                        ? "Valid Email Format"
-                        : "Invalid Email Format"}
-                    </h3>
-                    <p>
-                      {emailResult.valid_format
-                        ? "The address passed email format validation."
-                        : "The address does not meet email formatting requirements."}
-                    </p>
+                {passwordChecks.map((check) => (
+                  <div className="password-check-item" key={check.label}>
+                    {check.passed ? (
+                      <CircleCheck size={19} className="check-passed" />
+                    ) : (
+                      <Circle size={19} className="check-pending" />
+                    )}
+                    <span>{check.label}</span>
                   </div>
+                ))}
+              </div>
+
+              {/* Estimated Cracking Time */}
+              <div className="password-crack-time">
+                <div className="password-crack-time-heading">
+                  <ShieldCheck size={20} />
+                  <h3>Estimated Cracking Time</h3>
                 </div>
 
-                <div className="phone-details">
-                  <div className="phone-detail-item">
-                    <span>Email Address</span>
-                    <strong>{emailResult.email}</strong>
-                  </div>
+                <p className="crack-time-value">
+                  {estimatedCrackTime}
+                </p>
 
-                  <div className="phone-detail-item">
-                    <span>Domain</span>
-                    <strong>{emailResult.domain || "Not Available"}</strong>
-                  </div>
+                <p className="crack-time-description">
+                  Estimated time for an offline attack against a slow
+                  password hash. Actual cracking times may vary.
+                </p>
+              </div>
 
-                  <div className="phone-detail-item">
-                    <span>Domain Exists</span>
-                    <strong>
-                      {emailResult.domain_exists === null
-                        ? "Unknown"
-                        : emailResult.domain_exists
-                          ? "Yes"
-                          : "No"}
-                    </strong>
-                  </div>
+              {/* Security Analysis */}
+              <div className="password-feedback">
+                <h3>Security Analysis</h3>
 
-                  <div className="phone-detail-item">
-                    <span>MX Records Found</span>
-                    <strong>
-                      {emailResult.has_mx_records === null
-                        ? "Unknown"
-                        : emailResult.has_mx_records
-                          ? "Yes"
-                          : "No"}
-                    </strong>
-                  </div>
+                {passwordSuggestions.length > 0 ? (
+                  <ul>
+                    {passwordSuggestions.map((suggestion, index) => (
+                      <li key={index}>{suggestion}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>
+                    <ShieldCheck size={18} />
+                    No obvious weaknesses detected. Use unique passwords
+                    for every account.
+                  </p>
+                )}
+              </div>
+              {/* Reset Password Checker */}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={() => {
+                  setPassword("");
+                  setShowPassword(false);
+                }}
+              >
+                Check Another Password
+              </button>
+            </div>
+          )}
 
-                  <div className="phone-detail-item">
-                    <span>Disposable Email Domain</span>
-                    <strong>
-                      {emailResult.disposable === null
-                        ? "Unknown"
-                        : emailResult.disposable
-                          ? "Yes"
-                          : "No"}
-                    </strong>
-                  </div>
-                </div>
+          {/* Privacy Notice */}
+          <p className="password-privacy-note">
+            CyberGuard does not send or save the entered password.
+          </p>
+        </div>
+      </div>
+    )}
 
-                {emailResult.mx_records.length > 0 && (
-                  <div className="phone-reputation-section">
-                    <h3>Mail Servers (MX Records)</h3>
-                    <ul>
-                      {emailResult.mx_records.map((record, index) => (
-                        <li key={index}>{record}</li>
-                      ))}
-                    </ul>
-                  </div>
+    {/* PHONE NUMBER CHECKER */}
+    {activeChecker === "phone" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <Phone size={22} />
+          </div>
+          <div>
+            <h2>Phone Number Checker</h2>
+            <p>Validate a phone number and view its information.</p>
+          </div>
+        </div>
+
+        <div className="phone-checker-form">
+          <label htmlFor="phone-input">PHONE NUMBER</label>
+
+          <div className="phone-input-row">
+            <select
+              className="phone-country-select"
+              value={phoneCountry}
+              onChange={(e) => {
+                setPhoneCountry(e.target.value as CountryCode);
+                setPhoneResult(null);
+                setPhoneError("");
+                setPhoneReputation(null);
+                setPhoneReputationError("");
+              }}
+            >
+              <option value="US">United States (+1)</option>
+              <option value="CA">Canada (+1)</option>
+              <option value="GB">United Kingdom (+44)</option>
+              <option value="AU">Australia (+61)</option>
+              <option value="IN">India (+91)</option>
+              <option value="FR">France (+33)</option>
+              <option value="DE">Germany (+49)</option>
+              <option value="JP">Japan (+81)</option>
+              <option value="MX">Mexico (+52)</option>
+            </select>
+
+            <input
+              id="phone-input"
+              type="tel"
+              value={phoneInput}
+              onChange={(e) => {
+                setPhoneInput(e.target.value);
+                setPhoneResult(null);
+                setPhoneError("");
+                setPhoneReputation(null);
+                setPhoneReputationError("");
+              }}
+              placeholder="Enter a phone number"
+            />
+          </div>
+
+          <button
+            type="button"
+            className="check-phone-button"
+            onClick={handleCheckPhone}
+          >
+            Check Phone Number
+          </button>
+
+          {phoneError && (
+            <p className="phone-error-message">{phoneError}</p>
+          )}
+
+          {phoneResult && (
+            <div className="phone-analysis">
+              <div className="phone-result-heading">
+                {phoneResult.valid ? (
+                  <CheckCircle size={26} color="#198754" />
+                ) : (
+                  <AlertTriangle size={26} color="#d99a00" />
                 )}
 
-                <div className="phone-reputation-section">
-                  <h3>Security Analysis</h3>
-                  <ul>
-                    {emailResult.recommendations.map(
-                      (recommendation, index) => (
-                        <li key={index}>{recommendation}</li>
-                      ),
-                    )}
-                  </ul>
+                <div>
+                  <h3>
+                    {phoneResult.valid
+                      ? "Valid Phone Number"
+                      : "Invalid Phone Number"}
+                  </h3>
+                  <p>
+                    {phoneResult.valid
+                      ? "This number matches the numbering rules for its region."
+                      : "This number does not meet the numbering rules for its region."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="phone-details">
+                <div className="phone-detail-item">
+                  <span>Country / Region</span>
+                  <strong>{phoneResult.country}</strong>
                 </div>
 
-                {emailResult.valid_format && (
-                  <div className="email-reputation-section">
-                    <h3>Sender Reputation & Scam Detection</h3>
+                <div className="phone-detail-item">
+                  <span>Country Calling Code</span>
+                  <strong>{phoneResult.callingCode}</strong>
+                </div>
 
-                    <p>
-                      Check whether this email address has reputation signals
-                      associated with fraud, spam, or abusive activity.
-                    </p>
+                <div className="phone-detail-item">
+                  <span>International Format</span>
+                  <strong>{phoneResult.international}</strong>
+                </div>
 
-                    <button
-                      type="button"
-                      className="check-phone-button"
-                      onClick={handleCheckEmailReputation}
-                      disabled={emailReputationLoading}
-                    >
-                      {emailReputationLoading
-                        ? "Checking Sender Reputation..."
-                        : "Check Scam & Fraud Risk"}
-                    </button>
+                <div className="phone-detail-item">
+                  <span>National Format</span>
+                  <strong>{phoneResult.national}</strong>
+                </div>
 
-                    {emailReputationError && (
-                      <p className="phone-error-message">
-                        {emailReputationError}
-                      </p>
-                    )}
+                <div className="phone-detail-item">
+                  <span>Number Type</span>
+                  <strong>{phoneResult.type.replace(/_/g, " ")}</strong>
+                </div>
 
-                    {emailReputation && (
-                      <div className="email-reputation-results">
-                        <div className="email-reputation-summary">
-                          <h3>Sender Risk Assessment</h3>
+                <div className="phone-detail-item">
+                  <span>Possible Number Length</span>
+                  <strong>{phoneResult.possible ? "Yes" : "No"}</strong>
+                </div>
+              </div>
+              
+              {phoneResult.valid && (
+              <div className="phone-reputation-section">
+                <h3>Spam & Scam Detection</h3>
+                <p>
+                  Check whether this number has suspicious activity reported by
+                  our phone reputation provider.
+                </p>
 
-                          <strong
-                            className={`email-risk-${emailReputation.risk_level.toLowerCase()}`}
-                          >
-                            {emailReputation.risk_label}
+                <button
+                  type="button"
+                  className="check-phone-button"
+                  onClick={handleCheckPhoneReputation}
+                  disabled={phoneReputationLoading}
+                >
+                  {phoneReputationLoading
+                    ? "Checking Reputation..."
+                    : "Check Spam & Scam Risk"}
+                </button>
+
+                {phoneReputationError && (
+                  <p className="phone-error-message">{phoneReputationError}</p>
+                )}
+
+                {phoneReputation && (
+                  <div className="phone-reputation-results">
+                    <div className="phone-reputation-score">
+                      <span>Fraud Score</span>
+                      <strong>
+                        {phoneReputation.fraud_score === null
+                          ? "Not Available"
+                          : `${phoneReputation.fraud_score}/100`}
+                      </strong>
+                    </div>
+
+                    <div className="phone-details">
+                      {[
+                        ["Spam Indicator", phoneReputation.spammer],
+                        ["Recent Abuse", phoneReputation.recent_abuse],
+                        ["Risk Flag", phoneReputation.risky],
+                        ["VoIP Number", phoneReputation.voip],
+                      ].map(([label, value]) => (
+                        <div className="phone-detail-item" key={String(label)}>
+                          <span>{String(label)}</span>
+                          <strong>
+                            {value === null
+                              ? "Unknown"
+                              : value === true
+                              ? "Yes"
+                              : "No"}
                           </strong>
-
-                          <div className="risk-score-section">
-                            <div className="risk-score-heading">
-                              <span>CyberGuard Risk Score</span>
-
-                              <strong>
-                                {emailReputation.cyberguard_score == null
-                                  ? "N/A"
-                                  : `${emailReputation.cyberguard_score} / 100`}
-                              </strong>
-                            </div>
-
-                            <div className="risk-score-track">
-                              <div
-                                className="risk-score-fill"
-                                style={{
-                                  width: `${
-                                    emailReputation.cyberguard_score == null
-                                      ? 0
-                                      : Math.max(
-                                          0,
-                                          Math.min(
-                                            100,
-                                            emailReputation.cyberguard_score,
-                                          ),
-                                        )
-                                  }%`,
-                                  backgroundColor:
-                                    emailReputation.risk_level === "High"
-                                      ? "#dc3545"
-                                      : emailReputation.risk_level === "Medium"
-                                        ? "#d99a00"
-                                        : emailReputation.risk_level === "Low"
-                                          ? "#198754"
-                                          : "#94a3b8",
-                                }}
-                              />
-                            </div>
-                          </div>
                         </div>
+                      ))}
 
-                        <div className="phone-details">
-                          {[
-                            ["Recent Abuse", emailReputation.recent_abuse],
-                            ["Disposable Email", emailReputation.disposable],
-                            ["Spam Trap / Honeypot", emailReputation.honeypot],
-                            ["Data Leak Indicator", emailReputation.leaked],
-                          ].map(([label, value]) => (
-                            <div
-                              className="phone-detail-item"
-                              key={String(label)}
-                            >
-                              <span>{String(label)}</span>
-                              <strong>
-                                {value === null
-                                  ? "Unknown"
-                                  : value === true
-                                    ? "Yes"
-                                    : "No"}
-                              </strong>
-                            </div>
-                          ))}
+                      <div className="phone-detail-item">
+                        <span>Carrier</span>
+                        <strong>{phoneReputation.carrier || "Unknown"}</strong>
+                      </div>
 
-                          <div className="phone-detail-item">
-                            <span>First Seen</span>
+                      <div className="phone-detail-item">
+                        <span>Line Type</span>
+                        <strong>{phoneReputation.line_type || "Unknown"}</strong>
+                      </div>
+                    </div>
+
+                    <p className="phone-reputation-disclaimer">
+                      Reputation results are indicators, not proof that a caller
+                      is safe or malicious. Caller ID can be spoofed.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={handleResetPhone}
+              >
+                Check Another Number
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    {/* email address checker */}
+    {activeChecker === "email" && (
+      <div className="checker-panel">
+        <div className="checker-panel-title">
+          <div className="checker-panel-icon">
+            <Mail size={22} />
+          </div>
+          <div>
+            <h2>Email Address Checker</h2>
+            <p>Validate an email address and check its domain configuration.</p>
+          </div>
+        </div>
+
+        <div className="email-checker-form">
+          <label htmlFor="email-check-input">EMAIL ADDRESS</label>
+
+          <input
+            id="email-check-input"
+            type="email"
+            value={emailInput}
+            onChange={(e) => {
+              setEmailInput(e.target.value);
+              setEmailResult(null);
+              setEmailError("");
+              setEmailReputation(null);
+              setEmailReputationError("");
+            }}
+            placeholder="Enter an email address"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={emailLoading}
+          />
+
+          <button
+            type="button"
+            className="check-phone-button"
+            onClick={handleCheckEmail}
+            disabled={emailLoading}
+          >
+            {emailLoading ? "Checking Email..." : "Check Email Address"}
+          </button>
+
+          {emailError && (
+            <p className="phone-error-message">{emailError}</p>
+          )}
+
+          {emailResult && (
+            <div className="phone-analysis">
+              <div className="phone-result-heading">
+                {emailResult.valid_format ? (
+                  <CheckCircle size={26} color="#198754" />
+                ) : (
+                  <AlertTriangle size={26} color="#d99a00" />
+                )}
+
+                <div>
+                  <h3>
+                    {emailResult.valid_format
+                      ? "Valid Email Format"
+                      : "Invalid Email Format"}
+                  </h3>
+                  <p>
+                    {emailResult.valid_format
+                      ? "The address passed email format validation."
+                      : "The address does not meet email formatting requirements."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="phone-details">
+                <div className="phone-detail-item">
+                  <span>Email Address</span>
+                  <strong>{emailResult.email}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Domain</span>
+                  <strong>{emailResult.domain || "Not Available"}</strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Domain Exists</span>
+                  <strong>
+                    {emailResult.domain_exists === null
+                      ? "Unknown"
+                      : emailResult.domain_exists
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>MX Records Found</span>
+                  <strong>
+                    {emailResult.has_mx_records === null
+                      ? "Unknown"
+                      : emailResult.has_mx_records
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+
+                <div className="phone-detail-item">
+                  <span>Disposable Email Domain</span>
+                  <strong>
+                    {emailResult.disposable === null
+                      ? "Unknown"
+                      : emailResult.disposable
+                      ? "Yes"
+                      : "No"}
+                  </strong>
+                </div>
+              </div>
+
+              {emailResult.mx_records.length > 0 && (
+                <div className="phone-reputation-section">
+                  <h3>Mail Servers (MX Records)</h3>
+                  <ul>
+                    {emailResult.mx_records.map((record, index) => (
+                      <li key={index}>{record}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="phone-reputation-section">
+                <h3>Security Analysis</h3>
+                <ul>
+                  {emailResult.recommendations.map((recommendation, index) => (
+                    <li key={index}>{recommendation}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              {emailResult.valid_format && (
+                <div className="email-reputation-section">
+                  <h3>Sender Reputation & Scam Detection</h3>
+
+                  <p>
+                    Check whether this email address has reputation signals
+                    associated with fraud, spam, or abusive activity.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="check-phone-button"
+                    onClick={handleCheckEmailReputation}
+                    disabled={emailReputationLoading}
+                  >
+                    {emailReputationLoading
+                      ? "Checking Sender Reputation..."
+                      : "Check Scam & Fraud Risk"}
+                  </button>
+
+                  {emailReputationError && (
+                    <p className="phone-error-message">
+                      {emailReputationError}
+                    </p>
+                  )}
+
+                  {emailReputation && (
+                    <div className="email-reputation-results">
+
+                      <div className="email-reputation-summary">
+                        <h3>Sender Risk Assessment</h3>
+
+                        <strong
+                          className={`email-risk-${emailReputation.risk_level.toLowerCase()}`}
+                        >
+                          {emailReputation.risk_label}
+                        </strong>
+                                                
+                        <div className="risk-score-section">
+                          <div className="risk-score-heading">
+                            <span>CyberGuard Risk Score</span>
+
                             <strong>
-                              {emailReputation.first_seen || "Unknown"}
+                              {emailReputation.cyberguard_score == null
+                                ? "N/A"
+                                : `${emailReputation.cyberguard_score} / 100`}
                             </strong>
                           </div>
+
+                          <div className="risk-score-track">
+                            <div
+                              className="risk-score-fill"
+                              style={{
+                                width: `${
+                                  emailReputation.cyberguard_score == null
+                                    ? 0
+                                    : Math.max(
+                                        0,
+                                        Math.min(100, emailReputation.cyberguard_score)
+                                      )
+                                }%`,
+                                backgroundColor:
+                                  emailReputation.risk_level === "High"
+                                    ? "#dc3545"
+                                    : emailReputation.risk_level === "Medium"
+                                    ? "#d99a00"
+                                    : emailReputation.risk_level === "Low"
+                                    ? "#198754"
+                                    : "#94a3b8",
+                              }}
+                            />
+                          </div>
                         </div>
 
-                        <div className="email-reputation-findings">
-                          <h3>Domain Impersonation Check</h3>
 
-                          <p>{emailReputation.impersonation.details}</p>
+                      </div>
 
-                          {emailReputation.impersonation.status ===
-                            "possible_impersonation" && (
-                            <p style={{ color: "#dc3545", fontWeight: 600 }}>
-                              Warning: Possible brand impersonation detected.
-                            </p>
-                          )}
+                      <div className="phone-details">
+                        {[
+                          ["Recent Abuse", emailReputation.recent_abuse],
+                          ["Disposable Email", emailReputation.disposable],
+                          ["Spam Trap / Honeypot", emailReputation.honeypot],
+                          ["Data Leak Indicator", emailReputation.leaked],
+                        ].map(([label, value]) => (
+                          <div
+                            className="phone-detail-item"
+                            key={String(label)}
+                          >
+                            <span>{String(label)}</span>
+                            <strong>
+                              {value === null
+                                ? "Unknown"
+                                : value === true
+                                ? "Yes"
+                                : "No"}
+                            </strong>
+                          </div>
+                        ))}
+
+                        
+
+                        <div className="phone-detail-item">
+                          <span>First Seen</span>
+                          <strong>
+                            {emailReputation.first_seen || "Unknown"}
+                          </strong>
                         </div>
-                        <div className="email-reputation-findings">
-                          <h3>Security Findings</h3>
+                      </div>
+                      
+                      <div className="email-reputation-findings">
+                        <h3>Domain Impersonation Check</h3>
 
-                          <h4>Warnings & Risk Indicators</h4>
+                        <p>
+                          {emailReputation.impersonation.details}
+                        </p>
+
+                        {emailReputation.impersonation.status === "possible_impersonation" && (
+                          <p style={{ color: "#dc3545", fontWeight: 600 }}>
+                            Warning: Possible brand impersonation detected.
+                          </p>
+                        )}
+                      </div>
+                      <div className="email-reputation-findings">
+                        <h3>Security Findings</h3>
+
+                        <h4>Warnings & Risk Indicators</h4>
                           <ul>
                             {emailReputation.warnings.map((finding, index) => (
                               <li key={index}>{finding}</li>
@@ -1598,16 +1681,11 @@ function SecurityChecker() {
                           <h4>Checks Without Reported Warnings</h4>
                           <ul>
                             {emailReputation.positive_signals.length > 0 ? (
-                              emailReputation.positive_signals.map(
-                                (finding, index) => (
-                                  <li key={index}>{finding}</li>
-                                ),
-                              )
+                              emailReputation.positive_signals.map((finding, index) => (
+                                <li key={index}>{finding}</li>
+                              ))
                             ) : (
-                              <li>
-                                No additional positive indicators were
-                                available.
-                              </li>
+                              <li>No additional positive indicators were available.</li>
                             )}
                           </ul>
 
@@ -1615,39 +1693,36 @@ function SecurityChecker() {
                             <>
                               <h4>Unavailable Information</h4>
                               <ul>
-                                {emailReputation.unavailable_checks.map(
-                                  (item, index) => (
-                                    <li key={index}>{item}</li>
-                                  ),
-                                )}
+                                {emailReputation.unavailable_checks.map((item, index) => (
+                                  <li key={index}>{item}</li>
+                                ))}
                               </ul>
                             </>
                           )}
-                        </div>
-
-                        <p className="phone-reputation-disclaimer">
-                          Reputation scores are indicators, not proof of fraud.
-                          A low score does not guarantee safety. Sender
-                          addresses can be spoofed, and legitimate accounts can
-                          be compromised.
-                        </p>
                       </div>
-                    )}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="scan-another-button"
-                  onClick={handleResetEmail}
-                >
-                  Check Another Email
-                </button>
-              </div>
-            )}
-          </div>
+
+                      <p className="phone-reputation-disclaimer">
+                        Reputation scores are indicators, not proof of fraud.
+                        A low score does not guarantee safety. Sender addresses
+                        can be spoofed, and legitimate accounts can be compromised.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="scan-another-button"
+                onClick={handleResetEmail}
+              >
+                Check Another Email
+              </button>
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    )}
+  </div>
   );
 }
 

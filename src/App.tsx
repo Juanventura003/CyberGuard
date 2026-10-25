@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import AlertNotifier from "./components/AlertNotifier";
 import PageErrorBoundary from "./components/PageErrorBoundary";
 import Sidebar from "./components/Sidebar/Sidebar";
 import AuthModal from "./components/auth/AuthModal";
@@ -44,6 +45,15 @@ function App() {
       userId={session?.user.id ?? null}
     >
       <div className="app">
+        {/* Desktop notifications for new Security Alerts (renders nothing) */}
+        {session && (
+          <AlertNotifier
+            key={session.user.id}
+            userId={session.user.id}
+            accessToken={session.access_token}
+          />
+        )}
+
         <Sidebar onLogin={openLogin} onSignUp={openSignUp} />
 
         <main className="main-content">

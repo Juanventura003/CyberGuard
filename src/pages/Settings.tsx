@@ -1,6 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { getAlertSettings, updateAlertSettings } from "../api/alertsApi";
+import {
+  currentPermission,
+  desktopNotificationsEnabled,
+  requestDesktopPermission,
+  setDesktopNotificationsEnabled,
+  showDesktopNotification,
+  type DesktopPermission,
+} from "../lib/alertNotifications";
 import "./Settings.css";
 
 const NOT_CONFIGURED = "Supabase is not configured, so this action is unavailable.";
@@ -19,7 +28,7 @@ interface ProfileResult {
 }
 
 interface FormMessage {
-  type: "success" | "error";
+  type: "success" | "error" | "notice";
   text: string;
 }
 
@@ -367,8 +376,240 @@ function PasswordForm({ email }: PasswordFormProps) {
   );
 }
 
+interface SecurityAlertsSettingsProps {
+  accessToken: string;
+}
+
+const BLOCKED_HELP =
+  "Notifications are blocked for CyberGuard in this browser. To allow them, click the icon to the left of the address bar, set Notifications to Allow, then reload this page.";
+
+/** Desktop pop-up switch. Saved per browser, since permission is per browser. */
+function DesktopNotificationsToggle({ alertsEnabled }: { alertsEnabled: boolean }) {
+  const [permission, setPermission] = useState<DesktopPermission>(currentPermission);
+  const [on, setOn] = useState(() => desktopNotificationsEnabled() && currentPermission() === "granted");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<FormMessage | null>(() =>
+    desktopNotificationsEnabled() && currentPermission() === "denied"
+      ? { type: "error", text: BLOCKED_HELP }
+      : null
+  );
+
+  const sendTest = () => {
+    const shown = showDesktopNotification(
+      "✅ CyberGuard notifications are working",
+      "You'll get a pop-up like this when a scan finds a high-risk threat.",
+      // A new tag each time: reusing one makes Windows silently replace the
+      // previous test notification instead of popping up a new one.
+      `cyberguard-test-${Date.now()}`
+    );
+    setMessage(
+      shown
+        ? {
+            type: "success",
+            text: "Test notification sent. If you didn't see it, make sure your computer allows notifications from your browser (Windows: Settings → System → Notifications; Mac: System Settings → Notifications) and that Do Not Disturb is off.",
+          }
+        : { type: "error", text: "Your browser couldn't show a notification." }
+    );
+  };
+
+  const toggle = async () => {
+    if (busy) return;
+    setMessage(null);
+
+    if (on) {
+      setDesktopNotificationsEnabled(false);
+      setOn(false);
+      setMessage({ type: "success", text: "Desktop notifications are off in this browser." });
+      return;
+    }
+
+    setBusy(true);
+    const result = await requestDesktopPermission(); // shows the browser's Allow / Block prompt
+    setPermission(result);
+    setBusy(false);
+
+    if (result === "granted") {
+      setDesktopNotificationsEnabled(true);
+      setOn(true);
+      sendTest();
+    } else if (result === "denied") {
+      setDesktopNotificationsEnabled(false);
+      setMessage({ type: "error", text: BLOCKED_HELP });
+    } else if (result === "unsupported") {
+      setMessage({ type: "error", text: "This browser doesn't support desktop notifications." });
+    } else {
+      setMessage({
+        type: "notice",
+        text: "The permission prompt was closed without a choice. Click the switch again and choose Allow.",
+      });
+    }
+  };
+
+  const unsupported = permission === "unsupported";
+  const disabled = busy || unsupported || !alertsEnabled;
+  const stateText = unsupported
+    ? "Not supported in this browser"
+    : !alertsEnabled
+      ? "Turn on Security alerts first"
+      : permission === "denied"
+        ? "Blocked by your browser"
+        : on
+          ? "On in this browser (while a CyberGuard tab is open)"
+          : "Off";
+
+  return (
+    <>
+      <div className="settings-toggle-row">
+        <div>
+          <span className="settings-toggle-label" id="desktop-notifications-label">
+            Desktop notifications
+          </span>
+          <span className="settings-toggle-state">{stateText}</span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on && alertsEnabled}
+          aria-labelledby="desktop-notifications-label"
+          className={`settings-switch ${on && alertsEnabled ? "on" : ""}`}
+          onClick={toggle}
+          disabled={disabled}
+        >
+          <span className="settings-switch-knob" />
+        </button>
+      </div>
+
+      {on && alertsEnabled && (
+        <button className="settings-button secondary" type="button" onClick={sendTest}>
+          Send test notification
+        </button>
+      )}
+
+      {message && (
+        <p className={`settings-message ${message.type}`} role={message.type === "error" ? "alert" : "status"}>
+          {message.text}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** On/off switch for Security Alerts. Saves as soon as it is clicked. */
+function SecurityAlertsSettings({ accessToken }: SecurityAlertsSettingsProps) {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<FormMessage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getAlertSettings(accessToken)
+      .then((settings) => {
+        if (cancelled) return;
+        setEnabled(settings.enabled);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : "Could not load your alert settings.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, reloadKey]);
+
+  const retry = () => {
+    setLoadError(null);
+    setReloadKey((key) => key + 1);
+  };
+
+  const toggle = async () => {
+    if (enabled === null || saving) return;
+    const next = !enabled;
+
+    setSaving(true);
+    setMessage(null);
+    setEnabled(next); // update the switch right away, undo if saving fails
+
+    try {
+      const saved = await updateAlertSettings(accessToken, next);
+      setEnabled(saved.enabled);
+      setMessage({
+        type: "success",
+        text: saved.enabled
+          ? "Security alerts are on. Risky scan results will create alerts."
+          : "Security alerts are off. Scans still work, but no new alerts will be created.",
+      });
+    } catch (err) {
+      setEnabled(!next);
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? `Could not save: ${err.message}` : "Could not save your alert setting.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="settings-card">
+      <h2>Security alerts</h2>
+      <p className="settings-card-desc">
+        Get an alert when a scan finds a high-risk website, phishing email or dangerous file.
+        Turning this off doesn't delete alerts you already have.
+      </p>
+
+      {loadError ? (
+        <div className="settings-form">
+          <p className="settings-message error" role="alert">
+            Could not load your alert settings: {loadError}
+          </p>
+          <button className="settings-button" type="button" onClick={retry}>
+            Try again
+          </button>
+        </div>
+      ) : enabled === null ? (
+        <p className="settings-empty">Loading your alert settings...</p>
+      ) : (
+        <div className="settings-form">
+          <div className="settings-toggle-row">
+            <div>
+              <span className="settings-toggle-label" id="security-alerts-label">
+                Security alerts
+              </span>
+              <span className="settings-toggle-state">{enabled ? "On" : "Off"}</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={enabled}
+              aria-labelledby="security-alerts-label"
+              className={`settings-switch ${enabled ? "on" : ""}`}
+              onClick={toggle}
+              disabled={saving}
+            >
+              <span className="settings-switch-knob" />
+            </button>
+          </div>
+
+          {message && (
+            <p className={`settings-message ${message.type}`} role={message.type === "error" ? "alert" : "status"}>
+              {message.text}
+            </p>
+          )}
+
+          <DesktopNotificationsToggle alertsEnabled={enabled} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Settings() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const [result, setResult] = useState<ProfileResult | null>(null);
 
   useEffect(() => {
@@ -477,6 +718,8 @@ function Settings() {
           </dl>
         )}
       </section>
+
+      {session?.access_token && <SecurityAlertsSettings accessToken={session.access_token} />}
 
       {!loadingProfile && !result?.error && profile && (
         <section className="settings-card">

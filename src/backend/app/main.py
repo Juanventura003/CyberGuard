@@ -20,11 +20,11 @@ from threading import Event, Thread
 from urllib.parse import urlencode, urlparse
 from urllib.parse import urlencode, urlparse, urlsplit, urlunsplit, parse_qsl
 
-from fastapi import FastAPI, Header, HTTPException, Path, Query, UploadFile, File
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Path, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from . import gmail_oauth, phishing_detector, file_checker
+from . import gmail_oauth, phishing_detector, file_checker, alerts
 from .config import settings, MAX_EMAILS_PER_BATCH
 from .schemas import (
     BatchManualRequest,
@@ -160,6 +160,7 @@ async def check_phone_reputation(request: PhoneReputationRequest):
         "valid": data.get("valid")
     }
 app.include_router(protection_router)
+app.include_router(alerts.router)
 
 #email address checker
 DISPOSABLE_EMAIL_DOMAINS = {
@@ -601,7 +602,11 @@ def cybersecurity_news():
 
 # File Checker
 @app.post("/api/security/file-check")
-async def check_uploaded_file(file: UploadFile = File(...)):
+async def check_uploaded_file(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    authorization: str | None = Header(default=None),
+):
     max_file_size = 25 * 1024 * 1024
 
     contents = await file.read()
@@ -619,7 +624,7 @@ async def check_uploaded_file(file: UploadFile = File(...)):
         )
 
     try:
-        return file_checker.check_file(
+        result = file_checker.check_file(
             file.filename,
             contents
         )
@@ -628,6 +633,10 @@ async def check_uploaded_file(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Could not check file: {exc}"
         )
+
+    # Security alert for signed-in users (runs after the response is sent).
+    background_tasks.add_task(alerts.record_alerts, authorization, [alerts.file_alert(result)])
+    return result
 
 @app.get("/api/websites/history", response_model=list[WebsiteHistoryEntry])
 def get_website_history(
@@ -692,6 +701,7 @@ def delete_all_website_history(
 @app.post("/api/websites/history", response_model=WebsiteHistoryEntry)
 def store_website_history(
     payload: WebsiteAnalyzeResponse,
+    background_tasks: BackgroundTasks,
     authorization: str | None = Header(default=None),
 ):
     history_entry = WebsiteHistoryEntry(
@@ -710,9 +720,16 @@ def store_website_history(
         raise HTTPException(status_code=401, detail="Sign in before saving website history.")
 
     try:
-        return supabase_store.insert_history(user_id, history_entry.model_dump(exclude_none=True))
+        row = supabase_store.insert_history(user_id, history_entry.model_dump(exclude_none=True))
     except supabase_store.SupabaseStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    background_tasks.add_task(
+        alerts.record_alerts_for_user,
+        user_id,
+        [alerts.website_alert(payload.model_dump(), history_id=row.get("id"))],
+    )
+    return row
 
 
 def _authenticated_user_id(authorization: str | None) -> str | None:
@@ -734,6 +751,7 @@ def _authenticated_user_id(authorization: str | None) -> str | None:
 @app.post("/api/websites/analyze", response_model=WebsiteAnalyzeResponse)
 def analyze_website(
     payload: WebsiteAnalyzeRequest,
+    background_tasks: BackgroundTasks,
     authorization: str | None = Header(default=None),
 ):
     parsed_url = urlparse(payload.url)
@@ -760,11 +778,17 @@ def analyze_website(
             visited_at=datetime.now(timezone.utc).isoformat(),
         )
         try:
-            supabase_store.insert_history(
+            row = supabase_store.insert_history(
                 user_id, history_entry.model_dump(exclude_none=True)
             )
         except supabase_store.SupabaseStoreError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        background_tasks.add_task(
+            alerts.record_alerts_for_user,
+            user_id,
+            [alerts.website_alert(response.model_dump(), history_id=row.get("id"))],
+        )
 
     return response
 
@@ -775,13 +799,22 @@ def analyze_website(
 
 
 @app.post("/api/email/batch-analyze", response_model=list[EmailResult])
-def batch_analyze_manual(payload: BatchManualRequest):
+def batch_analyze_manual(
+    payload: BatchManualRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(default=None),
+):
     results = []
+    new_alerts = []
     for item in payload.emails:
         scored = phishing_detector.analyze_email(item.sender, item.subject, item.body, item.urls)
-        results.append(EmailResult(
+        result = EmailResult(
             source="manual", id=None, sender=item.sender, subject=item.subject or "(no subject)", **scored,
-        ))
+        )
+        results.append(result)
+        new_alerts.append(alerts.email_alert(result.model_dump(), body=item.body))
+
+    background_tasks.add_task(alerts.record_alerts, authorization, new_alerts)
     return results
 
 
@@ -869,9 +902,11 @@ def gmail_attachment_list(
 
 @app.post("/api/security/gmail/scan-attachment")
 async def scan_gmail_attachment(
+    background_tasks: BackgroundTasks,
     session: str = Query(...),
     message_id: str = Query(...),
     attachment_index: int = Query(..., ge=0),
+    authorization: str | None = Header(default=None),
 ):
     try:
         filename, contents = await asyncio.to_thread(
@@ -891,7 +926,7 @@ async def scan_gmail_attachment(
         )
 
     try:
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             file_checker.check_file,
             filename,
             contents,
@@ -902,8 +937,19 @@ async def scan_gmail_attachment(
             detail="Could not scan Gmail attachment.",
         )
 
+    background_tasks.add_task(
+        alerts.record_alerts,
+        authorization,
+        [alerts.file_alert(result, origin="gmail_attachment", gmail_message_id=message_id)],
+    )
+    return result
+
 @app.post("/api/email/gmail/analyze", response_model=list[EmailResult])
-async def gmail_analyze(payload: GmailAnalyzeRequest):
+async def gmail_analyze(
+    payload: GmailAnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(default=None),
+):
     if len(payload.message_ids) > MAX_EMAILS_PER_BATCH:
         raise HTTPException(status_code=400, detail=f"Select at most {MAX_EMAILS_PER_BATCH} emails at a time.")
 
@@ -925,7 +971,14 @@ async def gmail_analyze(payload: GmailAnalyzeRequest):
             scored = phishing_detector.analyze_email(full["sender"], full["subject"], full["body"], full["urls"])
             return EmailResult(source="gmail", id=message_id, sender=full["sender"], subject=full["subject"], **scored)
 
-    return await asyncio.gather(*(fetch_and_score(mid) for mid in payload.message_ids))
+    results = await asyncio.gather(*(fetch_and_score(mid) for mid in payload.message_ids))
+
+    background_tasks.add_task(
+        alerts.record_alerts,
+        authorization,
+        [alerts.email_alert(r.model_dump(), gmail_message_id=r.id) for r in results],
+    )
+    return results
 
 
 @app.post("/api/email/gmail/trash", response_model=GmailTrashResponse)
@@ -970,6 +1023,7 @@ def analyze_extension_page(payload: PageAnalyzeRequest):
 @app.patch("/api/websites/history/{history_id}", response_model=WebsiteHistoryEntry)
 def update_website_history(
     payload: WebsiteAnalyzeResponse,
+    background_tasks: BackgroundTasks,
     history_id: str = Path(..., min_length=1),
     authorization: str | None = Header(default=None),
 ):
@@ -979,6 +1033,14 @@ def update_website_history(
             status_code=401, detail="Sign in before updating website history."
         )
     try:
-        return supabase_store.update_history(user_id, history_id, payload.model_dump())
+        row = supabase_store.update_history(user_id, history_id, payload.model_dump())
     except supabase_store.SupabaseStoreError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # The extension's page check can raise a site's risk after the first scan.
+    background_tasks.add_task(
+        alerts.record_alerts_for_user,
+        user_id,
+        [alerts.website_alert(payload.model_dump(), history_id=history_id)],
+    )
+    return row
