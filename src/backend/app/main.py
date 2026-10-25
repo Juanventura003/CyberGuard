@@ -569,9 +569,25 @@ async def check_email_reputation(request: EmailReputationRequest):
         "unavailable_checks": unavailable_checks,
     }
 
+def frontend_origins() -> list[str]:
+    """Localhost and 127.0.0.1 are interchangeable for local OAuth return_to checks."""
+    primary = settings.FRONTEND_ORIGIN.strip().rstrip("/")
+    origins = {primary} if primary else set()
+    if primary.startswith("http://localhost"):
+        origins.add("http://127.0.0.1" + primary.removeprefix("http://localhost"))
+    elif primary.startswith("http://127.0.0.1"):
+        origins.add("http://localhost" + primary.removeprefix("http://127.0.0.1"))
+    origins.update({"http://localhost:5173", "http://127.0.0.1:5173"})
+    return sorted(origins)
+
+
+def is_allowed_frontend_return(return_to: str) -> bool:
+    return any(return_to.startswith(origin) for origin in frontend_origins())
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_ORIGIN, "http://127.0.0.1:5173"],
+    allow_origins=frontend_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -798,8 +814,14 @@ def batch_analyze_manual(payload: BatchManualRequest):
 
 @app.get("/api/email/oauth/login")
 def oauth_login(return_to: str = Query(...)):
-    if not return_to.startswith(settings.FRONTEND_ORIGIN):
-        raise HTTPException(status_code=400, detail="return_to must point back at the configured frontend origin.")
+    if not is_allowed_frontend_return(return_to):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "return_to must point back at the configured frontend origin "
+                f"({', '.join(frontend_origins())})."
+            ),
+        )
     try:
         auth_url = gmail_oauth.start_login(return_to)
     except RuntimeError as exc:
