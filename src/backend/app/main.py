@@ -97,8 +97,11 @@ async def check_phone_reputation(request: PhoneReputationRequest):
 
     if not api_key:
         raise HTTPException(
-            status_code=500,
-            detail="Phone reputation API is not configured."
+            status_code=503,
+            detail=(
+                "Phone reputation API is not configured. "
+                "Add IPQS_API_KEY to src/backend/.env and restart the backend."
+            ),
         )
 
     phone = re.sub(r"[^\d+]", "", request.phone_number)
@@ -375,8 +378,11 @@ async def check_email_reputation(request: EmailReputationRequest):
 
     if not api_key:
         raise HTTPException(
-            status_code=500,
-            detail="Email reputation API is not configured."
+            status_code=503,
+            detail=(
+                "Email reputation API is not configured. "
+                "Add IPQS_API_KEY to src/backend/.env and restart the backend."
+            ),
         )
 
     try:

@@ -326,7 +326,7 @@ function SecurityChecker() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/api/security/phone-reputation",
+        `${API_BASE}/api/security/phone-reputation`,
         {
           method: "POST",
           headers: {
@@ -625,7 +625,7 @@ function SecurityChecker() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/api/security/file-check",
+        `${API_BASE}/api/security/file-check`,
         {
           method: "POST",
           body: formData,
