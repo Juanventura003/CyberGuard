@@ -343,14 +343,24 @@ function SecurityChecker() {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.detail || "Phone reputation lookup failed.");
+      const detail =
+        typeof error.detail === "string"
+          ? error.detail
+          : "Phone reputation lookup failed.";
+      throw new Error(detail);
     }
 
     const data: PhoneReputationResult = await response.json();
     setPhoneReputation(data);
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to check phone reputation.";
     setPhoneReputationError(
-      error instanceof Error ? error.message : "Unable to check phone reputation."
+      message.includes("not configured")
+        ? "Spam & scam checks need an IPQS_API_KEY in src/backend/.env. Phone format validation above still works."
+        : message,
     );
   } finally {
     setPhoneReputationLoading(false);
@@ -431,20 +441,25 @@ function SecurityChecker() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-
-        throw new Error(
-          error.detail || "Unable to check sender reputation."
-        );
+        const detail =
+          typeof error.detail === "string"
+            ? error.detail
+            : "Unable to check sender reputation.";
+        throw new Error(detail);
       }
 
       const data: EmailReputationResult = await response.json();
 
       setEmailReputation(data);
     } catch (error) {
-      setEmailReputationError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Unable to check sender reputation."
+          : "Unable to check sender reputation.";
+      setEmailReputationError(
+        message.includes("not configured")
+          ? "Reputation checks need an IPQS_API_KEY in src/backend/.env. Email format/DNS results above still work."
+          : message,
       );
     } finally {
       setEmailReputationLoading(false);

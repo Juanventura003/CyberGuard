@@ -488,15 +488,34 @@ def check_file(filename: str, contents: bytes):
         result["status"] == "CLEAN"
         for result in (defender_result, clamav_result)
     )
+    antivirus_infected = any(
+        result["status"] == "INFECTED"
+        for result in (defender_result, clamav_result)
+    )
+    vt_clean = (
+        vt_result["status"] == "FOUND"
+        and vt_result.get("malicious", 0) == 0
+        and vt_result.get("suspicious", 0) == 0
+    )
+    deep_scan_available = antivirus_clean or vt_clean or antivirus_infected
 
-    if risk_score > 70:
+    if risk_score > 70 or antivirus_infected:
         classification = "HIGH RISK"
 
     elif risk_score > 30:
         classification = "SUSPICIOUS"
 
-    elif antivirus_clean:
+    elif antivirus_clean or vt_clean:
         classification = "SAFE"
+
+    elif risk_score <= 30 and not antivirus_infected:
+        # Local signals only (no ClamAV / Defender / VirusTotal hit).
+        classification = "SAFE"
+        if not deep_scan_available:
+            reasons.append(
+                "No strong local risk signals were found. "
+                "Add VIRUSTOTAL_API_KEY or install ClamAV for deeper malware scanning."
+            )
 
     else:
         classification = "UNKNOWN"
