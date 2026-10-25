@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "backend": "node scripts/run-backend.mjs",
-    "dev:all": "concurrently \"npm run dev\" \"npm run backend\"",
+    "scanner": "python src/local_scanner/scanner_server.py",
+    "dev:all": "concurrently -k -n FRONTEND,BACKEND,SCANNER \"npm run dev\" \"npm run backend\" \"npm run scanner\"",
     "build": "tsc -b && vite build",
     "build:extension": "node extension/build.mjs",
     "lint": "eslint .",
