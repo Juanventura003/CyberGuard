@@ -399,7 +399,7 @@ function LoggedInDashboard() {
             type="button"
             onClick={() => navigate("/website-tracker")}
           >
-            View Website History
+            Open Website Scanner
           </button>
         </div>
 
