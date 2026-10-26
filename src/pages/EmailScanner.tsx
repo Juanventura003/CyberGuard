@@ -18,6 +18,7 @@ import {
 } from "../api/emailApi";
 
 import ShareFinding from "../components/ShareFinding";
+import { recordEmailScans } from "../lib/scanActivity";
 import "./EmailScanner.css";
 
 const MAX_EMAILS = 50;
@@ -222,6 +223,14 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
       }));
       const data = await analyzeManualEmails(payload);
       setResults(data);
+      recordEmailScans(
+        session?.user.id,
+        data.map((item) => ({
+          subject: item.subject,
+          sender: item.sender,
+          classification: item.classification,
+        })),
+      );
       setMode("results");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Analysis failed.");
@@ -259,6 +268,14 @@ const [trashErrors, setTrashErrors] = useState<Record<string, string>>({});
     try {
       const data = await analyzeGmailMessages(gmailSession, Array.from(selectedIds));
       setResults(data);
+      recordEmailScans(
+        session?.user.id,
+        data.map((item) => ({
+          subject: item.subject,
+          sender: item.sender,
+          classification: item.classification,
+        })),
+      );
       setMode("results");
     } catch (err) {
       if (isSessionExpired(err)) {

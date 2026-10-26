@@ -107,7 +107,13 @@ def check_virustotal(sha256: str):
     api_key = os.getenv("VIRUSTOTAL_API_KEY")
 
     if not api_key:
-        raise RuntimeError("VirusTotal API key is not configured.")
+        return {
+            "status": "SKIPPED",
+            "malicious": 0,
+            "suspicious": 0,
+            "total": 0,
+            "reason": "VirusTotal API key is not configured.",
+        }
 
     try:
         response = requests.get(
@@ -115,10 +121,14 @@ def check_virustotal(sha256: str):
             headers={"x-apikey": api_key},
             timeout=15,
         )
-    except requests.RequestException as exc:
-        raise RuntimeError(
-            "Unable to connect to VirusTotal."
-        ) from exc
+    except requests.RequestException:
+        return {
+            "status": "SKIPPED",
+            "malicious": 0,
+            "suspicious": 0,
+            "total": 0,
+            "reason": "Unable to connect to VirusTotal.",
+        }
 
     if response.status_code == 404:
         return {
@@ -129,19 +139,31 @@ def check_virustotal(sha256: str):
         }
 
     if response.status_code == 429:
-        raise RuntimeError(
-            "VirusTotal rate limit reached. Try again later."
-        )
+        return {
+            "status": "SKIPPED",
+            "malicious": 0,
+            "suspicious": 0,
+            "total": 0,
+            "reason": "VirusTotal rate limit reached. Try again later.",
+        }
 
     if response.status_code in (401, 403):
-        raise RuntimeError(
-            "VirusTotal API key was rejected or lacks permission."
-        )
+        return {
+            "status": "SKIPPED",
+            "malicious": 0,
+            "suspicious": 0,
+            "total": 0,
+            "reason": "VirusTotal API key was rejected or lacks permission.",
+        }
 
     if not response.ok:
-        raise RuntimeError(
-            f"VirusTotal returned HTTP {response.status_code}."
-        )
+        return {
+            "status": "SKIPPED",
+            "malicious": 0,
+            "suspicious": 0,
+            "total": 0,
+            "reason": f"VirusTotal returned HTTP {response.status_code}.",
+        }
 
     stats = response.json()["data"]["attributes"]["last_analysis_stats"]
 
@@ -415,7 +437,7 @@ def check_file(filename: str, contents: bytes):
         if result["status"] == "INFECTED":
             risk_score = max(risk_score, 95)
 
-    # 5. VirusTotal hash lookup
+    # 5. VirusTotal hash lookup (optional — local checks still run without a key)
     vt_result = check_virustotal(sha256)
 
     if vt_result["status"] == "FOUND":
@@ -448,6 +470,12 @@ def check_file(filename: str, contents: bytes):
                 "VirusTotal reported no malware detections."
             )
 
+    elif vt_result["status"] == "SKIPPED":
+        reasons.append(
+            vt_result.get("reason")
+            or "VirusTotal lookup was skipped."
+        )
+
     else:
         reasons.append(
             "This file was not found in VirusTotal's database."
@@ -460,15 +488,34 @@ def check_file(filename: str, contents: bytes):
         result["status"] == "CLEAN"
         for result in (defender_result, clamav_result)
     )
+    antivirus_infected = any(
+        result["status"] == "INFECTED"
+        for result in (defender_result, clamav_result)
+    )
+    vt_clean = (
+        vt_result["status"] == "FOUND"
+        and vt_result.get("malicious", 0) == 0
+        and vt_result.get("suspicious", 0) == 0
+    )
+    deep_scan_available = antivirus_clean or vt_clean or antivirus_infected
 
-    if risk_score > 70:
+    if risk_score > 70 or antivirus_infected:
         classification = "HIGH RISK"
 
     elif risk_score > 30:
         classification = "SUSPICIOUS"
 
-    elif antivirus_clean:
+    elif antivirus_clean or vt_clean:
         classification = "SAFE"
+
+    elif risk_score <= 30 and not antivirus_infected:
+        # Local signals only (no ClamAV / Defender / VirusTotal hit).
+        classification = "SAFE"
+        if not deep_scan_available:
+            reasons.append(
+                "No strong local risk signals were found. "
+                "Add VIRUSTOTAL_API_KEY or install ClamAV for deeper malware scanning."
+            )
 
     else:
         classification = "UNKNOWN"
