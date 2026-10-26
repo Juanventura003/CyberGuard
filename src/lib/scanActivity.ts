@@ -90,6 +90,71 @@ export function emailFindingFromClassification(
   return "unverified";
 }
 
+export function fileFindingFromClassification(
+  classification: string,
+): ScanFinding {
+  if (classification === "HIGH RISK") return "high";
+  if (classification === "SUSPICIOUS") return "suspicious";
+  if (classification === "SAFE") return "safe";
+  return "unverified";
+}
+
+/** zxcvbn score 0–4 → dashboard finding. */
+export function passwordFindingFromScore(score: number): ScanFinding {
+  if (score <= 1) return "high";
+  if (score === 2) return "suspicious";
+  return "safe";
+}
+
+export function phoneReputationFinding(input: {
+  fraud_score: number | null;
+  spammer: boolean | null;
+  recent_abuse: boolean | null;
+  risky: boolean | null;
+}): ScanFinding {
+  const score = input.fraud_score;
+  if (
+    input.spammer === true ||
+    input.risky === true ||
+    (typeof score === "number" && score >= 75)
+  ) {
+    return "high";
+  }
+  if (
+    input.recent_abuse === true ||
+    (typeof score === "number" && score >= 40)
+  ) {
+    return "suspicious";
+  }
+  if (score === null && input.spammer === null && input.risky === null) {
+    return "unverified";
+  }
+  return "safe";
+}
+
+export function emailAddressFinding(input: {
+  valid_format: boolean;
+  domain_exists: boolean | null;
+  has_mx_records: boolean | null;
+  disposable: boolean | null;
+}): ScanFinding {
+  if (!input.valid_format) return "high";
+  if (input.disposable === true) return "suspicious";
+  if (input.domain_exists === false || input.has_mx_records === false) {
+    return "suspicious";
+  }
+  return "safe";
+}
+
+export function emailReputationFinding(
+  riskLevel: "Low" | "Medium" | "High" | "Unknown",
+): ScanFinding {
+  if (riskLevel === "High") return "high";
+  if (riskLevel === "Medium") return "suspicious";
+  if (riskLevel === "Low") return "safe";
+  return "unverified";
+}
+
 export function recordEmailScans(
   userId: string | undefined,
   results: {

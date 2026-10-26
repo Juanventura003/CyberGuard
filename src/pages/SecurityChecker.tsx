@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import {
   FileText,
   KeyRound,
@@ -27,6 +27,16 @@ import {
 } from "../api/emailApi";
 
 import { useAuth } from "../context/AuthContext";
+import {
+  emailAddressFinding,
+  emailReputationFinding,
+  fileFindingFromClassification,
+  maskEmail,
+  maskPhone,
+  passwordFindingFromScore,
+  phoneReputationFinding,
+  recordSecurityScan,
+} from "../lib/scanActivity";
 
 import zxcvbn from "zxcvbn";
 
@@ -34,6 +44,14 @@ import {
   parsePhoneNumberFromString,
   type CountryCode,
 } from "libphonenumber-js/max";
+
+const PASSWORD_STRENGTH_LABELS = [
+  "Very Weak",
+  "Weak",
+  "Fair",
+  "Good",
+  "Strong",
+] as const;
 
 type CheckerType =
   | "file"
@@ -183,6 +201,12 @@ function SecurityChecker() {
       const result: FileScanResult = await response.json();
       setFileScanResult(result);
       setGmailPickerOpen(false);
+      recordSecurityScan(session?.user.id, {
+        checkType: "file",
+        title: result.filename || "Gmail attachment",
+        detail: result.classification,
+        finding: fileFindingFromClassification(result.classification),
+      });
     } catch (error) {
       console.error("Gmail attachment scan error:", error);
 
@@ -302,15 +326,23 @@ function SecurityChecker() {
 
       const valid = parsed.isValid();
       const possible = parsed.isPossible();
+      const international = parsed.formatInternational();
 
       setPhoneResult({
         valid,
         possible,
-        international: parsed.formatInternational(),
+        international,
         national: parsed.formatNational(),
         country: parsed.country || "Unknown",
         callingCode: `+${parsed.countryCallingCode}`,
         type: parsed.getType() || "Unknown",
+      });
+
+      recordSecurityScan(session?.user.id, {
+        checkType: "phone",
+        title: "Phone format check",
+        detail: maskPhone(international),
+        finding: valid ? "safe" : possible ? "suspicious" : "high",
       });
     } catch {
       setPhoneError("Unable to analyze this phone number.");
@@ -352,6 +384,12 @@ function SecurityChecker() {
 
     const data: PhoneReputationResult = await response.json();
     setPhoneReputation(data);
+    recordSecurityScan(session?.user.id, {
+      checkType: "phone",
+      title: "Phone reputation check",
+      detail: maskPhone(phoneResult.international),
+      finding: phoneReputationFinding(data),
+    });
   } catch (error) {
     const message =
       error instanceof Error
@@ -407,6 +445,12 @@ function SecurityChecker() {
 
       const data: EmailCheckResult = await response.json();
       setEmailResult(data);
+      recordSecurityScan(session?.user.id, {
+        checkType: "email_address",
+        title: "Email address check",
+        detail: maskEmail(data.email),
+        finding: emailAddressFinding(data),
+      });
     } catch (error) {
       setEmailError(
         error instanceof Error
@@ -451,6 +495,12 @@ function SecurityChecker() {
       const data: EmailReputationResult = await response.json();
 
       setEmailReputation(data);
+      recordSecurityScan(session?.user.id, {
+        checkType: "email_address",
+        title: "Email reputation check",
+        detail: maskEmail(data.email),
+        finding: emailReputationFinding(data.risk_level),
+      });
     } catch (error) {
       const message =
         error instanceof Error
@@ -474,9 +524,29 @@ function SecurityChecker() {
   };
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const lastRecordedPasswordKey = useRef("");
 
   const passwordResult = password ? zxcvbn(password) : null;
   const passwordScore = passwordResult?.score ?? 0;
+
+  // Live analysis: record once after the user pauses typing (never store the password).
+  useEffect(() => {
+    if (!session?.user.id || password.length < 4) return;
+
+    const key = `${passwordScore}:${password.length}`;
+    const timer = window.setTimeout(() => {
+      if (lastRecordedPasswordKey.current === key) return;
+      lastRecordedPasswordKey.current = key;
+      recordSecurityScan(session.user.id, {
+        checkType: "password",
+        title: "Password strength check",
+        detail: PASSWORD_STRENGTH_LABELS[passwordScore] ?? "Checked",
+        finding: passwordFindingFromScore(passwordScore),
+      });
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [password, passwordScore, session?.user.id]);
 
   const passwordChecks = [
     {
@@ -514,13 +584,7 @@ function SecurityChecker() {
         ...passwordResult.feedback.suggestions,
       ]
     : [];
-  const strengthLabels = [
-    "Very Weak",
-    "Weak",
-    "Fair",
-    "Good",
-    "Strong",
-  ];
+  const strengthLabels = PASSWORD_STRENGTH_LABELS;
 
   const strengthColors = [
     "#dc3545",
@@ -662,6 +726,12 @@ function SecurityChecker() {
 
       const data: FileScanResult = await response.json();
       setFileScanResult(data);
+      recordSecurityScan(session?.user.id, {
+        checkType: "file",
+        title: data.filename || selectedFile.name,
+        detail: data.classification,
+        finding: fileFindingFromClassification(data.classification),
+      });
     } catch (error) {
       console.error("File scan error:", error);
 
