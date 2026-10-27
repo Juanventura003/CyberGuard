@@ -17,7 +17,7 @@
     font-size: 28px;
     font-weight: 700;
   }
-
+  
   .settings-hint {
     color: var(--s-muted);
     font-size: 13px;
@@ -126,13 +126,13 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
-
+  
   .settings-button.secondary {
     background: #ffffff;
     color: var(--s-primary);
     border: 1px solid var(--s-border);
   }
-
+  
   .settings-button.secondary:hover:not(:disabled) {
     background: #f1f5f9;
   }
@@ -166,7 +166,7 @@
   .settings-empty {
     color: var(--s-muted);
   }
-
+  
   /* Security alerts on/off switch */
   .settings-toggle-row {
     display: flex;
@@ -177,19 +177,19 @@
     border: 1px solid var(--s-border);
     border-radius: 10px;
   }
-
+  
   .settings-toggle-label {
     display: block;
     font-weight: 600;
   }
-
+  
   .settings-toggle-state {
     display: block;
     margin-top: 2px;
     color: var(--s-muted);
     font-size: 13px;
   }
-
+  
   .settings-switch {
     position: relative;
     flex-shrink: 0;
@@ -202,21 +202,21 @@
     cursor: pointer;
     transition: background-color 0.2s ease;
   }
-
+  
   .settings-switch.on {
     background: var(--s-primary);
   }
-
+  
   .settings-switch:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(65, 105, 225, 0.3);
   }
-
+  
   .settings-switch:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
-
+  
   .settings-switch-knob {
     position: absolute;
     top: 3px;
@@ -228,11 +228,35 @@
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
     transition: transform 0.2s ease;
   }
-
+  
   .settings-switch.on .settings-switch-knob {
     transform: translateX(20px);
   }
-
+  
+  /* Delete account */
+  .settings-card.danger {
+    border-color: #f5c2c2;
+  }
+  
+  .settings-card.danger h2 {
+    color: #991b1b;
+  }
+  
+  .settings-button.danger {
+    background: #dc2626;
+  }
+  
+  .settings-button.danger:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+  
+  .settings-warning {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 14px;
+    color: var(--s-muted);
+  }
+  
   @media (prefers-reduced-motion: reduce) {
     .settings-switch,
     .settings-switch-knob {

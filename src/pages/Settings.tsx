@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 import { supabase } from "../lib/supabase";
 import { getAlertSettings, updateAlertSettings } from "../api/alertsApi";
 import {
@@ -608,8 +609,130 @@ function SecurityAlertsSettings({ accessToken }: SecurityAlertsSettingsProps) {
   );
 }
 
+interface DeleteAccountFormProps {
+  email: string;
+  username: string | null;
+}
+
+function DeleteAccountForm({ email, username }: DeleteAccountFormProps) {
+  const [confirmText, setConfirmText] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [message, setMessage] = useState<FormMessage | null>(null);
+
+  const confirmWord = username || email;
+  const confirmKind = username ? "username" : "email address";
+  const confirmMatches = confirmText.trim().toLowerCase() === confirmWord.toLowerCase();
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+
+    const client = supabase;
+    if (!client) {
+      setMessage({ type: "error", text: NOT_CONFIGURED });
+      return;
+    }
+
+    if (!confirmMatches) {
+      setMessage({ type: "error", text: `Type your ${confirmKind} exactly as shown to confirm.` });
+      return;
+    }
+
+    setDeleting(true);
+
+    const { error: verifyError } = await client.auth.signInWithPassword({
+      email,
+      password: currentPassword,
+    });
+
+    if (verifyError) {
+      setDeleting(false);
+      setMessage({ type: "error", text: "Your current password is incorrect." });
+      return;
+    }
+
+    const { error: deleteError } = await client.rpc("delete_my_account");
+
+    if (deleteError) {
+      setDeleting(false);
+
+      if (deleteError.message.includes("owns_organization")) {
+        setMessage({
+          type: "error",
+          text: "You own an organization. Delete it in Team Security first, then try again.",
+        });
+      } else if (deleteError.message.includes("has_organization_records")) {
+        setMessage({
+          type: "error",
+          text: "Your account has organization records, such as reported incidents, domain rules, or temporary access grants. An organization admin needs to handle those before your account can be deleted.",
+        });
+      } else {
+        setMessage({ type: "error", text: deleteError.message });
+      }
+      return;
+    }
+
+    await client.auth.signOut({ scope: "local" });
+    window.location.assign("/");
+  };
+
+  return (
+    <form className="settings-form" onSubmit={handleSubmit}>
+      <p className="settings-card-desc">
+        Deleting your account is permanent and cannot be undone. This removes:
+      </p>
+      <ul className="settings-warning">
+        <li>Your profile and sign-in details</li>
+        <li>Your saved email scans and website history</li>
+        <li>Your notification preferences and security alerts</li>
+        <li>Your membership in any organization</li>
+      </ul>
+
+      {message && (
+        <p className={`settings-message ${message.type}`} role={message.type === "error" ? "alert" : "status"}>
+          {message.text}
+        </p>
+      )}
+
+      <label className="settings-field">
+        <span>
+          Type your {confirmKind} <strong>{confirmWord}</strong> to confirm
+        </span>
+        <input
+          type="text"
+          value={confirmText}
+          onChange={(event) => setConfirmText(event.target.value)}
+          autoComplete="off"
+          required
+        />
+      </label>
+
+      <label className="settings-field">
+        <span>Current password</span>
+        <input
+          type="password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          autoComplete="current-password"
+          required
+        />
+      </label>
+
+      <button
+        className="settings-button danger"
+        type="submit"
+        disabled={deleting || !confirmMatches}
+      >
+        {deleting ? "Deleting..." : "Delete my account"}
+      </button>
+    </form>
+  );
+}
+
 function Settings() {
   const { user, session, loading: authLoading } = useAuth();
+  const { setProfile } = useProfile();
   const [result, setResult] = useState<ProfileResult | null>(null);
 
   useEffect(() => {
@@ -635,6 +758,12 @@ function Settings() {
   }, [user]);
 
   const handleProfileSaved = (values: ProfileValues) => {
+    setProfile({
+      first_name: values.firstName,
+      last_name: values.lastName,
+      username: values.username,
+    });
+
     setResult((previous) =>
       previous
         ? {
@@ -746,6 +875,11 @@ function Settings() {
         <h2>Password</h2>
         <p className="settings-card-desc">Choose a strong password that you don't use anywhere else.</p>
         <PasswordForm email={user.email ?? ""} />
+      </section>
+
+      <section className="settings-card danger">
+        <h2>Delete account</h2>
+        <DeleteAccountForm email={user.email ?? ""} username={profile?.username ?? null} />
       </section>
     </div>
   );
