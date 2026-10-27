@@ -14,6 +14,7 @@ import {
 
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useProfile } from "../../context/ProfileContext";
 
 import cyberGuardLogo from "../../assets/logo.png";
 import "./Sidebar.css";
@@ -24,7 +25,8 @@ type SidebarProps = {
 };
 
 function Sidebar({ onLogin, onSignUp }: SidebarProps) {
-  const { session, user, signOut } = useAuth();
+  const { session, signOut } = useAuth();
+  const { displayName } = useProfile();
 
   const handleLogout = async () => {
     await signOut();
@@ -54,7 +56,7 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
                 </span>
 
                 <span className="sidebar-user-email">
-                  {user?.email}
+                {displayName}
                 </span>
               </div>
             </div>

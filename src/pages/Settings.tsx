@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 import { supabase } from "../lib/supabase";
 import { getAlertSettings, updateAlertSettings } from "../api/alertsApi";
 import {
@@ -731,6 +732,7 @@ function DeleteAccountForm({ email, username }: DeleteAccountFormProps) {
 
 function Settings() {
   const { user, session, loading: authLoading } = useAuth();
+  const { setProfile } = useProfile();
   const [result, setResult] = useState<ProfileResult | null>(null);
 
   useEffect(() => {
@@ -756,6 +758,12 @@ function Settings() {
   }, [user]);
 
   const handleProfileSaved = (values: ProfileValues) => {
+    setProfile({
+      first_name: values.firstName,
+      last_name: values.lastName,
+      username: values.username,
+    });
+
     setResult((previous) =>
       previous
         ? {
