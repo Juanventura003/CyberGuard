@@ -849,25 +849,6 @@ function SecurityChecker() {
             <p>Check an unfamiliar email address.</p>
           </div>
         </button>
-
-        {/* Data Breach Checker */}
-        <button
-          className={`checker-option ${
-            activeChecker === "breach" ? "active" : ""
-          }`}
-          onClick={() => setActiveChecker("breach")}
-        >
-          <div className="checker-option-icon">
-            <Database size={24} />
-          </div>
-
-          <div>
-            <h3>Data Breach Checker</h3>
-            <p>
-              Check if your email appears in known data breaches.
-            </p>
-          </div>
-        </button>
       </div>
 
       {/* FILE CHECKER*/}
