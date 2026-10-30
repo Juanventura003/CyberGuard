@@ -36,11 +36,15 @@ type CheckResult = {
   profiles?: FirewallProfile[];
 };
 
+
 type SecurityResult = {
   antivirus: CheckResult;
   firewall: CheckResult;
   threats: CheckResult;
   gatekeeper?: CheckResult;
+  sip?: CheckResult;
+  filevault?: CheckResult;
+  xprotect?: CheckResult;
 };
 
 type MalwareResult = {
@@ -288,6 +292,17 @@ function DeviceScanner() {
   const firewall = scanResults?.firewall;
   const threats = scanResults?.threats;
 
+  
+const isMac = operatingSystem === "macOS Device";
+
+const macSecurityChecks = [
+  { title: "Gatekeeper", result: scanResults?.gatekeeper },
+  { title: "System Integrity Protection", result: scanResults?.sip },
+  { title: "FileVault Encryption", result: scanResults?.filevault },
+  { title: "XProtect", result: scanResults?.xprotect },
+];
+
+
   const panels = [
     {
       id: "antivirus" as PanelType,
@@ -461,11 +476,13 @@ function DeviceScanner() {
                         )}
                         <div>
                           <strong>{provider.name}</strong>
-                          <p>
-                            {provider.active
-                              ? "Reported as active by Windows Security Center"
-                              : "Not currently reported as active"}
-                          </p>
+                        <p>
+                          {provider.active
+                            ? isMac
+                              ? "Reported as active by the local scanner"
+                              : "Reported as active by Windows Security Center"
+                            : "Not currently reported as active"}
+                        </p>
                         </div>
                       </div>
 
@@ -522,7 +539,7 @@ function DeviceScanner() {
                         )}
                         <div>
                           <strong>{profile.name} Network</strong>
-                          <p>Windows Firewall profile</p>
+                          <p>{isMac ? "macOS Firewall" : "Windows Firewall profile"}</p>
                         </div>
                       </div>
                       <span
@@ -693,27 +710,41 @@ function DeviceScanner() {
                   }>Run Malware Scan</button>
                 )}
               </div>
-
-              <div className="detail-info">
-                <Info size={18} />
-                <p>
-                  Checking antivirus and firewall settings does not
-                  establish whether your device contains malware.
-                </p>
-              </div>
             </>
           )}
+        </div>
+      )}
+      
+      {isMac && scanResults && (
+        <div className="device-card">
+          <h2>macOS Security Protections</h2>
+          <p>Built-in security features on your Mac.</p>
 
-          {scanResults?.gatekeeper && (
-            <div className="detail-info">
-              <ShieldCheck size={18} />
-              <p>
-                macOS Gatekeeper:{" "}
-                {statusLabel(scanResults.gatekeeper.status)} —{" "}
-                {scanResults.gatekeeper.details}
-              </p>
-            </div>
-          )}
+          <div className="provider-list">
+            {macSecurityChecks.map((check) => (
+              <div className="provider-row" key={check.title}>
+                <div className="provider-name">
+                  <ShieldCheck size={21} />
+
+                  <div>
+                    <strong>{check.title}</strong>
+                    <p>
+                      {check.result?.details ??
+                        "Security information unavailable."}
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  className={`status-pill ${statusClass(
+                    check.result?.status
+                  )}`}
+                >
+                  {statusLabel(check.result?.status)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

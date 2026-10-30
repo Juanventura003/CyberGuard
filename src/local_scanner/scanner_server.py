@@ -159,11 +159,6 @@ def start_malware_scan(
         folder=request.folder,
     )
 
-    return start_scan(
-        mode=request.mode,
-        folder=request.folder,
-    )
-
 @app.get("/scan-malware/status")
 def malware_scan_status(_=Depends(require_local_frontend)):
     return scan_status()
