@@ -910,9 +910,7 @@ const confirmProcessTermination = async () => {
               : `${stats.gpu.usage_percent}%`
             : "N/A",
           percent: stats.gpu.usage_percent ?? 0,
-          detail: stats.gpu.supported
-            ? "GPU utilization"
-            : stats.gpu.message,
+          detail: stats.gpu.message,
           icon: Monitor,
           color: "#94a3b8",
         },

@@ -1,3 +1,5 @@
+import math
+import plistlib
 import platform
 import subprocess
 import threading
@@ -117,10 +119,66 @@ def get_windows_gpu_usage():
         return None
 
 
+def get_mac_gpu_usage():
+    """Read driver-reported GPU utilization without administrator privileges.
+
+    IOAccelerator counters vary by macOS version and GPU driver. Only use
+    explicit device utilization percentages; missing counters are unavailable,
+    not zero. For multiple GPUs, report the busiest device rather than sum them.
+    """
+    if platform.system() != "Darwin":
+        return None
+
+    try:
+        result = subprocess.run(
+            ["/usr/sbin/ioreg", "-r", "-c", "IOAccelerator", "-a"],
+            capture_output=True,
+            timeout=5,
+            check=True,
+        )
+        registry = plistlib.loads(result.stdout)
+        if not isinstance(registry, list):
+            return None
+        readings = []
+        pending = list(registry)
+        while pending:
+            entry = pending.pop()
+            if not isinstance(entry, dict):
+                continue
+            children = entry.get("IORegistryEntryChildren")
+            if isinstance(children, list):
+                pending.extend(children)
+            statistics = entry.get("PerformanceStatistics")
+            if not isinstance(statistics, dict):
+                continue
+            usage = statistics.get("Device Utilization %")
+            if (
+                isinstance(usage, (int, float))
+                and not isinstance(usage, bool)
+                and math.isfinite(usage)
+                and 0 <= usage <= 100
+            ):
+                readings.append(float(usage))
+        if not readings:
+            return None
+        return {
+            "supported": True,
+            "usage_percent": round(max(readings), 1),
+            "message": "macOS driver-reported GPU utilization (busiest device)",
+        }
+    except (subprocess.SubprocessError, OSError, ValueError, OverflowError):
+        return None
+
+
 def get_gpu_stats():
     """Return GPU utilization when supported."""
 
     operating_system = platform.system()
+    if operating_system == "Darwin":
+        mac = get_mac_gpu_usage()
+        if mac is not None:
+            return mac
+
     nvidia = get_nvidia_gpu_usage()
 
     if nvidia is not None:

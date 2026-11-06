@@ -14,3 +14,4 @@ requests
 python-dotenv
 dnspython
 email-validator
+psutil==7.2.2

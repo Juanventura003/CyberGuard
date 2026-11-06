@@ -4,7 +4,6 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  Info,
   Globe2,
   Monitor,
   Wifi,

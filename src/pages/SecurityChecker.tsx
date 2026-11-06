@@ -4,7 +4,6 @@ import {
   KeyRound,
   Phone,
   Mail,
-  Database,
   CheckCircle,
   AlertTriangle,
   XCircle,
