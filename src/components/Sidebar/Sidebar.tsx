@@ -5,6 +5,7 @@ import {
   Mail,
   ShieldCheck,
   Monitor,
+  Activity,
   Bot,
   FileText,
   Newspaper,
@@ -140,6 +141,16 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
         >
           <Monitor size={18} />
           <span>Device Scanner</span>
+        </NavLink>
+       
+        <NavLink
+          to="/system-guardian"
+          className={({ isActive }) =>
+            `nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Activity size={18} />
+          <span>System Guardian</span>
         </NavLink>
 
         <NavLink

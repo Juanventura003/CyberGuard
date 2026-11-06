@@ -12,6 +12,7 @@ const WebsiteTracker = lazy(() => import("./pages/WebsiteTracker"));
 const EmailScanner = lazy(() => import("./pages/EmailScanner"));
 const SecurityChecker = lazy(() => import("./pages/SecurityChecker"));
 const DeviceScanner = lazy(() => import("./pages/DeviceScanner"));
+const SystemGuardian = lazy(() => import("./pages/SystemGuardian"));
 const CyberAssistant = lazy(() => import("./pages/CyberAssistant"));
 const News = lazy(() => import("./pages/News"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -92,6 +93,22 @@ function App() {
                       </div>
                     ) : session ? (
                       <DeviceScanner />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
+                    )
+                  }
+                />
+                
+                {/* System Guardian - Login Required */}
+                <Route
+                  path="/system-guardian"
+                  element={
+                    loading ? (
+                      <div style={{ padding: "32px" }}>
+                        <p>Loading...</p>
+                      </div>
+                    ) : session ? (
+                      <SystemGuardian />
                     ) : (
                       <Navigate to="/dashboard" replace />
                     )
