@@ -577,6 +577,24 @@ const [terminationConfirm, setTerminationConfirm] =
 const [terminationMessage, setTerminationMessage] =
   useState("");
 
+const [terminationMode, setTerminationMode] =
+  useState<"single" | "application">("application");
+
+type ApplicationTerminationCheck = {
+  eligible: boolean;
+  reason: string;
+  processes: {
+    pid: number;
+    name: string;
+    create_time: number;
+    eligible: boolean;
+    reason: string;
+  }[];
+};
+
+const [applicationCheck, setApplicationCheck] =
+  useState<ApplicationTerminationCheck | null>(null);
+
   useEffect(() => {
     let active = true;
     let fetching = false;
@@ -731,15 +749,18 @@ const [terminationMessage, setTerminationMessage] =
   };
 
   const openProcessDetails = async (process: SystemProcess) => {
-    setTerminationCheck(null);
-    setTerminationConfirm(false);
-    setTerminationMessage("");
-    setDetailsLoading(true);
-    setSelectedProcess(null);
-    setSelectedProcessAnalysis(process.analysis);
-    setProcessError("");
+  setTerminationMessage("");
+  setTerminationConfirm(false);
+  setTerminationCheck(null);
+  setApplicationCheck(null);
+  setTerminationMode("application");
 
-    try {
+  setDetailsLoading(true);
+  setSelectedProcess(null);
+  setSelectedProcessAnalysis(process.analysis);
+  setProcessError("");
+
+  try {
       const response = await fetch(
         `${API_URL}/system/processes/${process.pid}`
       );
@@ -824,8 +845,7 @@ const checkProcessTermination = async (
     setTerminationLoading(false);
   }
 };
-
-const confirmProcessTermination = async () => {
+const loadApplicationTerminationCheck = async () => {
   if (
     !selectedProcess ||
     !terminationCheck?.eligible ||
@@ -836,10 +856,11 @@ const confirmProcessTermination = async () => {
 
   setTerminationLoading(true);
   setTerminationMessage("");
+  setApplicationCheck(null);
 
   try {
     const response = await fetch(
-      `${API_URL}/system/processes/terminate`,
+      `${API_URL}/system/processes/application-check`,
       {
         method: "POST",
         headers: {
@@ -853,23 +874,92 @@ const confirmProcessTermination = async () => {
     );
 
     if (!response.ok) {
-      throw new Error("Termination request failed.");
+      throw new Error("Application check failed.");
     }
 
-    const result: TerminationResult =
+    const result: ApplicationTerminationCheck =
       await response.json();
 
-    setTerminationMessage(result.message);
+    setApplicationCheck(result);
+  } catch {
+    setTerminationMessage(
+      "Unable to check related application processes."
+    );
+  } finally {
+    setTerminationLoading(false);
+  }
+};
+
+const confirmProcessTermination = async () => {
+  if (
+    !selectedProcess ||
+    !terminationCheck?.eligible ||
+    terminationCheck.create_time === undefined
+  ) {
+    return;
+  }
+
+  if (
+    terminationMode === "application" &&
+    !applicationCheck?.eligible
+  ) {
+    setTerminationMessage(
+      "Check the related application processes before continuing."
+    );
+    return;
+  }
+
+  setTerminationLoading(true);
+  setTerminationMessage("");
+
+  try {
+    const endpoint =
+      terminationMode === "application"
+        ? `${API_URL}/system/processes/terminate-application`
+        : `${API_URL}/system/processes/terminate`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pid: selectedProcess.pid,
+        create_time: terminationCheck.create_time,
+      }),
+    });
+
+    const result: TerminationResult | null =
+      await response.json();
+
+    if (!result) {
+      setTerminationMessage(
+        "The scanner did not return a termination result."
+      );
+      return;
+    }
+
+    setTerminationMessage(
+      result.message ||
+        "The termination request has completed."
+    );
+
+    if (!response.ok) {
+      return;
+    }
 
     if (result.success) {
       setTerminationConfirm(false);
       setTerminationCheck(null);
+      setApplicationCheck(null);
       setSelectedProcess(null);
       setSelectedProcessAnalysis(null);
+    } else if (terminationMode === "application") {
+      setApplicationCheck(null);
     }
   } catch {
     setTerminationMessage(
-      "Unable to complete the termination request."
+      "Unable to contact the scanner or read its response."
     );
   } finally {
     setTerminationLoading(false);
@@ -1782,6 +1872,85 @@ const confirmProcessTermination = async () => {
                                 <div className="guardian-termination-confirm">
                                   <strong>Are you sure?</strong>
 
+                                  <div className="guardian-termination-modes">
+                                    <label>
+                                      <input
+                                        type="radio"
+                                        name="termination-mode"
+                                        checked={terminationMode === "application"}
+                                        onChange={() => {
+                                          setTerminationMode("application");
+                                          setApplicationCheck(null);
+                                          setTerminationMessage("");
+                                        }}
+                                      />
+                                      <span>
+                                        <strong>Close Entire Application</strong>
+                                        <small>
+                                          Close the selected application and its verified
+                                          related processes.
+                                        </small>
+                                      </span>
+                                    </label>
+
+                                    <label>
+                                      <input
+                                        type="radio"
+                                        name="termination-mode"
+                                        checked={terminationMode === "single"}
+                                        onChange={() => {
+                                          setTerminationMode("single");
+                                          setApplicationCheck(null);
+                                          setTerminationMessage("");
+                                        }}
+                                      />
+                                      <span>
+                                        <strong>End Selected Process Only</strong>
+                                        <small>
+                                          Close only this specific process.
+                                        </small>
+                                      </span>
+                                    </label>
+                                  </div>
+
+                                  {terminationMode === "application" && (
+                                    <div className="guardian-application-preview">
+                                      {!applicationCheck ? (
+                                        <button
+                                          type="button"
+                                          onClick={loadApplicationTerminationCheck}
+                                          disabled={terminationLoading}
+                                        >
+                                          {terminationLoading
+                                            ? "Checking..."
+                                            : "Check Related Processes"}
+                                        </button>
+                                      ) : (
+                                        <>
+                                          <p>{applicationCheck.reason}</p>
+
+                                          <p>
+                                            <strong>
+                                              {applicationCheck.processes.length}
+                                            </strong>{" "}
+                                            related processes identified
+                                          </p>
+
+                                          <ul>
+                                            {applicationCheck.processes.map((proc) => (
+                                              <li key={`${proc.pid}-${proc.create_time}`}>
+                                                {proc.name} (PID {proc.pid}) —{" "}
+                                                {proc.eligible
+                                                  ? "Eligible"
+                                                  : proc.reason}
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+
                                   <p>
                                     <strong>Warning: Unsaved work may be lost.</strong>
                                   </p>
@@ -1805,10 +1974,18 @@ const confirmProcessTermination = async () => {
                                     <button
                                       type="button"
                                       className="guardian-confirm-button"
-                                      disabled={terminationLoading}
+                                      disabled={
+                                        terminationLoading ||
+                                        (terminationMode === "application" &&
+                                          !applicationCheck?.eligible)
+                                      }
                                       onClick={confirmProcessTermination}
                                     >
-                                      Confirm End Process
+                                      {terminationLoading
+                                        ? "Ending..."
+                                        : terminationMode === "application"
+                                        ? "Confirm Close Application"
+                                        : "Confirm End Process"}
                                     </button>
                                   </div>
                                 </div>

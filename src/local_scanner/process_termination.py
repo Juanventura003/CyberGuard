@@ -1,6 +1,8 @@
 import os
 import platform
 import tempfile
+import math
+import threading
 from pathlib import Path
 
 import psutil
@@ -279,3 +281,394 @@ def terminate_eligible_process(
                 "termination."
             ),
         }
+
+APPLICATION_TERMINATION_LOCK = threading.Lock()
+MAX_APPLICATION_PROCESSES = 100
+
+
+def _same_identity(proc, expected_create_time):
+    try:
+        return (
+            abs(
+                proc.create_time()
+                - float(expected_create_time)
+            ) <= 0.001
+        )
+    except (psutil.Error, ValueError, TypeError):
+        return False
+
+
+def _application_executable(proc):
+    try:
+        return os.path.normcase(
+            os.path.realpath(proc.exe())
+        )
+    except (psutil.Error, OSError):
+        return None
+
+
+def _application_group_key(executable):
+    """
+    Use a conservative application identity.
+
+    macOS: the containing .app bundle.
+    Windows: the executable's parent directory.
+
+    This is a grouping hint, not a security guarantee.
+    """
+    path = Path(executable)
+
+    if platform.system() == "Darwin":
+        for part in [path, *path.parents]:
+            if part.name.lower().endswith(".app"):
+                return str(part)
+
+    return str(path.parent)
+
+
+def _find_application_candidates(pid, expected_create_time):
+    """
+    Find the selected process and related descendants.
+
+    Never group unrelated processes solely by name.
+    """
+    selected = psutil.Process(pid)
+
+    if not _same_identity(selected, expected_create_time):
+        raise ValueError("The selected process has changed.")
+
+    selected_executable = _application_executable(selected)
+
+    if not selected_executable:
+        raise ValueError(
+            "The application's executable could not be verified."
+        )
+
+    selected_group = _application_group_key(
+        selected_executable
+    )
+
+    root = selected
+    visited = set()
+
+    while True:
+        if root.pid in visited:
+            break
+
+        visited.add(root.pid)
+
+        try:
+            parent = root.parent()
+
+            if parent is None:
+                break
+
+            parent_executable = _application_executable(
+                parent
+            )
+
+            if not parent_executable:
+                break
+
+            if (
+                _application_group_key(parent_executable)
+                != selected_group
+            ):
+                break
+
+            root = parent
+
+        except psutil.Error:
+            break
+
+    candidates = [root]
+
+    try:
+        descendants = root.children(recursive=True)
+    except psutil.Error:
+        descendants = []
+
+    for child in descendants:
+        executable = _application_executable(child)
+
+        if not executable:
+            continue
+
+        if (
+            _application_group_key(executable)
+            == selected_group
+        ):
+            candidates.append(child)
+
+    unique = {}
+
+    for proc in candidates:
+        try:
+            unique[(proc.pid, proc.create_time())] = proc
+        except psutil.Error:
+            continue
+
+    return list(unique.values())
+
+
+def check_application_termination(
+    pid,
+    expected_create_time,
+):
+    """
+    Preview which related processes can safely
+    be terminated. No process is stopped here.
+    """
+    selected_check = check_termination_eligibility(
+        pid,
+        expected_create_time,
+    )
+
+    if not selected_check["eligible"]:
+        return {
+            "eligible": False,
+            "reason": selected_check["reason"],
+            "processes": [],
+        }
+
+    try:
+        candidates = _find_application_candidates(
+            pid,
+            expected_create_time,
+        )
+
+        if len(candidates) > MAX_APPLICATION_PROCESSES:
+            return {
+                "eligible": False,
+                "reason": (
+                    "Too many related processes were found. "
+                    "No action taken."
+                ),
+                "processes": [],
+            }
+
+        if not candidates:
+            return {
+                "eligible": False,
+                "reason": "No matching processes were found.",
+                "processes": [],
+            }
+
+        preview = []
+
+        for proc in candidates:
+            try:
+                created = proc.create_time()
+                name = proc.name()
+
+                check = check_termination_eligibility(
+                    proc.pid,
+                    created,
+                )
+
+                preview.append({
+                    "pid": proc.pid,
+                    "name": name,
+                    "create_time": created,
+                    "eligible": check["eligible"],
+                    "reason": check["reason"],
+                })
+
+            except psutil.Error:
+                return {
+                    "eligible": False,
+                    "reason": (
+                        "A related process changed during "
+                        "the safety check. No action taken."
+                    ),
+                    "processes": [],
+                }
+
+        blocked = [
+            item for item in preview
+            if not item["eligible"]
+        ]
+
+        if blocked:
+            return {
+                "eligible": False,
+                "reason": (
+                    "At least one related process failed "
+                    "CyberGuard's safety checks. "
+                    "No action taken."
+                ),
+                "processes": preview,
+            }
+
+        return {
+            "eligible": True,
+            "reason": (
+                f"{len(preview)} related process(es) "
+                "passed CyberGuard's safety checks."
+            ),
+            "pid": pid,
+            "create_time": expected_create_time,
+            "processes": preview,
+        }
+
+    except (psutil.Error, ValueError, OSError) as exc:
+        return {
+            "eligible": False,
+            "reason": str(exc),
+            "processes": [],
+        }
+
+
+def terminate_application(
+    pid,
+    expected_create_time,
+):
+    """
+    Terminate the verified application process group.
+
+    Every process is rechecked immediately before
+    termination. Partial outcomes are reported.
+    """
+    if not APPLICATION_TERMINATION_LOCK.acquire(
+        blocking=False
+    ):
+        return {
+            "success": False,
+            "terminated": False,
+            "message": (
+                "Another application termination "
+                "is already in progress."
+            ),
+            "results": [],
+        }
+
+    try:
+        preview = check_application_termination(
+            pid,
+            expected_create_time,
+        )
+
+        if not preview["eligible"]:
+            return {
+                "success": False,
+                "terminated": False,
+                "message": preview["reason"],
+                "results": [],
+            }
+
+        approved = {
+            (item["pid"], item["create_time"])
+            for item in preview["processes"]
+        }
+
+        current = _find_application_candidates(
+            pid,
+            expected_create_time,
+        )
+
+        current_ids = {
+            (proc.pid, proc.create_time())
+            for proc in current
+        }
+
+        if current_ids != approved:
+            return {
+                "success": False,
+                "terminated": False,
+                "message": (
+                    "Application processes changed. "
+                    "Please review and try again."
+                ),
+                "results": [],
+            }
+
+        def depth(proc):
+            count = 0
+
+            try:
+                parent = proc.parent()
+
+                while parent is not None and count < 100:
+                    count += 1
+                    parent = parent.parent()
+
+            except psutil.Error:
+                pass
+
+            return count
+
+        ordered = sorted(
+            current,
+            key=depth,
+            reverse=True,
+        )
+
+        results = []
+
+        for proc in ordered:
+            created = proc.create_time()
+
+            # Recheck existing security restrictions.
+            check = check_termination_eligibility(
+                proc.pid,
+                created,
+            )
+
+            if not check["eligible"]:
+                results.append({
+                    "pid": proc.pid,
+                    "name": preview["processes"][0]["name"],
+                    "success": False,
+                    "message": check["reason"],
+                })
+                continue
+
+            result = terminate_eligible_process(
+                proc.pid,
+                created,
+            )
+
+            results.append({
+                "pid": proc.pid,
+                "name": check["name"],
+                "success": bool(
+                    result.get("success")
+                    and result.get("terminated")
+                ),
+                "message": result.get("message", ""),
+            })
+
+        stopped = sum(
+            1 for item in results if item["success"]
+        )
+
+        total = len(results)
+
+        all_stopped = stopped == total
+
+        return {
+            "success": all_stopped,
+            "terminated": stopped > 0,
+            "name": preview["processes"][0]["name"],
+            "message": (
+                f"Stopped {stopped} of {total} "
+                "related processes."
+            ),
+            "terminated_count": stopped,
+            "total_count": total,
+            "results": results,
+        }
+
+    except (psutil.Error, ValueError, OSError):
+        return {
+            "success": False,
+            "terminated": False,
+            "message": (
+                "Application processes changed or "
+                "could not be accessed."
+            ),
+            "results": [],
+        }
+
+    finally:
+        APPLICATION_TERMINATION_LOCK.release()

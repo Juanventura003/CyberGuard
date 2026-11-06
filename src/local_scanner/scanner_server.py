@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from process_termination import (
     check_termination_eligibility,
     terminate_eligible_process,
+    check_application_termination,
+    terminate_application,
 )
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -323,6 +325,7 @@ def system_check_process_termination(
         request.create_time,
     )
 
+
 @app.post("/system/processes/terminate")
 def system_terminate_process(
     request: TerminationRequest,
@@ -338,6 +341,38 @@ def system_terminate_process(
             request.pid,
             result.get("name") or f"PID {request.pid}",
         )
+
+    return result
+
+@app.post("/system/processes/application-check")
+def system_check_application_termination(
+    request: TerminationRequest,
+    _=Depends(require_local_frontend),
+):
+    return check_application_termination(
+        request.pid,
+        request.create_time,
+    )
+
+
+@app.post("/system/processes/terminate-application")
+def system_terminate_application(
+    request: TerminationRequest,
+    _=Depends(require_local_frontend),
+):
+    result = terminate_application(
+        request.pid,
+        request.create_time,
+    )
+
+    for item in result.get("results", []):
+        if item.get("success"):
+            record_process_termination(
+                item["pid"],
+                item["name"],
+            )
+
+    return result
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8765)
