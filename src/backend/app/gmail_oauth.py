@@ -25,7 +25,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from .config import settings, GMAIL_SCOPES
-from . import session_store
+from . import email_checks, session_store
 
 # Google returns previously granted scopes too (include_granted_scopes), which
 # oauthlib otherwise treats as a fatal "Scope has changed" error.
@@ -162,27 +162,127 @@ def _extract_plain_text(payload: dict) -> str:
     return ""
 
 
+def _extract_bodies(payload: dict) -> tuple[str, str]:
+    """(plain text, HTML) of a message, skipping attachments."""
+    plain, html = [], []
+
+    def walk(part: dict):
+        if part.get("filename"):
+            return  # an attachment, not the message body
+        mime = part.get("mimeType", "")
+        data = part.get("body", {}).get("data")
+        if data and mime == "text/plain":
+            plain.append(_decode_part(data))
+        elif data and mime == "text/html":
+            html.append(_decode_part(data))
+        for child in part.get("parts", []) or []:
+            walk(child)
+
+    walk(payload)
+    return "\n".join(plain), "\n".join(html)
+
+
+# Headers the sender checks use (see email_checks.analyze_sender).
+_CHECKED_HEADERS = {"authentication-results", "reply-to", "return-path", "received-spf"}
+
+
 def get_full_email(session_id: str, message_id: str) -> dict:
     service = _get_gmail_service(session_id)
     msg = service.users().messages().get(userId="me", id=message_id, format="full").execute()
     payload = msg.get("payload", {})
-    headers = {h["name"]: h["value"] for h in payload.get("headers", [])}
+    header_list = payload.get("headers", [])
+    headers = {h["name"]: h["value"] for h in header_list}
 
     raw_from = headers.get("From", "")
     display_name, sender_email = parseaddr(raw_from)
     sender = sender_email or raw_from
 
-    body = _extract_plain_text(payload) or msg.get("snippet", "")
+    plain, html = _extract_bodies(payload)
+    body = plain.strip() or email_checks.html_to_text(html) or msg.get("snippet", "")
     urls = list(dict.fromkeys(URL_RE.findall(body)))  # de-duped, order preserved
+
+    # Every value of the headers we check (some, like Authentication-Results,
+    # can appear more than once), keyed by lower-case name.
+    checked: dict[str, list[str]] = {}
+    for h in header_list:
+        name = h.get("name", "").lower()
+        if name in _CHECKED_HEADERS:
+            checked.setdefault(name, []).append(h.get("value", ""))
 
     return {
         "id": message_id,
         "sender": sender,
         "sender_display": display_name or sender,
+        "display_name": display_name,
         "subject": headers.get("Subject", "(no subject)"),
         "body": body,
         "urls": urls,
+        # Real link destinations and the text shown for them.
+        "links": email_checks.extract_html_links(html),
+        "headers": checked,
     }
+
+
+def _metadata_item(service, message_id: str) -> dict:
+    msg = (
+        service.users().messages()
+        .get(userId="me", id=message_id, format="metadata", metadataHeaders=["From", "Subject", "Date"])
+        .execute()
+    )
+    headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+    return {
+        "id": msg["id"],
+        "sender": headers.get("From", "(unknown sender)"),
+        "subject": headers.get("Subject", "(no subject)"),
+        "date": headers.get("Date", ""),
+        "snippet": msg.get("snippet", ""),
+        "unread": "UNREAD" in msg.get("labelIds", []),
+    }
+
+
+def search_messages(
+    session_id: str,
+    query: str = "",
+    unread_only: bool = False,
+    page_token: str | None = None,
+    limit: int = 50,
+) -> dict:
+    """
+    Inbox messages matching a Gmail search (same syntax as Gmail's search
+    box, e.g. "from:paypal" or "invoice"), newest first, one page at a time.
+    Returns {items, next_page_token}.
+    """
+    service = _get_gmail_service(session_id)
+    limit = max(1, min(limit, 100))
+    q = " ".join(part for part in (query.strip(), "is:unread" if unread_only else "") if part)
+
+    params = {"userId": "me", "maxResults": limit, "labelIds": ["INBOX"]}
+    if q:
+        params["q"] = q
+    if page_token:
+        params["pageToken"] = page_token
+    msg_list = service.users().messages().list(**params).execute()
+    refs = msg_list.get("messages", [])
+
+    items = [_metadata_item(service, ref["id"]) for ref in refs]
+    return {"items": items, "next_page_token": msg_list.get("nextPageToken")}
+
+
+def spam_message(session_id: str, message_id: str) -> None:
+    """Move a message to Spam (and out of the inbox), which also trains Gmail's filter."""
+    service = _get_gmail_service(session_id)
+    try:
+        service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"addLabelIds": ["SPAM"], "removeLabelIds": ["INBOX"]},
+        ).execute()
+    except HttpError as exc:
+        if exc.resp.status == 403:
+            raise PermissionError(
+                "Gmail did not grant permission to move messages to Spam. Please reconnect your Gmail account."
+            ) from exc
+        raise
 
 def trash_message(session_id: str, message_id: str) -> None:
    service = _get_gmail_service(session_id)

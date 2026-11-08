@@ -9,9 +9,14 @@ The model only reads the words of an email, so a few structural checks
 (link domain vs sender domain, high-risk TLDs, requests for credentials) are
 layered on top. They add a small amount of risk and show up as reasons.
 
-analyze_email() returns the same fields as before
-(risk_score, classification, confidence, explanation), so main.py and the
-frontend need no changes.
+email_checks.py adds evidence the wording can't show: where links really go
+(and whether they're on Google Web Risk / OpenPhish), and whether the sender
+is who it claims to be (SPF/DKIM/DMARC, Reply-To, display name, lookalike
+domains).
+
+analyze_email() returns risk_score, classification, confidence and
+explanation as before, plus checks, links, highlights and preview for the
+Email Scanner's result cards.
 """
 
 import re
@@ -19,6 +24,8 @@ import warnings
 from pathlib import Path
 
 import joblib
+
+from . import email_checks
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "phishing_model.pkl"
 
@@ -119,22 +126,71 @@ def _structural_signals(sender: str, body: str, urls: list[str]) -> tuple[float,
     return bonus, reasons
 
 
-def analyze_email(sender: str, subject: str, body: str, urls: list[str] | None = None) -> dict:
+PREVIEW_CHARS = 1500
+# A link on Google Web Risk / OpenPhish makes an email phishing regardless of wording.
+KNOWN_THREAT_MIN_SCORE = 90.0
+
+
+def _preview(body: str) -> str:
+    text = re.sub(r"[ \t]+", " ", body or "")
+    text = re.sub(r"\n\s*\n+", "\n\n", text).strip()
+    return text[:PREVIEW_CHARS] + ("…" if len(text) > PREVIEW_CHARS else "")
+
+
+def analyze_email(
+    sender: str,
+    subject: str,
+    body: str,
+    urls: list[str] | None = None,
+    *,
+    links: list[dict] | None = None,
+    headers: dict[str, list[str]] | None = None,
+    display_name: str = "",
+) -> dict:
+    """
+    urls: addresses written in the email; links: [{href, text}] from its HTML;
+    headers: lower-case header name -> values (Gmail only); display_name: the
+    name shown with the sender address.
+    """
     urls = urls or []
     subject, body = subject or "", body or ""
     text = _normalize(subject, body)
 
+    # Evidence beyond the wording: links and the sender (see email_checks.py).
+    link_info = email_checks.analyze_links(links or [], urls, email_checks.domain_of(sender))
+    sender_info = email_checks.analyze_sender(sender, display_name, headers)
+    checks = sender_info["checks"] + link_info["checks"]
+    extra = {
+        "checks": checks,
+        "links": link_info["reports"],
+        "preview": _preview(body),
+    }
+
     if not text:
+        if link_info["known_threat"]:
+            return {
+                "risk_score": KNOWN_THREAT_MIN_SCORE,
+                "classification": "PHISHING",
+                "confidence": 0.95,
+                "explanation": ["This email links to an address listed as phishing or malware."],
+                "highlights": [],
+                **extra,
+            }
         return {
             "risk_score": 0.0,
             "classification": "SAFE",
             "confidence": 0.0,
             "explanation": ["This email has no readable text, so the model could not analyze it."],
+            "highlights": [],
+            **extra,
         }
 
     phishing_proba = float(_model.predict_proba([text])[0][1])
     bonus, structural_reasons = _structural_signals(sender, body, urls)
+    bonus += link_info["bonus"] + sender_info["bonus"]
     risk_score = max(0.0, min(100.0, phishing_proba * 100 * 0.85 + bonus))
+    if link_info["known_threat"]:
+        risk_score = max(risk_score, KNOWN_THREAT_MIN_SCORE)
 
     if risk_score <= SAFE_MAX:
         classification = "SAFE"
@@ -155,6 +211,8 @@ def analyze_email(sender: str, subject: str, body: str, urls: list[str] | None =
             explanation.append(f"Wording most associated with phishing in this email: {quoted}.")
         else:
             explanation.append(f"Wording that matches legitimate email patterns: {quoted}.")
+    # The strongest sender/link findings, in plain words, after the model's view.
+    explanation.extend(c["detail"] for c in checks if c["status"] == "fail")
     explanation.extend(structural_reasons)
 
     return {
@@ -162,4 +220,7 @@ def analyze_email(sender: str, subject: str, body: str, urls: list[str] | None =
         "classification": classification,
         "confidence": round(max(phishing_proba, 1 - phishing_proba), 3),
         "explanation": explanation,
+        # Words to highlight in the email preview (only when they point to phishing).
+        "highlights": _key_phrases(text, toward_phishing=True, n=8) if risk_score > SAFE_MAX else [],
+        **extra,
     }
