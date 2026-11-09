@@ -36,6 +36,26 @@ class GmailTrashResponse(BaseModel):
    failed: list[GmailTrashFailure]
 
 
+class EmailCheck(BaseModel):
+    """One row of a result's sender/link checks."""
+    id: str
+    label: str
+    status: Literal["pass", "warn", "fail", "info"]
+    detail: str
+
+
+class EmailLinkReport(BaseModel):
+    """A risky link found in an email."""
+    url: str
+    host: str
+    text: str = ""
+    displayed_host: str | None = None
+    mismatch: bool = False
+    verdict: Literal["dangerous", "suspicious", "ok"]
+    threats: list[str] = []
+    reasons: list[str] = []
+
+
 class EmailResult(BaseModel):
     source: str  # "manual" | "gmail"
     id: str | None = None
@@ -46,6 +66,10 @@ class EmailResult(BaseModel):
     confidence: float
     explanation: list[str]
     error: str | None = None
+    checks: list[EmailCheck] = []
+    links: list[EmailLinkReport] = []
+    highlights: list[str] = []
+    preview: str | None = None
 
 
 class GmailHeaderItem(BaseModel):
@@ -54,6 +78,17 @@ class GmailHeaderItem(BaseModel):
     subject: str
     date: str
     snippet: str
+    unread: bool = False
+
+
+class GmailSearchResponse(BaseModel):
+    items: list[GmailHeaderItem]
+    next_page_token: str | None = None
+
+
+class GmailSpamResponse(BaseModel):
+    moved: list[str]
+    failed: list[GmailTrashFailure]
 
 
 class WebsiteAnalyzeRequest(BaseModel):

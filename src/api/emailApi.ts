@@ -14,6 +14,27 @@ export interface GmailHeaderItem {
   subject: string;
   date: string;
   snippet: string;
+  unread?: boolean;
+}
+
+/** One row of a result's sender/link checks. */
+export interface EmailCheck {
+  id: string;
+  label: string;
+  status: "pass" | "warn" | "fail" | "info";
+  detail: string;
+}
+
+/** A risky link found in an email: what it shows vs. where it really goes. */
+export interface EmailLinkReport {
+  url: string;
+  host: string;
+  text: string;
+  displayed_host: string | null;
+  mismatch: boolean;
+  verdict: "dangerous" | "suspicious" | "ok";
+  threats: string[];
+  reasons: string[];
 }
 
 export interface EmailResult {
@@ -26,6 +47,11 @@ export interface EmailResult {
   confidence: number;
   explanation: string[];
   error?: string | null;
+  checks?: EmailCheck[];
+  links?: EmailLinkReport[];
+  /** Words in the email that point to phishing, for highlighting in the preview. */
+  highlights?: string[];
+  preview?: string | null;
 }
 
 export interface WebsiteHistoryEntry {
@@ -133,6 +159,26 @@ export function listGmailMessages(
   ).then((r) => asJson<GmailHeaderItem[]>(r));
 }
 
+export interface GmailSearchPage {
+  items: GmailHeaderItem[];
+  next_page_token: string | null;
+}
+
+/** One page of inbox messages matching a Gmail search ("from:paypal",
+ * "invoice", …). Pass the previous page's next_page_token to load more. */
+export function searchGmailMessages(
+  session: string,
+  options: { query?: string; unreadOnly?: boolean; pageToken?: string | null; limit?: number } = {},
+): Promise<GmailSearchPage> {
+  const params = new URLSearchParams({ session, limit: String(options.limit ?? 50) });
+  if (options.query?.trim()) params.set("q", options.query.trim());
+  if (options.unreadOnly) params.set("unread", "true");
+  if (options.pageToken) params.set("page_token", options.pageToken);
+  return fetch(`${API_BASE}/api/email/gmail/search?${params}`).then((r) =>
+    asJson<GmailSearchPage>(r),
+  );
+}
+
 /** JSON headers, plus the CyberGuard login token when signed in so the
  * backend can create Security Alerts for the scan's risky findings. */
 function scanHeaders(accessToken?: string | null): Record<string, string> {
@@ -169,6 +215,23 @@ export function trashGmailMessages(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session, message_ids: messageIds }),
   }).then((r) => asJson<GmailTrashResponse>(r));
+}
+
+export interface GmailSpamResponse {
+  moved: string[];
+  failed: { id: string; error: string }[];
+}
+
+/** Moves messages to Gmail's Spam folder, which also teaches Gmail's own filter. */
+export function spamGmailMessages(
+  session: string,
+  messageIds: string[],
+): Promise<GmailSpamResponse> {
+  return fetch(`${API_BASE}/api/email/gmail/spam`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session, message_ids: messageIds }),
+  }).then((r) => asJson<GmailSpamResponse>(r));
 }
 
 export function analyzeManualEmails(
