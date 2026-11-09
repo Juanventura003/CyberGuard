@@ -20,6 +20,7 @@ import {
   isTodayIso,
   listEmailScans,
   listSecurityScans,
+  syncEmailScans,
   type EmailScanEntry,
   type ScanFinding,
   type SecurityScanEntry,
@@ -111,6 +112,8 @@ function LoggedInDashboard() {
 
   useEffect(() => {
     refreshLocalActivity();
+    // Email scans are saved to the account; pull in ones from other devices.
+    if (userId) void syncEmailScans(userId);
     const onActivity = () => refreshLocalActivity();
     window.addEventListener(SCAN_ACTIVITY_EVENT, onActivity);
     window.addEventListener("storage", onActivity);

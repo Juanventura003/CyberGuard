@@ -1,4 +1,5 @@
 import logging
+from email.utils import parseaddr
 from googleapiclient.errors import HttpError
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ from .schemas import (
     GmailTrashResponse,
     EmailResult,
     GmailHeaderItem,
+    GmailSearchResponse,
+    GmailSpamResponse,
     WebsiteAnalyzeRequest,
     WebsiteAnalyzeResponse,
     WebsiteHistoryEntry,
@@ -829,7 +832,11 @@ def batch_analyze_manual(
     results = []
     new_alerts = []
     for item in payload.emails:
-        scored = phishing_detector.analyze_email(item.sender, item.subject, item.body, item.urls)
+        # "Name <address>" pasted as the sender: check the name too.
+        display_name, _ = parseaddr(item.sender)
+        scored = phishing_detector.analyze_email(
+            item.sender, item.subject, item.body, item.urls, display_name=display_name,
+        )
         result = EmailResult(
             source="manual", id=None, sender=item.sender, subject=item.subject or "(no subject)", **scored,
         )
@@ -892,6 +899,23 @@ def gmail_list(session: str = Query(...), limit: int = Query(50, le=100)):
         raise HTTPException(status_code=401, detail=str(exc))
     except Exception as exc:  # Gmail API errors, expired refresh token, etc.
         raise HTTPException(status_code=502, detail=f"Could not read Gmail inbox: {exc}")
+
+@app.get("/api/email/gmail/search", response_model=GmailSearchResponse)
+def gmail_search(
+    session: str = Query(...),
+    q: str = Query("", max_length=200),
+    unread: bool = Query(False),
+    page_token: str | None = Query(None, max_length=200),
+    limit: int = Query(50, ge=1, le=100),
+):
+    """Inbox messages matching a Gmail search, one page at a time (for "Load more")."""
+    try:
+        return gmail_oauth.search_messages(session, q, unread, page_token, limit)
+    except LookupError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except Exception as exc:  # Gmail API errors, expired refresh token, etc.
+        raise HTTPException(status_code=502, detail=f"Could not read Gmail inbox: {exc}")
+
 
 @app.get("/api/security/gmail/attachments")
 def gmail_attachment_list(
@@ -996,7 +1020,12 @@ async def gmail_analyze(
                     explanation=[], error=f"Could not fetch this message: {exc}",
                 )
 
-            scored = phishing_detector.analyze_email(full["sender"], full["subject"], full["body"], full["urls"])
+            # In a worker thread: link reputation lookups can wait on Google.
+            scored = await asyncio.to_thread(
+                phishing_detector.analyze_email,
+                full["sender"], full["subject"], full["body"], full["urls"],
+                links=full["links"], headers=full["headers"], display_name=full["display_name"],
+            )
             return EmailResult(source="gmail", id=message_id, sender=full["sender"], subject=full["subject"], **scored)
 
     results = await asyncio.gather(*(fetch_and_score(mid) for mid in payload.message_ids))
@@ -1007,6 +1036,30 @@ async def gmail_analyze(
         [alerts.email_alert(r.model_dump(), gmail_message_id=r.id) for r in results],
     )
     return results
+
+
+@app.post("/api/email/gmail/spam", response_model=GmailSpamResponse)
+async def gmail_spam(payload: GmailTrashRequest):
+    """Move messages to Gmail's Spam folder (also teaches Gmail's own filter)."""
+    semaphore = asyncio.Semaphore(8)
+
+    async def move(message_id: str) -> str | None:
+        async with semaphore:
+            try:
+                await asyncio.to_thread(gmail_oauth.spam_message, payload.session, message_id)
+            except LookupError as exc:
+                raise HTTPException(status_code=401, detail=str(exc))
+            except PermissionError as exc:
+                raise HTTPException(status_code=403, detail=str(exc))
+            except Exception as exc:
+                return f"Could not move this message to Spam: {exc}"
+            return None
+
+    errors = await asyncio.gather(*(move(mid) for mid in payload.message_ids))
+    return GmailSpamResponse(
+        moved=[mid for mid, err in zip(payload.message_ids, errors) if err is None],
+        failed=[{"id": mid, "error": err} for mid, err in zip(payload.message_ids, errors) if err is not None],
+    )
 
 
 @app.post("/api/email/gmail/trash", response_model=GmailTrashResponse)

@@ -32,6 +32,8 @@ __pycache__/
 *.pyc
 .env
 
+src/backend/ml/phishing_email.csv
+
 # Downloaded browser-extension threat intelligence
 src/backend/.cache/
 
