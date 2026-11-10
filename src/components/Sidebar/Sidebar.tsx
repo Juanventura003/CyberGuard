@@ -27,7 +27,7 @@ type SidebarProps = {
 
 function Sidebar({ onLogin, onSignUp }: SidebarProps) {
   const { session, signOut } = useAuth();
-  const { displayName } = useProfile();
+  const { displayName, profile } = useProfile();
 
   const handleLogout = async () => {
     await signOut();
@@ -49,6 +49,7 @@ function Sidebar({ onLogin, onSignUp }: SidebarProps) {
           <div className="sidebar-user">
             <div className="sidebar-user-info">
               <div className="sidebar-profile-icon">
+                {profile?.avatar_url && <img src={profile.avatar_url} alt="" />}
               </div>
 
               <div className="sidebar-user-text">

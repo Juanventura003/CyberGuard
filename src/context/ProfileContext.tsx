@@ -6,18 +6,26 @@ export interface Profile {
   first_name: string | null;
   last_name: string | null;
   username: string | null;
+  avatar_url: string | null;
 }
 
 interface ProfileContextType {
   profile: Profile | null;
   displayName: string;
-  setProfile: (profile: Profile) => void;
+  setProfile: (changes: Partial<Profile>) => void;
 }
 
 interface LoadedProfile {
   userId: string;
   profile: Profile | null;
 }
+
+const EMPTY_PROFILE: Profile = {
+  first_name: null,
+  last_name: null,
+  username: null,
+  avatar_url: null,
+};
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
@@ -34,7 +42,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     const loadProfile = async () => {
       const { data } = await client
         .from("profiles")
-        .select("first_name, last_name, username")
+        .select("first_name, last_name, username, avatar_url")
         .eq("id", userId)
         .maybeSingle();
 
@@ -50,9 +58,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const profile = loaded && loaded.userId === userId ? loaded.profile : null;
 
-  const setProfile = (next: Profile) => {
+  const setProfile = (changes: Partial<Profile>) => {
     if (!userId) return;
-    setLoaded({ userId, profile: next });
+    setLoaded((previous) => ({
+      userId,
+      profile: {
+        ...EMPTY_PROFILE,
+        ...(previous && previous.userId === userId ? previous.profile : null),
+        ...changes,
+      },
+    }));
   };
 
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ");

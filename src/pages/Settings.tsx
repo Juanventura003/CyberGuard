@@ -11,6 +11,7 @@ import {
   showDesktopNotification,
   type DesktopPermission,
 } from "../lib/alertNotifications";
+import ProfilePictureCard from "../components/ProfilePictureCard";
 import "./Settings.css";
 
 const NOT_CONFIGURED = "Supabase is not configured, so this action is unavailable.";
@@ -864,6 +865,14 @@ function Settings() {
           />
         </section>
       )}
+
+      <section className="settings-card">
+        <h2>Profile picture</h2>
+        <p className="settings-card-desc">
+          Add a photo so people can recognize you. PNG, JPEG or WebP, up to 2 MB.
+        </p>
+        <ProfilePictureCard />
+      </section>
 
       <section className="settings-card">
         <h2>Email address</h2>

@@ -125,3 +125,16 @@
   background-color: #4169e1;
   color: #ffffff;
 }
+
+/* profile picture in the signed-in box */
+.sidebar-profile-icon {
+  overflow: hidden;
+}
+
+.sidebar-profile-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
