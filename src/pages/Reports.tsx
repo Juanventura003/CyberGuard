@@ -54,6 +54,7 @@ type ReportSource =
   | "website_history"
   | "email_scanner"
   | "security_checker"
+  | "device_scanner"
   | "news";
 
 type ReportItem = {
@@ -115,7 +116,7 @@ const CATEGORIES: {
     id: "devices",
     label: "Device scans",
     icon: Laptop,
-    description: "Device security assessments",
+    description: "Device Scanner security assessments",
   },
   {
     id: "news",
@@ -137,6 +138,7 @@ const SOURCE_LABELS: Record<ReportSource, string> = {
   website_history: "Website Tracker history",
   email_scanner: "Email Scanner activity",
   security_checker: "Security Checker activity",
+  device_scanner: "Device Scanner activity",
   news: "News reading activity",
 };
 
@@ -145,6 +147,14 @@ const SECURITY_CATEGORY: Record<SecurityScanEntry["checkType"], Category> = {
   password: "passwords",
   phone: "phones",
   email_address: "addresses",
+  device: "devices",
+};
+
+const securitySourceOf = (
+  checkType: SecurityScanEntry["checkType"],
+): ReportSource => {
+  if (checkType === "device") return "device_scanner";
+  return "security_checker";
 };
 
 const riskOf = (risk: WebsiteHistoryEntry["risk_level"]): Finding => {
@@ -209,7 +219,7 @@ const securityToReportItem = (entry: SecurityScanEntry): ReportItem => {
     detail: isPassword ? "Password value not stored in report" : entry.detail,
     finding: entry.finding,
     occurredAt: entry.occurredAt,
-    source: "security_checker",
+    source: securitySourceOf(entry.checkType),
     passwordStrength: isPassword ? passwordStrengthOf(entry) : undefined,
     notes: isPassword
       ? [
@@ -879,7 +889,7 @@ function ReportsContent() {
                   {loading
                     ? "Gathering recent activity…"
                     : items.length === 0
-                      ? "Scan emails, check security items, or use Website Tracker to start building this report."
+                      ? "Scan emails, run Device Scanner, check security items, or use Website Tracker — activity appears here automatically."
                       : "Try a different period or clear your search."}
                 </p>
               </div>

@@ -35,10 +35,17 @@ type PendingEmailScan = {
   source: string;
 };
 
+export type SecurityCheckType =
+  | "password"
+  | "phone"
+  | "file"
+  | "email_address"
+  | "device";
+
 export type SecurityScanEntry = {
   id: string;
   kind: "security";
-  checkType: "password" | "phone" | "file" | "email_address";
+  checkType: SecurityCheckType;
   title: string;
   detail: string;
   finding: ScanFinding;

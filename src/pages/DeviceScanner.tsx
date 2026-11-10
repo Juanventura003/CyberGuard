@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Monitor,
   ShieldCheck,
@@ -13,6 +13,11 @@ import {
   Info,
 } from "lucide-react";
 
+import { useAuth } from "../context/AuthContext";
+import {
+  recordSecurityScan,
+  type ScanFinding,
+} from "../lib/scanActivity";
 import "./DeviceScanner.css";
 
 type ScanStatus = "checking" | "ready" | "unavailable" | "scanning";
@@ -94,7 +99,61 @@ function statusClass(status?: string) {
   return "neutral";
 }
 
+function deviceFindingFromResult(data: SecurityResult): ScanFinding {
+  const statuses = [
+    data.antivirus?.status,
+    data.firewall?.status,
+    data.threats?.status,
+    data.gatekeeper?.status,
+    data.sip?.status,
+    data.filevault?.status,
+    data.xprotect?.status,
+  ].filter(Boolean);
+
+  if (
+    statuses.some(
+      (status) =>
+        status === "warning" ||
+        status === "threats_found" ||
+        status === "completed_with_errors",
+    )
+  ) {
+    return "high";
+  }
+  if (statuses.some((status) => status === "unknown" || status === "not_scanned")) {
+    return "unverified";
+  }
+  if (
+    statuses.length > 0 &&
+    statuses.every((status) => status === "protected" || status === "clean")
+  ) {
+    return "safe";
+  }
+  return "unverified";
+}
+
+function malwareFindingFromResult(data: MalwareResult): ScanFinding {
+  if (data.status === "threats_found") return "high";
+  if (data.status === "completed_with_errors") return "suspicious";
+  if (data.status === "clean") return "safe";
+  return "unverified";
+}
+
+function malwareScanLabel(mode?: string) {
+  if (mode === "quick") return "Quick malware scan";
+  if (mode === "custom") return "Custom malware scan";
+  if (mode === "full") return "Full malware scan";
+  return "Malware scan";
+}
+
+function folderDisplayName(folder?: string) {
+  if (!folder) return null;
+  const parts = folder.replace(/\\/g, "/").split("/").filter(Boolean);
+  return parts[parts.length - 1] || folder;
+}
+
 function DeviceScanner() {
+  const { session } = useAuth();
   const [operatingSystem, setOperatingSystem] = useState("Detecting...");
   const [scanStatus, setScanStatus] = useState<ScanStatus>("unavailable");
   const [scanResults, setScanResults] = useState<SecurityResult | null>(null);
@@ -110,6 +169,8 @@ function DeviceScanner() {
 
   const [scanFolder, setScanFolder] = useState("");
   const [folderPicking, setFolderPicking] = useState(false);
+  const recordedMalwareKey = useRef<string | null>(null);
+  const previousMalwareStatus = useRef<string | null>(null);
 
   useEffect(() => {
     const platform = navigator.userAgent;
@@ -188,6 +249,19 @@ function DeviceScanner() {
       setScanResults(data);
       setLastChecked(new Date());
       setScanStatus("ready");
+
+      const finding = deviceFindingFromResult(data);
+      const summary = [
+        `Antivirus: ${statusLabel(data.antivirus?.status)}`,
+        `Firewall: ${statusLabel(data.firewall?.status)}`,
+        `Threats: ${statusLabel(data.threats?.status)}`,
+      ].join(" · ");
+      recordSecurityScan(session?.user.id, {
+        checkType: "device",
+        title: `${operatingSystem || "Device"} security scan`,
+        detail: summary,
+        finding,
+      });
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Security check failed."
@@ -215,6 +289,62 @@ function DeviceScanner() {
     const interval = window.setInterval(() => void refresh(), 1000);
     return () => { active = false; window.clearInterval(interval); };
   }, [scanStatus,]);
+
+  useEffect(() => {
+    if (!malware) return;
+
+    const previous = previousMalwareStatus.current;
+    previousMalwareStatus.current = malware.status;
+
+    const completed = ["clean", "threats_found", "completed_with_errors"].includes(
+      malware.status,
+    );
+    const cameFromScan =
+      previous === "scanning" || previous === "cancelling";
+
+    if (!completed || !cameFromScan) {
+      if (malware.status === "scanning") {
+        recordedMalwareKey.current = null;
+      }
+      return;
+    }
+
+    const key = [
+      malware.status,
+      malware.scan_mode ?? "",
+      malware.scan_folder ?? "",
+      String(malware.scanned_files ?? ""),
+      String(malware.infected_files ?? ""),
+      String(malware.duration_seconds ?? ""),
+    ].join("|");
+
+    if (recordedMalwareKey.current === key) return;
+    recordedMalwareKey.current = key;
+
+    const modeLabel = malwareScanLabel(malware.scan_mode);
+    const folderName = folderDisplayName(malware.scan_folder);
+    const title = folderName
+      ? `${modeLabel}: ${folderName}`
+      : modeLabel;
+
+    const detailParts = [
+      malware.details,
+      typeof malware.scanned_files === "number"
+        ? `${malware.scanned_files} scanned`
+        : null,
+      typeof malware.infected_files === "number"
+        ? `${malware.infected_files} infected`
+        : null,
+      malware.scan_folder ? `Path: ${malware.scan_folder}` : null,
+    ].filter(Boolean);
+
+    recordSecurityScan(session?.user.id, {
+      checkType: "device",
+      title,
+      detail: detailParts.join(" · "),
+      finding: malwareFindingFromResult(malware),
+    });
+  }, [malware, session?.user.id]);
 
   const chooseScanFolder = async () => {
     setMalwareError("");
@@ -249,6 +379,7 @@ function DeviceScanner() {
   const startMalwareScan = async () => {
     setMalwareError("");
     setMalwareBusy(true);
+    recordedMalwareKey.current = null;
     try {
       const response = await fetch(`${SCANNER_URL}/scan-malware`, {
         method: "POST",
