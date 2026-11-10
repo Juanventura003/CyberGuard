@@ -30,6 +30,7 @@ export interface NewsActivity {
   article: NewsArticle;
   saved: boolean;
   read: boolean;
+  updated_at?: string | null;
 }
 
 export async function fetchNewsActivity(
@@ -39,7 +40,7 @@ export async function fetchNewsActivity(
 
   const { data, error } = await supabase
     .from("news_activity")
-    .select("article, saved, read")
+    .select("article, saved, read, updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 

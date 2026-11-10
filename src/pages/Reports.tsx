@@ -25,7 +25,16 @@ import {
 } from "lucide-react";
 
 import { listWebsiteHistory, type WebsiteHistoryEntry } from "../api/emailApi";
+import { fetchNewsActivity } from "../api/newsApi";
 import { useAuth } from "../context/AuthContext";
+import {
+  SCAN_ACTIVITY_EVENT,
+  listEmailScans,
+  listSecurityScans,
+  syncEmailScans,
+  type EmailScanEntry,
+  type SecurityScanEntry,
+} from "../lib/scanActivity";
 import "./Reports.css";
 
 type Category =
@@ -46,6 +55,12 @@ type RiskFinding = "safe" | "suspicious" | "high";
 
 type Range = "today" | "yesterday" | "7days" | "30days" | "all" | "custom";
 
+type ReportSource =
+  | "website_history"
+  | "email_scanner"
+  | "security_checker"
+  | "news";
+
 type ReportItem = {
   id: string;
   category: Category;
@@ -53,7 +68,7 @@ type ReportItem = {
   detail: string;
   finding: Finding;
   occurredAt: string;
-  source: "live" | "demo";
+  source: ReportSource;
   score?: number;
   notes?: string[];
   passwordStrength?: "strong" | "moderate" | "weak";
@@ -138,186 +153,91 @@ const FINDINGS: Record<Finding, string> = {
 
 const RISK_CATEGORIES: RiskFinding[] = ["safe", "suspicious", "high"];
 
-const daysAgo = (days: number, hour: number, minute: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  date.setHours(hour, minute, 0, 0);
-  return date.toISOString();
+const SOURCE_LABELS: Record<ReportSource, string> = {
+  website_history: "Website Tracker history",
+  email_scanner: "Email Scanner activity",
+  security_checker: "Security Checker activity",
+  news: "News reading activity",
 };
 
-// Temporary sample data.
-const DEMO: ReportItem[] = [
-  {
-    id: "demo-w1",
-    category: "websites",
-    title: "github.com",
-    detail: "Website visit analyzed",
-    finding: "safe",
-    occurredAt: daysAgo(0, 10, 42),
-    source: "demo",
-    score: 5,
-    notes: ["No known threat indicators detected."],
-  },
-  {
-    id: "demo-w2",
-    category: "websites",
-    title: "suspicious-download.example",
-    detail: "Potentially unsafe website",
-    finding: "high",
-    occurredAt: daysAgo(0, 10, 15),
-    source: "demo",
-    score: 92,
-    notes: ["Illustrative high-risk detection."],
-  },
-  {
-    id: "demo-w3",
-    category: "websites",
-    title: "wikipedia.org",
-    detail: "Website visit analyzed",
-    finding: "safe",
-    occurredAt: daysAgo(0, 9, 31),
-    source: "demo",
-    score: 2,
-  },
-  {
-    id: "demo-e1",
-    category: "emails",
-    title: "Account verification request",
-    detail: "Sender: notifications@example.com",
-    finding: "suspicious",
-    occurredAt: daysAgo(0, 11, 20),
-    source: "demo",
-    notes: [
-      "Example phishing-language indicators found.",
-      "Do not open unexpected verification links.",
-    ],
-  },
-  {
-    id: "demo-e2",
-    category: "emails",
-    title: "Project meeting update",
-    detail: "Email content analyzed",
-    finding: "safe",
-    occurredAt: daysAgo(0, 8, 50),
-    source: "demo",
-  },
-  {
-    id: "demo-l1",
-    category: "links",
-    title: "https://example.com/login",
-    detail: "URL reputation check",
-    finding: "safe",
-    occurredAt: daysAgo(0, 12, 5),
-    source: "demo",
-  },
-  {
-    id: "demo-l2",
-    category: "links",
-    title: "https://suspicious-link.example",
-    detail: "URL reputation check",
-    finding: "high",
-    occurredAt: daysAgo(0, 11, 2),
-    source: "demo",
-  },
-  {
-    id: "demo-f1",
-    category: "files",
-    title: "project-document.pdf",
-    detail: "File safety scan",
-    finding: "safe",
-    occurredAt: daysAgo(0, 10, 20),
-    source: "demo",
-  },
-  {
-    id: "demo-f2",
-    category: "files",
-    title: "installer.exe",
-    detail: "Executable inspection",
-    finding: "suspicious",
-    occurredAt: daysAgo(0, 8, 45),
-    source: "demo",
-  },
-  {
-    id: "demo-p1",
-    category: "passwords",
-    title: "Password strength assessment",
-    detail: "Password value not stored in report",
-    finding: "suspicious",
-    passwordStrength: "weak",
-    occurredAt: daysAgo(0, 11, 50),
-    source: "demo",
-    notes: [
-      "Password strength: Weak",
-      "Consider using a longer, unique password.",
-    ],
-  },
-  {
-    id: "demo-ph1",
-    category: "phones",
-    title: "Phone reputation lookup",
-    detail: "Number ending in ••42",
-    finding: "safe",
-    occurredAt: daysAgo(0, 9, 20),
-    source: "demo",
-  },
-  {
-    id: "demo-a1",
-    category: "addresses",
-    title: "Email exposure lookup",
-    detail: "Address: d•••@example.com",
-    finding: "safe",
-    occurredAt: daysAgo(0, 9, 10),
-    source: "demo",
-  },
-  {
-    id: "demo-b1",
-    category: "breaches",
-    title: "Breach database lookup",
-    detail: "Example account exposure review",
-    finding: "high",
-    breachFound: true,
-    occurredAt: daysAgo(0, 9, 0),
-    source: "demo",
-    notes: [
-      "Email address appeared in a known data breach.",
-      "Consider changing passwords for affected accounts.",
-      "Enable two-factor authentication where available.",
-    ],
-  },
-  {
-    id: "demo-d1",
-    category: "devices",
-    title: "Windows security assessment",
-    detail: "Device scan completed",
-    finding: "safe",
-    occurredAt: daysAgo(0, 10, 0),
-    source: "demo",
-  },
-  {
-    id: "demo-n1",
-    category: "news",
-    title: "Understanding phishing campaigns",
-    detail: "Cybersecurity article viewed",
-    finding: "info",
-    occurredAt: daysAgo(0, 9, 25),
-    source: "demo",
-  },
-  {
-    id: "demo-n2",
-    category: "news",
-    title: "How to protect online accounts",
-    detail: "Cybersecurity article viewed",
-    finding: "info",
-    occurredAt: daysAgo(1, 14, 5),
-    source: "demo",
-  },
-];
+const SECURITY_CATEGORY: Record<SecurityScanEntry["checkType"], Category> = {
+  file: "files",
+  password: "passwords",
+  phone: "phones",
+  email_address: "addresses",
+};
 
 const riskOf = (risk: WebsiteHistoryEntry["risk_level"]): Finding => {
   if (risk === "HIGH_RISK") return "high";
   if (risk === "SUSPICIOUS") return "suspicious";
   if (risk === "NO_KNOWN_THREAT") return "safe";
   return "unverified";
+};
+
+const passwordStrengthOf = (
+  entry: SecurityScanEntry,
+): "strong" | "moderate" | "weak" => {
+  const detail = entry.detail.toLowerCase();
+  if (detail.includes("strong") || detail.includes("good")) return "strong";
+  if (detail.includes("fair")) return "moderate";
+  if (detail.includes("weak")) return "weak";
+  if (entry.finding === "safe") return "strong";
+  if (entry.finding === "suspicious") return "moderate";
+  return "weak";
+};
+
+const websiteToReportItem = (entry: WebsiteHistoryEntry): ReportItem => ({
+  id: `website-${entry.id}`,
+  category: "websites",
+  title: entry.domain || entry.url,
+  detail: entry.url,
+  finding: riskOf(entry.risk_level),
+  occurredAt: entry.visited_at,
+  source: "website_history",
+  score:
+    typeof entry.risk_score === "number"
+      ? Math.round(entry.risk_score)
+      : undefined,
+  notes: [
+    ...(entry.threat_types ?? []).map(
+      (t) => `Threat type: ${t.replaceAll("_", " ")}`,
+    ),
+    ...(entry.explanation ?? []),
+  ],
+});
+
+const emailToReportItem = (entry: EmailScanEntry): ReportItem => ({
+  id: `email-${entry.id}`,
+  category: "emails",
+  title: entry.title,
+  detail: entry.detail.startsWith("Sender:")
+    ? entry.detail
+    : `Sender: ${entry.detail}`,
+  finding: entry.finding,
+  occurredAt: entry.occurredAt,
+  source: "email_scanner",
+});
+
+const securityToReportItem = (entry: SecurityScanEntry): ReportItem => {
+  const category = SECURITY_CATEGORY[entry.checkType];
+  const isPassword = entry.checkType === "password";
+
+  return {
+    id: `security-${entry.id}`,
+    category,
+    title: entry.title,
+    detail: isPassword ? "Password value not stored in report" : entry.detail,
+    finding: entry.finding,
+    occurredAt: entry.occurredAt,
+    source: "security_checker",
+    passwordStrength: isPassword ? passwordStrengthOf(entry) : undefined,
+    notes: isPassword
+      ? [
+          `Password strength: ${entry.detail}`,
+          "The original password is not stored.",
+        ]
+      : undefined,
+  };
 };
 
 const dateText = (iso: string) =>
@@ -339,22 +259,12 @@ const inRange = (iso: string, range: Range, start: string, end: string) => {
 
   const today = dayStart(new Date());
 
-  if (range === "today") {
-    return value >= today;
-  }
-
+  if (range === "today") return value >= today;
   if (range === "yesterday") {
     return value >= today - 86400000 && value < today;
   }
-
-  if (range === "7days") {
-    return value >= today - 6 * 86400000;
-  }
-
-  if (range === "30days") {
-    return value >= today - 29 * 86400000;
-  }
-
+  if (range === "7days") return value >= today - 6 * 86400000;
+  if (range === "30days") return value >= today - 29 * 86400000;
   if (!start || !end) return false;
 
   return (
@@ -385,13 +295,14 @@ export default function Reports() {
 
 function ReportsContent() {
   const { session } = useAuth();
+  const userId = session?.user.id;
 
-  const [live, setLive] = useState<ReportItem[]>([]);
+  const [websites, setWebsites] = useState<ReportItem[]>([]);
+  const [emails, setEmails] = useState<ReportItem[]>([]);
+  const [security, setSecurity] = useState<ReportItem[]>([]);
+  const [news, setNews] = useState<ReportItem[]>([]);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(Boolean(session?.access_token));
-
-  // Keep temporary records enabled until other report APIs exist.
-  const showDemo = true;
 
   const [range, setRange] = useState<Range>("today");
   const [start, setStart] = useState("");
@@ -404,51 +315,91 @@ function ReportsContent() {
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  // Load actual Website Tracker history.
+  const refreshLocalActivity = () => {
+    if (!userId) {
+      setEmails([]);
+      setSecurity([]);
+      return;
+    }
+
+    setEmails(listEmailScans(userId).map(emailToReportItem));
+    setSecurity(listSecurityScans(userId).map(securityToReportItem));
+  };
+
+  // Email Scanner + Security Checker history (localStorage + Supabase emails).
   useEffect(() => {
-    if (!session?.access_token) return;
+    refreshLocalActivity();
+    if (userId) void syncEmailScans(userId).then(refreshLocalActivity);
+    const onActivity = () => refreshLocalActivity();
+    window.addEventListener(SCAN_ACTIVITY_EVENT, onActivity);
+    window.addEventListener("storage", onActivity);
+    window.addEventListener("focus", onActivity);
+    return () => {
+      window.removeEventListener(SCAN_ACTIVITY_EVENT, onActivity);
+      window.removeEventListener("storage", onActivity);
+      window.removeEventListener("focus", onActivity);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when user changes
+  }, [userId]);
+
+  // Website Tracker history + news reading activity.
+  useEffect(() => {
+    if (!session?.access_token || !userId) {
+      setWebsites([]);
+      setNews([]);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    let requestInFlight = false;
 
     async function load() {
+      if (cancelled || document.hidden || requestInFlight) return;
+      requestInFlight = true;
+
       try {
-        const history = await listWebsiteHistory(1000, session?.access_token);
+        const [history, newsActivity] = await Promise.all([
+          listWebsiteHistory(1000, session?.access_token),
+          fetchNewsActivity(userId!).catch(() => []),
+        ]);
 
         if (cancelled) return;
 
-        setLive(
-          history.map((entry): ReportItem => ({
-            id: `website-${entry.id}`,
-            category: "websites",
-            title: entry.domain || entry.url,
-            detail: entry.url,
-            finding: riskOf(entry.risk_level),
-            occurredAt: entry.visited_at,
-            source: "live",
-            score:
-              typeof entry.risk_score === "number"
-                ? Math.round(entry.risk_score)
-                : undefined,
-            notes: [
-              ...(entry.threat_types ?? []).map(
-                (t) => `Threat type: ${t.replaceAll("_", " ")}`,
-              ),
-              ...(entry.explanation ?? []),
-            ],
-          })),
+        setWebsites(history.map(websiteToReportItem));
+        setNews(
+          newsActivity
+            .filter((item) => item.read && item.article)
+            .map((item) => ({
+              id: `news-${item.article.id}`,
+              category: "news" as const,
+              title: item.article.title,
+              detail: item.article.source
+                ? `Article from ${item.article.source}`
+                : "Cybersecurity article viewed",
+              finding: "info" as const,
+              occurredAt:
+                item.updated_at ||
+                item.article.published_at ||
+                new Date().toISOString(),
+              source: "news" as const,
+              notes: item.article.summary ? [item.article.summary] : undefined,
+            })),
         );
-
         setLoadError("");
       } catch (error) {
         if (!cancelled) {
           setLoadError(
             error instanceof Error
               ? error.message
-              : "Unable to load website history.",
+              : "Unable to load report activity.",
           );
         }
       } finally {
+        requestInFlight = false;
         if (!cancelled) {
           setLoading(false);
+          refreshLocalActivity();
         }
       }
     }
@@ -456,19 +407,25 @@ function ReportsContent() {
     void load();
 
     const timer = window.setInterval(() => void load(), 30000);
+    const onVisibility = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [session?.access_token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when session changes
+  }, [session?.access_token, userId]);
 
   const items = useMemo(
     () =>
-      [...live, ...(showDemo ? DEMO : [])]
+      [...websites, ...emails, ...security, ...news]
         .filter((item) => inRange(item.occurredAt, range, start, end))
         .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)),
-    [live, range, start, end, showDemo],
+    [websites, emails, security, news, range, start, end],
   );
 
   const flagged = items.filter(
@@ -522,7 +479,7 @@ function ReportsContent() {
     finding: FINDINGS[item.finding],
     score: item.score ?? "",
     date: item.occurredAt,
-    data_source: item.source,
+    data_source: SOURCE_LABELS[item.source],
     notes: (item.notes ?? []).join("; "),
   }));
 
@@ -532,7 +489,7 @@ function ReportsContent() {
       JSON.stringify(
         {
           period: periodLabel,
-          contains_demo_data: shown.some((item) => item.source === "demo"),
+          generated_at: new Date().toISOString(),
           activities: exportRows,
         },
         null,
@@ -710,7 +667,7 @@ function ReportsContent() {
 
       {loadError && (
         <div className="report-notice report-error">
-          Website history could not be loaded: {loadError}
+          Some report activity could not be loaded: {loadError}
         </div>
       )}
 
@@ -858,10 +815,12 @@ function ReportsContent() {
                   onClick={() => {
                     setSelectedCategory(selectedCategory === id ? "all" : id);
 
-                    document.getElementById("report-activity")?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
+                    document
+                      .getElementById("report-activity")
+                      ?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
                   }}
                 >
                   <span className="report-category-icon">
@@ -996,10 +955,7 @@ function ReportsContent() {
                     {open && (
                       <div className="report-log-detail">
                         <div>
-                          <strong>Source:</strong>{" "}
-                          {item.source === "demo"
-                            ? "Sample data (not a real scan)"
-                            : "Saved website history"}
+                          <strong>Source:</strong> {SOURCE_LABELS[item.source]}
                         </div>
 
                         {/* PASSWORD CHECKER DETAILS */}
@@ -1057,12 +1013,20 @@ function ReportsContent() {
               <div className="report-empty">
                 <FileText size={25} />
 
-                <strong>No matching activities</strong>
+                <strong>
+                  {loading
+                    ? "Loading your report…"
+                    : items.length === 0
+                      ? "No security activity yet"
+                      : "No matching activities"}
+                </strong>
 
                 <p>
                   {loading
-                    ? "Loading saved history…"
-                    : "No activities match your selected filters."}
+                    ? "Gathering website history, scans, and news activity…"
+                    : items.length === 0
+                      ? "Use Website Tracker, Email Scanner, Security Checker, or News — activity will appear here automatically."
+                      : "No activities match your selected filters."}
                 </p>
               </div>
             )}
