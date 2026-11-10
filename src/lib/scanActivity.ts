@@ -52,6 +52,14 @@ export type SecurityScanEntry = {
   occurredAt: string;
 };
 
+type SharedReportRow = {
+  id: string;
+  user_id: string;
+  kind: "email" | "security" | "device";
+  occurred_at: string;
+  payload: Record<string, unknown>;
+};
+
 export type ScanActivityEntry = EmailScanEntry | SecurityScanEntry;
 
 type ActivityStore = {
@@ -228,6 +236,29 @@ export function recordEmailScans(
 
   store.emails = trim([...entries, ...store.emails]);
   writeStore(userId, store);
+  if (supabase) {
+    void supabase.from("cg_report_activity").upsert(
+      entries.map((entry, index) => ({
+        id: entry.id,
+        user_id: userId,
+        kind: "email",
+        occurred_at: entry.occurredAt,
+        payload: {
+          sender: results[index].sender,
+          subject: results[index].subject,
+          classification: results[index].classification,
+        },
+      })),
+      { onConflict: "id", ignoreDuplicates: true },
+    ).then(({ error }) => {
+      if (error) {
+        console.warn(
+          "CyberGuard: couldn't share email activity with the organization.",
+          error.message,
+        );
+      }
+    });
+  }
   void uploadPendingEmailScans(userId);
 }
 
@@ -334,6 +365,61 @@ export async function syncEmailScans(userId: string): Promise<void> {
     ),
   );
   writeStore(userId, store);
+
+  await uploadSharedActivity(userId, store);
+}
+
+async function uploadSharedActivity(
+  userId: string,
+  store: ActivityStore,
+): Promise<void> {
+  if (!supabase || !(await signedInAs(userId))) return;
+
+  const rows = [
+    ...store.emails
+      .filter((entry) => entry.pending === undefined)
+      .map((entry) => ({
+        id: entry.id,
+        user_id: userId,
+        kind: "email" as const,
+        occurred_at: entry.occurredAt,
+        payload: {
+          sender: entry.detail,
+          subject: entry.title,
+          classification: entry.finding === "high"
+            ? "PHISHING"
+            : entry.finding === "suspicious"
+              ? "SUSPICIOUS"
+              : entry.finding === "safe"
+                ? "SAFE"
+                : "UNKNOWN",
+        },
+      })),
+    ...store.security.map((entry) => ({
+      id: entry.id,
+      user_id: userId,
+      kind: entry.checkType === "device" ? "device" as const : "security" as const,
+      occurred_at: entry.occurredAt,
+      payload: {
+        checkType: entry.checkType,
+        title: entry.title,
+        detail: entry.detail,
+        finding: entry.finding,
+      },
+    })),
+  ];
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from("cg_report_activity")
+    .upsert(rows, { onConflict: "id", ignoreDuplicates: true });
+  if (error) {
+    console.warn(
+      "CyberGuard: couldn't backfill shared report activity.",
+      error.message,
+    );
+  }
 }
 
 export function recordSecurityScan(
@@ -358,6 +444,62 @@ export function recordSecurityScan(
     ...store.security,
   ]);
   writeStore(userId, store);
+  if (supabase) {
+    void supabase.from("cg_report_activity").upsert({
+      id: store.security[0].id,
+      user_id: userId,
+      kind: entry.checkType === "device" ? "device" : "security",
+      occurred_at: store.security[0].occurredAt,
+      payload: {
+        checkType: entry.checkType,
+        title: entry.title,
+        detail: entry.detail,
+        finding: entry.finding,
+      },
+    }, { onConflict: "id", ignoreDuplicates: true }).then(({ error }) => {
+      if (error) {
+        console.warn(
+          "CyberGuard: couldn't share security activity with the organization.",
+          error.message,
+        );
+      }
+    });
+  }
+}
+
+export async function listSharedReportActivity(
+  userId: string,
+): Promise<ScanActivityEntry[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("cg_report_activity")
+    .select("id,user_id,kind,occurred_at,payload")
+    .eq("user_id", userId)
+    .order("occurred_at", { ascending: false })
+    .limit(MAX_ENTRIES);
+  if (error) throw error;
+  return ((data ?? []) as SharedReportRow[]).map((row) => ({
+    id: row.id,
+    kind: row.kind === "email" ? "email" : "security",
+    ...(row.kind === "email"
+      ? {
+          title: String(row.payload.subject ?? "(No subject)"),
+          detail: String(row.payload.sender ?? "Unknown sender"),
+          finding: emailFindingFromClassification(
+            String(row.payload.classification ?? "UNKNOWN"),
+          ),
+        }
+      : {
+          checkType:
+            row.kind === "device"
+              ? "device"
+              : (String(row.payload.checkType) as SecurityCheckType),
+          title: String(row.payload.title ?? "Security check"),
+          detail: String(row.payload.detail ?? ""),
+          finding: (row.payload.finding as ScanFinding) ?? "unverified",
+        }),
+    occurredAt: row.occurred_at,
+  })) as ScanActivityEntry[];
 }
 
 export function maskEmail(email: string) {

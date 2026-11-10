@@ -5,6 +5,9 @@ import ListPagination from "./ListPagination";
 import { useOrganizationPresence } from "../context/organizationPresence";
 import HelpTip from "./HelpTip";
 import { supabase } from "../lib/supabase";
+import type { useWarningOverrides } from "../lib/useWarningOverrides";
+import OrganizationWarningOverrides from "./OrganizationWarningOverrides";
+import type { TeamMember } from "./OrganizationMembers";
 
 type Presence = {
   user_id: string;
@@ -20,13 +23,17 @@ export default function OrganizationLiveActivity({
   isAdmin,
   visible,
   refreshRevision,
+  warningOverrides,
+  onViewActivity,
 }: {
   organizationId: string;
-  members: { user_id: string; email: string }[];
+  members: TeamMember[];
   userId: string;
   isAdmin: boolean;
   visible: boolean;
   refreshRevision: number;
+  warningOverrides: ReturnType<typeof useWarningOverrides>;
+  onViewActivity: (memberId: string) => void;
 }) {
   const {
     presenceRevision,
@@ -92,6 +99,7 @@ export default function OrganizationLiveActivity({
   }
   return (
     <section hidden={!visible} className="org-live-activity">
+      {isAdmin && <OrganizationWarningOverrides key={organizationId} activity={warningOverrides} />}
       <div className="org-card">
         <h2>
           <Users size={21} /> {isAdmin ? "Who’s active" : "Your presence"}
@@ -196,6 +204,14 @@ export default function OrganizationLiveActivity({
               >
                 {memberStatus(member.user_id)}
               </span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => onViewActivity(member.user_id)}
+                >
+                  View activity
+                </button>
+              )}
             </div>
           ))}
         <ListPagination

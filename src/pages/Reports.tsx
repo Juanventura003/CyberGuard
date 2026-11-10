@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Activity,
   AlertTriangle,
@@ -26,11 +27,13 @@ import {
 import { listWebsiteHistory, type WebsiteHistoryEntry } from "../api/emailApi";
 import { fetchNewsActivity } from "../api/newsApi";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import {
   SCAN_ACTIVITY_EVENT,
   listEmailScans,
   listSecurityScans,
   syncEmailScans,
+  emailFindingFromClassification,
   type EmailScanEntry,
   type SecurityScanEntry,
 } from "../lib/scanActivity";
@@ -285,7 +288,12 @@ export default function Reports() {
 
 function ReportsContent() {
   const { session } = useAuth();
+  const [searchParams] = useSearchParams();
   const userId = session?.user.id;
+  const memberId = searchParams.get("member");
+  const viewedUserId = memberId || userId;
+  const viewingMember = Boolean(memberId && memberId !== userId);
+  const organizationId = searchParams.get("org");
 
   const [websites, setWebsites] = useState<ReportItem[]>([]);
   const [emails, setEmails] = useState<ReportItem[]>([]);
@@ -293,6 +301,10 @@ function ReportsContent() {
   const [news, setNews] = useState<ReportItem[]>([]);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(Boolean(session?.access_token));
+  const [memberProfile, setMemberProfile] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
 
   const [range, setRange] = useState<Range>("today");
   const [start, setStart] = useState("");
@@ -311,6 +323,7 @@ function ReportsContent() {
       setSecurity([]);
       return;
     }
+    if (viewingMember) return;
 
     setEmails(listEmailScans(userId).map(emailToReportItem));
     setSecurity(listSecurityScans(userId).map(securityToReportItem));
@@ -330,13 +343,14 @@ function ReportsContent() {
       window.removeEventListener("focus", onActivity);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when user changes
-  }, [userId]);
+  }, [userId, viewingMember]);
 
   // Website Tracker history + news reading activity.
   useEffect(() => {
-    if (!session?.access_token || !userId) {
+    if (!session?.access_token || !userId || !viewedUserId) {
       setWebsites([]);
       setNews([]);
+      setMemberProfile(null);
       setLoading(false);
       return;
     }
@@ -349,16 +363,145 @@ function ReportsContent() {
       requestInFlight = true;
 
       try {
-        const [history, newsActivity] = await Promise.all([
-          listWebsiteHistory(1000, session?.access_token),
-          fetchNewsActivity(userId!).catch(() => []),
-        ]);
+        const [
+          history,
+          newsActivity,
+          memberEmails,
+          memberActivity,
+          member,
+          profile,
+        ] =
+          viewingMember
+            ? await Promise.all([
+                supabase!
+                  .from("website_history")
+                  .select(
+                    "id,url,domain,risk_score,risk_level,source,threat_types,explanation,visited_at",
+                  )
+                  .eq("user_id", viewedUserId)
+                  .order("visited_at", { ascending: false })
+                  .limit(1000),
+                supabase!
+                  .from("news_activity")
+                  .select("article,read,updated_at")
+                  .eq("user_id", viewedUserId)
+                  .eq("read", true)
+                  .order("updated_at", { ascending: false })
+                  .limit(1000),
+                supabase!
+                  .from("email_scans")
+                  .select(
+                    "id,sender,subject,classification,scanned_at",
+                  )
+                  .eq("user_id", viewedUserId)
+                  .order("scanned_at", { ascending: false })
+                  .limit(1000),
+                supabase!
+                  .from("cg_report_activity")
+                  .select("id,kind,payload,occurred_at")
+                  .eq("user_id", viewedUserId)
+                  .order("occurred_at", { ascending: false })
+                  .limit(1000),
+                supabase!
+                  .from("cg_memberships")
+                  .select("email")
+                  .eq("organization_id", organizationId)
+                  .eq("user_id", viewedUserId)
+                  .maybeSingle(),
+                supabase!
+                  .from("profiles")
+                  .select("first_name,last_name,username")
+                  .eq("id", viewedUserId)
+                  .maybeSingle(),
+              ])
+            : [
+                {
+                  data: await listWebsiteHistory(1000, session?.access_token ?? ""),
+                  error: null,
+                },
+                { data: await fetchNewsActivity(userId!).catch(() => []), error: null },
+                { data: [], error: null },
+                { data: [], error: null },
+                { data: null, error: null },
+                { data: null, error: null },
+              ];
+
+        const failure =
+          history.error ??
+          newsActivity.error ??
+          memberEmails.error ??
+          memberActivity.error ??
+          member.error ??
+          profile.error;
+        if (failure) throw failure;
 
         if (cancelled) return;
 
-        setWebsites(history.map(websiteToReportItem));
+        setWebsites((history.data ?? []).map(websiteToReportItem));
+        if (viewingMember) {
+          setMemberProfile({
+            name: [profile.data?.first_name, profile.data?.last_name]
+              .filter(Boolean)
+              .join(" ") || profile.data?.username || "",
+            email: member.data?.email ?? "Member",
+          });
+          setEmails(
+            [
+              ...(memberEmails.data ?? []).map((entry) =>
+                emailToReportItem({
+                  id: entry.id,
+                  kind: "email",
+                  title: entry.subject ?? "(No subject)",
+                  detail: entry.sender,
+                  finding: emailFindingFromClassification(entry.classification),
+                  occurredAt: entry.scanned_at,
+                }),
+              ),
+              ...(memberActivity.data ?? [])
+                .filter(
+                  (entry) =>
+                    entry.kind === "email" &&
+                    !(memberEmails.data ?? []).some(
+                      (email) => email.id === entry.id,
+                    ),
+                )
+                .map((entry) => {
+                  const payload = entry.payload as Record<string, unknown>;
+                  return emailToReportItem({
+                    id: entry.id,
+                    kind: "email",
+                    title: String(payload.subject ?? "(No subject)"),
+                    detail: String(payload.sender ?? "Unknown sender"),
+                    finding: emailFindingFromClassification(
+                      String(payload.classification ?? "UNKNOWN"),
+                    ),
+                    occurredAt: entry.occurred_at,
+                  });
+                }),
+            ],
+          );
+          setSecurity(
+            (memberActivity.data ?? [])
+              .filter((entry) => entry.kind !== "email")
+              .map((entry) => {
+                const payload = entry.payload as Record<string, unknown>;
+                return securityToReportItem({
+                  id: entry.id,
+                  kind: "security",
+                  checkType:
+                    entry.kind === "device"
+                      ? "device"
+                      : (String(payload.checkType) as SecurityScanEntry["checkType"]),
+                  title: String(payload.title ?? "Security check"),
+                  detail: String(payload.detail ?? ""),
+                  finding: (payload.finding as SecurityScanEntry["finding"]) ?? "unverified",
+                  occurredAt: entry.occurred_at,
+                });
+              }),
+          );
+        }
         setNews(
-          newsActivity
+          (newsActivity.data ?? [])
             .filter((item) => item.read && item.article)
             .map((item) => ({
               id: `news-${item.article.id}`,
@@ -389,7 +532,7 @@ function ReportsContent() {
         requestInFlight = false;
         if (!cancelled) {
           setLoading(false);
-          refreshLocalActivity();
+          if (!viewingMember) refreshLocalActivity();
         }
       }
     }
@@ -408,7 +551,7 @@ function ReportsContent() {
       document.removeEventListener("visibilitychange", onVisibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh when session changes
-  }, [session?.access_token, userId]);
+  }, [session?.access_token, userId, viewedUserId, viewingMember]);
 
   const items = useMemo(
     () =>
@@ -579,7 +722,13 @@ function ReportsContent() {
     <main className="reports-page">
       <header className="report-topbar no-print">
         <div>
-          <h1>Security reports</h1>
+          <h1>{viewingMember ? "Member security reports" : "Security reports"}</h1>
+          {viewingMember && memberProfile && (
+            <div className="report-member-identity">
+              <strong>{memberProfile.name || memberProfile.email}</strong>
+              <span>{memberProfile.email}</span>
+            </div>
+          )}
           <p>
             {loading
               ? "Loading activity…"

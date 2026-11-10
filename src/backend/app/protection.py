@@ -1,5 +1,7 @@
 """Device enrollment and credential-based rule sync; credentials never appear in URLs."""
 
+from datetime import datetime
+
 import httpx
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -99,3 +101,27 @@ def sync(payload: Sync):
 def disconnect(payload: Sync):
     rpc("cg_browser_disconnect", {"secret": payload.token}, expect_json=False)
     return {"ok": True}
+
+
+class WarningOverride(BaseModel):
+    token: str = Field(pattern=r"^[a-f0-9]{64}$")
+    event_id: UUID
+    domain: str = Field(min_length=1, max_length=253, pattern=r"^[a-z0-9.-]+$")
+    reasons: list[str] = Field(min_length=1, max_length=500)
+    occurred_at: datetime
+
+
+@router.post("/warning-override")
+def warning_override(payload: WarningOverride):
+    if any(not reason.strip() or len(reason) > 1000 for reason in payload.reasons):
+        raise HTTPException(422, "Invalid warning reasons.")
+    return rpc(
+        "cg_record_warning_override",
+        {
+            "secret": payload.token,
+            "event_id": str(payload.event_id),
+            "hostname": payload.domain,
+            "warning_reasons": payload.reasons,
+            "happened_at": payload.occurred_at.isoformat(),
+        },
+    )

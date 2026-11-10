@@ -7,12 +7,14 @@ import {
   organizationError,
 } from "../lib/organizationData";
 import { useOrganizationClock } from "../lib/useOrganizationClock";
+import { countUnreadTeamNotices } from "../lib/teamNotices";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useOrganizationPresence } from "../context/organizationPresence";
 import CreateOrganization from "../components/CreateOrganization";
 import PresenceAgreement from "../components/PresenceAgreement";
 import OrganizationLiveActivity from "../components/OrganizationLiveActivity";
+import { useWarningOverrides } from "../lib/useWarningOverrides";
 import OrganizationProtection from "../components/OrganizationProtection";
 import OrganizationSettings from "../components/OrganizationSettings";
 import ArchivedOrganization from "../components/ArchivedOrganization";
@@ -97,6 +99,7 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
   const [rosterError, setRosterError] = useState("");
   const [awaitingOrg, setAwaitingOrg] = useState("");
   const [notice, setNotice] = useState("");
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
   const [live, setLive] = useState(false);
   const now = useOrganizationClock();
   const allJoinedOrgs = organizations.filter((org) =>
@@ -133,6 +136,26 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
     roster.org === org?.id
       ? roster.members
       : memberships.filter((member) => member.organization_id === org?.id);
+  const ownMembership = memberships.find(
+    (member) => member.organization_id === org?.id && member.user_id === userId,
+  );
+  useEffect(() => {
+    if (!orgId || isAdmin) {
+      setUnreadNoticeCount(0);
+      return;
+    }
+    let active = true;
+    void countUnreadTeamNotices(orgId, userId)
+      .then((count) => {
+        if (active) setUnreadNoticeCount(count);
+      })
+      .catch(() => {
+        if (active) setUnreadNoticeCount(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, [orgId, userId, isAdmin, reload]);
   const incoming = invites.filter(
     (invite) =>
       !organizations.find((item) => item.id === invite.organization_id)
@@ -167,7 +190,10 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
           collectOrganizationPages<TeamMember>((from, to) =>
             client
               .from("cg_memberships")
-              .select("organization_id,user_id,email,role", { count: "exact" })
+              .select(
+                "organization_id,user_id,email,role,report_sharing_consent_at",
+                { count: "exact" },
+              )
               .eq("user_id", userId)
               .order("organization_id")
               .range(from, to),
@@ -207,7 +233,10 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
     void collectOrganizationPages<TeamMember>((from, to) =>
       supabase!
         .from("cg_memberships")
-        .select("organization_id,user_id,email,role", { count: "exact" })
+        .select(
+          "organization_id,user_id,email,role,report_sharing_consent_at",
+          { count: "exact" },
+        )
         .eq("organization_id", id)
         .order("user_id")
         .range(from, to),
@@ -270,6 +299,7 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
       active = false;
     };
   }, [orgId, isAdmin, reload, findingRevision]);
+  const warningOverrides = useWarningOverrides(orgId, isAdmin, reload);
   async function perform(
     task: () => PromiseLike<{
       error: { message: string } | null;
@@ -401,11 +431,23 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
           }}
           onConfirm={() =>
             void perform(
-              () =>
-                supabase!.rpc("cg_accept_invitation_v2", {
-                  invite: joiningInvite.id,
-                  accept_presence: true,
-                }),
+              async () => {
+                const accepted = await supabase!.rpc(
+                  "cg_accept_invitation_v2",
+                  {
+                    invite: joiningInvite.id,
+                    accept_presence: true,
+                  },
+                );
+                if (accepted.error || typeof accepted.data !== "string") {
+                  return accepted;
+                }
+                const consent = await supabase!.rpc("cg_set_report_sharing", {
+                  org: accepted.data,
+                  sharing: true,
+                });
+                return consent;
+              },
               "Invitation accepted.",
               undefined,
               (id) => {
@@ -576,6 +618,35 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
                 />
               </section>
             )}
+          {org &&
+            !org.archived_at &&
+            !presenceLoading &&
+            preferences.some(
+              (pref) => pref.organization_id === org.id && pref.accepted,
+            ) &&
+            !isAdmin &&
+            !ownMembership?.report_sharing_consent_at && (
+              <PresenceAgreement
+                key={`reports-${org.id}`}
+                organizationName={org.name}
+                busy={busy}
+                error={actionError}
+                onClose={() => setNotice("Report sharing is required for membership.")}
+                onConfirm={() =>
+                  void perform(
+                    () =>
+                      supabase!.rpc("cg_set_report_sharing", {
+                        org: org.id,
+                        sharing: true,
+                      }),
+                    "Report sharing enabled.",
+                    undefined,
+                    () => setReload((value) => value + 1),
+                  )
+                }
+                joining={false}
+              />
+            )}
           {org && !org.archived_at && presenceLoading && (
             <p role="status">Loading membership requirement…</p>
           )}
@@ -614,16 +685,27 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
                               : view === "members"
                                 ? "Members"
                                 : "Settings"}
-                      {view === "reports" && isAdmin && (
+                      {view === "activity" && isAdmin && warningOverrides.unread > 0 && !warningOverrides.error && (
+                        <span className="org-review-badge" role="status" title="Warning overrides awaiting admin review">
+                          {warningOverrides.unread} unread
+                        </span>
+                      )}
+                      {view === "notices" && !isAdmin && unreadNoticeCount > 0 && (
                         <span
                           className="org-review-badge"
+                          role="status"
+                          title="Unread team notices"
+                        >
+                          Unread: {unreadNoticeCount}
+                        </span>
+                      )}
+                      {view === "reports" && isAdmin && reviewCount?.org === org.id && reviewCount.count !== null && reviewCount.count > 0 && (
+                        <span
+                          className="org-review-badge"
+                          role="status"
                           title="New, under review, and confirmed findings awaiting resolution; this is not an unread count."
                         >
-                          {reviewCount?.org !== org.id
-                            ? "Needs review: …"
-                            : reviewCount.count === null
-                              ? "Needs review: unavailable"
-                              : `Needs review: ${reviewCount.count}`}
+                          {reviewCount.count} need review
                         </span>
                       )}
                     </button>
@@ -645,6 +727,12 @@ function Workspace({ userId, email }: { userId: string; email: string }) {
                     isAdmin={isAdmin}
                     visible
                     refreshRevision={reload}
+                    warningOverrides={warningOverrides}
+                    onViewActivity={(memberId) => {
+                      window.location.assign(
+                        `/reports?member=${encodeURIComponent(memberId)}&org=${encodeURIComponent(org.id)}`,
+                      );
+                    }}
                   />
                 )}
                 {section === "protection" && (

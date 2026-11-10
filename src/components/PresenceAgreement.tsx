@@ -78,9 +78,21 @@ export default function PresenceAgreement({
             <p>Approximate device type and operating system.</p>
           </div>
         </div>
+        <div className="presence-agreement-fact">
+          <Activity size={19} />
+          <div>
+            <strong>Security activity reports</strong>
+            <p>
+              Organization admins can see your security report summaries,
+              including website checks, email scans, and device or security
+              checks. Password values, email bodies, and typed content are
+              never shared.
+            </p>
+          </div>
+        </div>
         <p className="presence-agreement-note">
-          Required for membership; leaving stops sharing. Browsing history,
-          other apps, and typed content stay private.
+          Required for membership; leaving stops sharing. Full browsing
+          history, other apps, and typed content stay private.
         </p>
         {!joining && (
           <p className="presence-agreement-note">
@@ -96,7 +108,10 @@ export default function PresenceAgreement({
             disabled={busy}
             required
           />
-          <span>I agree to required presence sharing.</span>
+          <span>
+            I agree to presence sharing and sharing my security report
+            summaries with organization admins.
+          </span>
         </label>
         {error && (
           <p className="presence-agreement-error" role="alert">
