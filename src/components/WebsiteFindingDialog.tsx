@@ -40,10 +40,6 @@ export default function WebsiteFindingDialog({
           Close
         </button>
       </header>
-      <p>
-        Choose an organization and review what will be shared. Your website
-        history stays private unless you submit a finding.
-      </p>
       <ShareFinding
         initialOpen
         finding={{

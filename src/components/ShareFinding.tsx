@@ -176,12 +176,6 @@ function ReportForm({
       {open && (
         <form onSubmit={submit}>
           <h3>Share this finding with your team</h3>
-          <p>
-            Your organization’s admins can see everything in the preview below.
-            Only the evidence shown here and the scanner summary are shared.
-            Review the preview before submitting. Email bodies, attachments, and
-            inbox access are not attached.
-          </p>
           {loading ? (
             <p role="status">Loading your organizations…</p>
           ) : choices.length > 0 ? (

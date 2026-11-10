@@ -134,10 +134,18 @@ Create an organization from the team toolbar, invite verified accounts inside Cy
 - **Website protection:** Admins publish Warn or Block rules for enrolled browser profiles. Members can continue past warnings or request review of a block.
 - **Temporary access:** Admins can approve one member for 15 minutes, 1 hour, 4 hours, or 24 hours. Normal website use is allowed; personal blocks and other matching restrictions still apply. Expiry is handled locally, although Chrome can delay it during sleep. Early revocation requires synchronization.
 - **Security inbox:** Members explicitly share selected findings. Admins respond with guidance or website actions and can archive handled findings without changing protection.
-- **Team notices:** Admins share News articles with guidance. Members acknowledge notices; admins see receipt counts and can pin, expire, or archive notices.
+- **Team notices:** Admins share News articles with guidance or publish custom general announcements. Members acknowledge notices; admins can pin announcements and set expiration dates.
 - **Presence:** Members explicitly accept required Active/Away and approximate device/OS sharing. Admins retain optional sharing. Presence covers CyberGuard activity only, with a two-second Away grace period.
 - **Organization lifecycle:** Owners can archive, restore, or delete a team. Archive preserves read-only records but revokes browser connections and temporary approvals; members reconnect after restoration.
 
 Protection applies only to connected browser profiles and remains after CyberGuard sign-out. Offline browsers keep cached restrictions until they successfully sync. Personal blocks remain separate.
 
 Use the team’s configured Supabase project for Team Security and persistent News. A separate project needs the organization/news database setup and scheduled cleanup; obtain that setup from the team. Keep `SUPABASE_SERVICE_ROLE_KEY` in the backend environment only.
+
+### Warning override monitoring
+
+When a member continues past an organization warning, CyberGuard records the member, domain, warning reason, and time. Full URLs and page contents stay local. Events are retried while the browser enrollment is active and appear in Live Activity for admin review.
+
+### Shared member reports
+
+Members must accept the sharing disclosure before admins can view their reports. Admins can view consenting members' website history, email summaries, security and device activity, and read news activity from Reports. Sensitive data such as email bodies, passwords, and typed content is not shared.

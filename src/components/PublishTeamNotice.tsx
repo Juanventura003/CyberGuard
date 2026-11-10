@@ -136,9 +136,6 @@ export default function PublishTeamNotice({
         </label>
         <p className="notice-help">
           All current organization members can read and acknowledge this notice.
-          Acknowledgement records receipt; it does not prove understanding.
-          Published guidance stays fixed; archive and publish a new notice if it
-          changes.
         </p>
         {error && (
           <p className="notice-error" role="alert">
