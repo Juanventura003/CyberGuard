@@ -92,7 +92,7 @@ declare const chrome: {
 					: "Your team recommends caution.";
 				document.querySelector("#explanation")!.textContent = blocked
 					? "Your organization restricts this website. An active approval lets you open it temporarily."
-					: "Your organization has a warning for this website. You can choose to continue, but this does not mean it is safe.";
+					: "Your organization has a warning for this website. If you continue, your organization’s admins will be notified with your identity, the website domain, warning reason, and time. Offline events are sent after reconnecting. Continuing does not mean the website is safe.";
 				document.querySelector("#reason")!.textContent = result.policies
 					.map((rule) => rule.reason)
 					.join(" · ");

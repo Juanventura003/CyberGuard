@@ -1,4 +1,4 @@
-/** Policy decisions are local: no visited URLs or page contents leave the browser. */
+/** Policy decisions are local: only explicit warning continuations report the hostname and warning reasons; full URLs and page contents stay local. */
 export type WebsitePolicy = {
 	domain: string;
 	action: "warn" | "block";

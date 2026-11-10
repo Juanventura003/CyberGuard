@@ -6,6 +6,7 @@ export type TeamMember = {
   user_id: string;
   email: string;
   role: "admin" | "member";
+  report_sharing_consent_at?: string | null;
 };
 export type TeamInvitation = {
   id: string;

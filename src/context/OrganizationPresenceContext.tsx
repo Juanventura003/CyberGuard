@@ -17,6 +17,9 @@ export function OrganizationPresenceProvider({
   children: ReactNode;
 }) {
   const [preferences, setPreferences] = useState<Preference[]>([]);
+  const [adminOrganizations, setAdminOrganizations] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [loading, setLoading] = useState(Boolean(userId && supabase));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -30,16 +33,30 @@ export function OrganizationPresenceProvider({
     if (!userId || !supabase) return;
     let active = true;
     const epoch = generation.current;
-    void Promise.resolve(supabase.rpc("cg_get_required_presence_memberships"))
-      .then(({ data, error }) => {
+    void Promise.all([
+      supabase.rpc("cg_get_required_presence_memberships"),
+      supabase
+        .from("cg_memberships")
+        .select("organization_id,role")
+        .eq("user_id", userId),
+    ])
+      .then(([presenceResult, membershipResult]) => {
         if (!active || changing.current || generation.current !== epoch) return;
-        if (error) {
+        const { data, error } = presenceResult;
+        if (error || membershipResult.error) {
           setPreferences([]);
           setError(
             "Could not load organization presence requirements. Please try again.",
           );
         } else {
           setPreferences(data ?? []);
+          setAdminOrganizations(
+            new Set(
+              (membershipResult.data ?? [])
+                .filter((membership) => membership.role === "admin")
+                .map((membership) => membership.organization_id),
+            ),
+          );
           setError("");
         }
         setLoading(false);
@@ -210,6 +227,11 @@ export function OrganizationPresenceProvider({
         accepted: true,
       });
       if (error) throw new Error(error.message);
+      const reportConsent = await supabase.rpc("cg_set_report_sharing", {
+        org,
+        sharing: true,
+      });
+      if (reportConsent.error) throw new Error(reportConsent.error.message);
       if (generation.current !== epoch) return;
       setPreferences((previous) => [
         ...previous.filter((pref) => pref.organization_id !== org),
@@ -261,7 +283,10 @@ export function OrganizationPresenceProvider({
     }
   }
   const pending = preferences.find(
-    (pref) => !pref.accepted && !dismissed.includes(pref.organization_id),
+    (pref) =>
+      !pref.accepted &&
+      !adminOrganizations.has(pref.organization_id) &&
+      !dismissed.includes(pref.organization_id),
   );
   return (
     <Context.Provider

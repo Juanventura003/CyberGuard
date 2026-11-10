@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export function subscribeOrganizationChanges(
   client: SupabaseClient,
   topic: string,
-  table: "cg_incidents",
+  table: "cg_incidents" | "cg_warning_overrides",
   onChange: () => void,
   options: {
     organizationId?: string;

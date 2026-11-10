@@ -831,3 +831,34 @@
 .org-team-empty p {
   margin: 0 0 18px;
 }
+
+.org-overrides-heading,
+.org-overrides-toolbar,
+.org-override-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.org-overrides-eyebrow { color: #6b7890; font-size: 11px; font-weight: 700; letter-spacing: .09em; }
+.org-overrides h2 { margin: 12px 0 8px; }
+.org-overrides-count { display: inline-flex; align-items: center; gap: 5px; border-radius: 20px; background: #fff0d8; color: #88500b; padding: 5px 10px; font-size: 12px; }
+.org-overrides-preview { background: #eff4fd; color: #425979; border: 1px solid #dce5f1; border-radius: 8px; padding: 12px 14px; font-size: 13px; line-height: 1.6; }
+.org-overrides-toolbar { margin: 22px 0 12px; font-size: 14px; }
+.org-overrides-toolbar label { display: flex; align-items: center; gap: 8px; color: #5b6d85; font-size: 13px; }
+.org-overrides-events { border-top: 1px solid #e4eaf3; }
+.org-override-event { display: flex; align-items: flex-start; gap: 14px; padding: 20px 0; border-bottom: 1px solid #e4eaf3; }
+.org-override-icon { display: grid; place-items: center; flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; color: #a8660e; background: #fff3df; }
+.org-override-detail { flex: 1; min-width: 0; }
+.org-override-title > time { color: #6b7890; font-size: 12px; }
+.org-override-detail p { margin: 7px 0 10px; font-size: 14px; line-height: 1.6; color: #425979; overflow-wrap: anywhere; }
+.org-override-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.org-override-tags span { border: 1px solid #ead9bb; border-radius: 5px; padding: 4px 8px; color: #885b1e; background: #fffbf3; font-size: 11px; }
+.org-override-event button { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.org-override-event.is-reviewed .org-override-icon { color: #66778d; background: #f0f3f7; }
+@media (max-width: 700px) {
+  .org-override-event { flex-wrap: wrap; }
+  .org-override-event > button { margin-left: 52px; }
+  .org-override-title { align-items: flex-start; flex-direction: column; gap: 5px; }
+}

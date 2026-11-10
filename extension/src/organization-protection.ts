@@ -12,6 +12,32 @@ const KEY = "organizationProtection";
 const EXPIRY_ALARM = "organization-access-expiry";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
 const API = "http://127.0.0.1:8000/api/protection";
+const WARNING_QUEUE_KEY = "organizationWarningQueue";
+type WarningEvent = {
+  event_id: string;
+  domain: string;
+  reasons: string[];
+  occurred_at: string;
+  enrollmentId: string;
+};
+async function pendingWarningEvents(): Promise<WarningEvent[]> {
+  const stored = await chrome.storage.local.get([WARNING_QUEUE_KEY]);
+  return (stored[WARNING_QUEUE_KEY] as WarningEvent[] | undefined) ?? [];
+}
+// Called inside the protection queue so enqueue and acknowledgement cannot race.
+async function flushWarningEvents() {
+  const enrollment = await read();
+  if (!enrollment) return;
+  const pending = await pendingWarningEvents();
+  for (const event of pending) {
+    if (event.enrollmentId !== enrollment.id) continue;
+    const { enrollmentId: _id, ...payload } = event;
+    void _id;
+    await post("warning-override", { ...payload, token: enrollment.token });
+    const latest = await pendingWarningEvents();
+    await chrome.storage.local.set({ [WARNING_QUEUE_KEY]: latest.filter((item) => item.event_id !== event.event_id) });
+  }
+}
 type Rule = {
 	id: number;
 	priority: number;
@@ -103,6 +129,15 @@ function serialize<T>(task: () => Promise<T>): Promise<T> {
 	protectionQueue = next.catch(() => undefined);
 	return next;
 }
+class ProtectionRequestError extends Error {
+	status: number;
+
+	constructor(message: string, status: number) {
+		super(message);
+		this.name = "ProtectionRequestError";
+		this.status = status;
+	}
+}
 async function read(): Promise<Enrollment | undefined> {
 	const stored = await chrome.storage.local.get([KEY]);
 	return stored[KEY] as Enrollment | undefined;
@@ -123,8 +158,9 @@ async function post(path: string, body: unknown, token?: string) {
 			typeof body.detail === "string"
 				? body.detail
 				: `Protection request failed (HTTP ${response.status}).`;
-		throw new Error(
+		throw new ProtectionRequestError(
 			`${detail} Previously applied rules, if any, remain active.`,
+			response.status,
 		);
 	}
 	return response.json();
@@ -391,6 +427,7 @@ async function clearEnrollment() {
 	});
 }
 async function syncInternal() {
+	await flushWarningEvents().catch(() => undefined);
 	const enrollment = await read();
 	if (!enrollment) return;
 	try {
@@ -516,11 +553,23 @@ export function handleProtection(message: ProtectionMessage) {
 			await syncInternal().catch(() => undefined);
 		} else if (message.action === "disconnect") {
 			const enrollment = await read();
-			if (enrollment)
-				await post("disconnect", {
-					token: enrollment.token,
-					version: chrome.runtime.getManifest().version,
-				});
+			if (enrollment) {
+				try {
+					await post("disconnect", {
+						token: enrollment.token,
+						version: chrome.runtime.getManifest().version,
+					});
+				} catch (error) {
+					// A deleted or revoked organization has no server row left to
+					// disconnect. Clear only that permanent credential failure;
+					// transient outages must preserve local protection rules.
+					if (
+						!(error instanceof ProtectionRequestError) ||
+						error.status !== 403
+					)
+						throw error;
+				}
+			}
 			await clearEnrollment();
 		}
 		return publicState(await read());
@@ -663,6 +712,20 @@ export async function continueOrganizationNavigation(
 			throw new Error(
 				"Access is restricted or your temporary approval has expired.",
 			);
+        const warnings = checked.policies.filter((policy) => policy.action === "warn");
+        if (warnings.length) {
+          const pending = await pendingWarningEvents();
+          if (pending.length >= 5000) throw new Error("Warning activity storage is full. Reconnect and sync your extension before continuing.");
+          await chrome.storage.local.set({ [WARNING_QUEUE_KEY]: [...pending, {
+            event_id: crypto.randomUUID(),
+            enrollmentId: enrollment.id,
+            domain: new URL(checked.url).hostname.toLowerCase(),
+            reasons: [...new Set(warnings.map((policy) => policy.reason))],
+            occurred_at: new Date().toISOString(),
+          } satisfies WarningEvent] });
+          // Persist before returning; delivery retries on the existing sync alarm.
+          void serialize(flushWarningEvents).catch(() => undefined);
+        }
 		return { url: result.url };
 	});
 }

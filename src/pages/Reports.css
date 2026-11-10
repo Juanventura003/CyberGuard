@@ -37,6 +37,25 @@
   font-size: 14px;
 }
 
+.report-member-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: #44546a;
+  font-size: 14px;
+}
+
+.report-member-identity strong {
+  color: #1f2d3d;
+  font-size: 16px;
+}
+
+.report-member-identity span {
+  color: #667085;
+}
+
 .report-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -85,3 +85,53 @@ export async function listTeamNotices(
   if (error) throw error;
   return data as NoticePage;
 }
+
+export async function countUnreadTeamNotices(
+  org: string,
+  userId: string,
+): Promise<number> {
+  const firstPage = await listTeamNotices(org, false, 0);
+  const pages = await Promise.all(
+    Array.from(
+      { length: Math.max(0, Math.ceil(firstPage.total / 10) - 1) },
+      (_, index) => listTeamNotices(org, false, index + 1),
+    ),
+  );
+  const articleUnread = [firstPage, ...pages].reduce(
+    (count, page) =>
+      count +
+      page.notices.filter(
+        (notice) =>
+          !notice.acknowledged_at &&
+          !notice.archived_at &&
+          (!notice.expires_at || Date.parse(notice.expires_at) > Date.now()),
+      ).length,
+    0,
+  );
+  if (!supabase) return articleUnread;
+
+  const { data: announcements, error } = await supabase
+    .from("cg_general_announcements")
+    .select("id,expires_at,archived_at")
+    .eq("organization_id", org);
+  if (error) throw error;
+  const activeAnnouncements = (announcements ?? []).filter(
+    (announcement) =>
+      !announcement.archived_at &&
+      (!announcement.expires_at ||
+        Date.parse(announcement.expires_at) > Date.now()),
+  );
+  if (!activeAnnouncements.length) return articleUnread;
+
+  const { data: acknowledgements, error: acknowledgementError } =
+    await supabase
+      .from("cg_general_announcement_acknowledgements")
+      .select("announcement_id")
+      .eq("user_id", userId)
+      .in(
+        "announcement_id",
+        activeAnnouncements.map((announcement) => announcement.id),
+      );
+  if (acknowledgementError) throw acknowledgementError;
+  return articleUnread + activeAnnouncements.length - (acknowledgements ?? []).length;
+}
