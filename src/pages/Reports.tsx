@@ -13,7 +13,6 @@ import {
   Globe2,
   KeyRound,
   Laptop,
-  Link2,
   Mail,
   Newspaper,
   Phone,
@@ -40,18 +39,14 @@ import "./Reports.css";
 type Category =
   | "websites"
   | "emails"
-  | "links"
   | "files"
   | "passwords"
   | "phones"
   | "addresses"
-  | "breaches"
   | "devices"
   | "news";
 
 type Finding = "safe" | "suspicious" | "high" | "unverified" | "info";
-
-type RiskFinding = "safe" | "suspicious" | "high";
 
 type Range = "today" | "yesterday" | "7days" | "30days" | "all" | "custom";
 
@@ -72,7 +67,6 @@ type ReportItem = {
   score?: number;
   notes?: string[];
   passwordStrength?: "strong" | "moderate" | "weak";
-  breachFound?: boolean;
 };
 
 const CATEGORIES: {
@@ -92,12 +86,6 @@ const CATEGORIES: {
     label: "Emails scanned",
     icon: Mail,
     description: "Phishing and suspicious-message detection",
-  },
-  {
-    id: "links",
-    label: "Links scanned",
-    icon: Link2,
-    description: "URL and link reputation checks",
   },
   {
     id: "files",
@@ -124,12 +112,6 @@ const CATEGORIES: {
     description: "Email-address reputation and exposure",
   },
   {
-    id: "breaches",
-    label: "Data breaches checked",
-    icon: ShieldAlert,
-    description: "Known breach lookups",
-  },
-  {
     id: "devices",
     label: "Device scans",
     icon: Laptop,
@@ -150,8 +132,6 @@ const FINDINGS: Record<Finding, string> = {
   unverified: "Unverified",
   info: "Informational",
 };
-
-const RISK_CATEGORIES: RiskFinding[] = ["safe", "suspicious", "high"];
 
 const SOURCE_LABELS: Record<ReportSource, string> = {
   website_history: "Website Tracker history",
@@ -432,10 +412,14 @@ function ReportsContent() {
     (item) => item.finding === "high" || item.finding === "suspicious",
   );
 
-  // Unverified and informational records do not enter
-  const riskTotal = items.filter((item) =>
-    RISK_CATEGORIES.includes(item.finding as RiskFinding),
-  ).length;
+  const counts = useMemo(
+    () => ({
+      safe: items.filter((item) => item.finding === "safe").length,
+      suspicious: items.filter((item) => item.finding === "suspicious").length,
+      high: items.filter((item) => item.finding === "high").length,
+    }),
+    [items],
+  );
 
   const shown = useMemo(
     () =>
@@ -523,14 +507,6 @@ function ReportsContent() {
   };
 
   const getResultLabel = (item: ReportItem) => {
-    if (item.category === "breaches") {
-      if (typeof item.breachFound === "boolean") {
-        return item.breachFound ? "Yes" : "No";
-      }
-
-      return "Not checked";
-    }
-
     if (item.category === "passwords" && item.passwordStrength) {
       return {
         strong: "Strong",
@@ -543,13 +519,6 @@ function ReportsContent() {
   };
 
   const getResultClass = (item: ReportItem) => {
-    if (item.category === "breaches") {
-      if (typeof item.breachFound === "boolean") {
-        return item.breachFound ? "high" : "safe";
-      }
-
-      return "unverified";
-    }
     if (item.category === "passwords" && item.passwordStrength) {
       return {
         strong: "safe",
@@ -598,72 +567,70 @@ function ReportsContent() {
 
   return (
     <main className="reports-page">
-      {/* PAGE HEADER */}
       <header className="report-topbar no-print">
         <div>
-          <h1>Security Activity Report</h1>
-          <p>A complete record of your CyberGuard security activity.</p>
+          <h1>Security reports</h1>
+          <p>
+            {loading
+              ? "Loading activity…"
+              : flagged.length
+                ? `${items.length} activities · ${flagged.length} flagged`
+                : `${items.length} activities in this period`}
+          </p>
         </div>
 
-        <div className="report-top-actions">
-          <button type="button" onClick={() => window.print()}>
-            <Printer size={16} />
-            Print / Save PDF
-          </button>
+        <div className="report-toolbar">
+          <label className="report-period">
+            <CalendarDays size={16} />
+            <select
+              value={range}
+              aria-label="Report period"
+              onChange={(event) => setRange(event.target.value as Range)}
+            >
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="7days">Last 7 days</option>
+              <option value="30days">Last 30 days</option>
+              <option value="all">All time</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </label>
 
-          <button type="button" onClick={exportCsv}>
-            <Download size={16} />
-            CSV
-          </button>
-
-          <button type="button" onClick={exportJson}>
-            <Download size={16} />
-            JSON
-          </button>
-        </div>
-      </header>
-
-      {/* DATE FILTER */}
-      <div className="report-controls no-print">
-        <label>
-          <CalendarDays size={16} />
-          Report period
-          <select
-            value={range}
-            onChange={(event) => setRange(event.target.value as Range)}
-          >
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="all">All time</option>
-            <option value="custom">Custom range</option>
-          </select>
-        </label>
-
-        {range === "custom" && (
-          <div className="report-custom-dates">
-            <label>
-              From
+          {range === "custom" && (
+            <div className="report-custom-dates">
               <input
                 type="date"
+                aria-label="From date"
                 value={start}
                 onChange={(event) => setStart(event.target.value)}
               />
-            </label>
-
-            <label>
-              To
+              <span>to</span>
               <input
                 type="date"
+                aria-label="To date"
                 min={start || undefined}
                 value={end}
                 onChange={(event) => setEnd(event.target.value)}
               />
-            </label>
+            </div>
+          )}
+
+          <div className="report-top-actions">
+            <button type="button" onClick={() => window.print()}>
+              <Printer size={16} />
+              Print
+            </button>
+            <button type="button" onClick={exportCsv}>
+              <Download size={16} />
+              CSV
+            </button>
+            <button type="button" onClick={exportJson}>
+              <Download size={16} />
+              JSON
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      </header>
 
       {loadError && (
         <div className="report-notice report-error">
@@ -672,134 +639,50 @@ function ReportsContent() {
       )}
 
       <article className="report-document">
-        {/* REPORT HEADER */}
         <section className="report-document-header">
           <div>
-            <h2>{periodLabel} — Security Summary</h2>
+            <h2>{periodLabel}</h2>
             <p>Generated {new Date().toLocaleString()}</p>
           </div>
-
-          <div className="report-id">
-            <span>REPORT TYPE</span>
-            <strong>Activity overview</strong>
-
-            <span>STATUS</span>
-            <strong>{loading ? "Loading" : "Generated"}</strong>
-          </div>
         </section>
 
-        {/* SECTION 1: EXECUTIVE SUMMARY */}
         <section className="report-section">
           <div className="report-section-title">
-            <span>01</span>
-            <h3>Executive summary</h3>
+            <h3>Summary</h3>
           </div>
 
-          <p className="report-intro">
-            CyberGuard recorded <strong>{items.length} activities</strong> in
-            the selected period across{" "}
-            <strong>
-              {
-                CATEGORIES.filter((category) =>
-                  items.some((item) => item.category === category.id),
-                ).length
-              }{" "}
-              security categories
-            </strong>
-            .{" "}
-            {flagged.length
-              ? `${flagged.length} activities were flagged for review.`
-              : "No high-risk or suspicious findings are present in the displayed records."}
-          </p>
-
-          {/* THREE SUMMARY CARDS */}
           <div className="report-metrics">
             <div>
-              <Activity size={19} />
-              <span>Total activities</span>
+              <Activity size={18} />
+              <span>Total</span>
               <strong>{items.length}</strong>
             </div>
-
             <div>
-              <CheckCircle2 size={19} color="#059669" />
+              <CheckCircle2 size={18} />
               <span>Safe</span>
-              <strong>
-                {items.filter((item) => item.finding === "safe").length}
-              </strong>
+              <strong>{counts.safe}</strong>
             </div>
-
             <div>
-              <AlertTriangle size={19} color="#e6a000" />
+              <AlertTriangle size={18} />
               <span>Suspicious</span>
-              <strong>
-                {items.filter((item) => item.finding === "suspicious").length}
-              </strong>
+              <strong>{counts.suspicious}</strong>
             </div>
-
             <div>
-              <ShieldAlert size={19} color="#ef4444" />
+              <ShieldAlert size={18} />
               <span>High risk</span>
-              <strong>
-                {items.filter((item) => item.finding === "high").length}
-              </strong>
-            </div>
-          </div>
-
-          {/* THREE-CATEGORY RISK DISTRIBUTION */}
-          <div className="report-risk-overview">
-            <div className="report-risk-head">
-              <strong>Risk distribution</strong>
-              <span>{riskTotal} classified security results</span>
-            </div>
-
-            <div className="report-risk-track">
-              {RISK_CATEGORIES.map((finding) => {
-                const count = items.filter(
-                  (item) => item.finding === finding,
-                ).length;
-
-                if (count === 0) return null;
-
-                return (
-                  <span
-                    key={finding}
-                    className={`report-risk-fill ${finding}`}
-                    style={{
-                      width: `${(count / Math.max(riskTotal, 1)) * 100}%`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            <div className="report-risk-legend">
-              {RISK_CATEGORIES.map((finding) => (
-                <span key={finding}>
-                  <i className={`report-dot ${finding}`} />
-                  {FINDINGS[finding]}:{" "}
-                  {items.filter((item) => item.finding === finding).length}
-                </span>
-              ))}
+              <strong>{counts.high}</strong>
             </div>
           </div>
         </section>
 
-        {/* SECTION 2: SECURITY CATEGORIES */}
         <section className="report-section">
           <div className="report-section-title">
-            <span>02</span>
-            <h3>Activity by security category</h3>
+            <h3>Categories</h3>
           </div>
-
-          <p className="report-section-desc">
-            Every security feature is represented below. Categories without
-            recorded activity show zero.
-          </p>
 
           <div className="report-category-grid">
             {CATEGORIES.map(({ id, label, icon: Icon }) => {
               const group = items.filter((item) => item.category === id);
-
               const warnings = group.filter(
                 (item) =>
                   item.finding === "high" || item.finding === "suspicious",
@@ -814,7 +697,6 @@ function ReportsContent() {
                   }`}
                   onClick={() => {
                     setSelectedCategory(selectedCategory === id ? "all" : id);
-
                     document
                       .getElementById("report-activity")
                       ?.scrollIntoView({
@@ -823,51 +705,44 @@ function ReportsContent() {
                       });
                   }}
                 >
-                  <span className="report-category-icon">
-                    <Icon size={19} />
+                  <span className="report-category-top">
+                    <span className="report-category-icon">
+                      <Icon size={16} />
+                    </span>
+                    <strong>{group.length}</strong>
                   </span>
-
                   <span className="report-category-name">{label}</span>
-
-                  <strong>{group.length}</strong>
-
-                  <small>
-                    {warnings
-                      ? `${warnings} flagged`
-                      : group.length
-                        ? "No flagged findings"
-                        : "No activity"}
-                  </small>
+                  {warnings > 0 && (
+                    <small className="report-category-flag">
+                      {warnings} flagged
+                    </small>
+                  )}
                 </button>
               );
             })}
           </div>
         </section>
 
-        {/* SECTION 3: DETAILED ACTIVITY LOG */}
         <section className="report-section" id="report-activity">
           <div className="report-section-title">
-            <span>03</span>
-            <h3>Detailed activity log</h3>
+            <h3>Activity</h3>
           </div>
 
           <div className="report-log-controls no-print">
             <label className="report-search">
-              <Search size={17} />
-
+              <Search size={16} />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search activity, domain, filename, or result..."
+                placeholder="Search activity…"
               />
-
               {search && (
                 <button
                   type="button"
                   aria-label="Clear search"
                   onClick={() => setSearch("")}
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               )}
             </label>
@@ -880,7 +755,6 @@ function ReportsContent() {
               }
             >
               <option value="all">All categories</option>
-
               {CATEGORIES.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.label}
@@ -954,56 +828,36 @@ function ReportsContent() {
 
                     {open && (
                       <div className="report-log-detail">
-                        <div>
-                          <strong>Source:</strong> {SOURCE_LABELS[item.source]}
-                        </div>
+                        <p>
+                          <strong>Source</strong> {SOURCE_LABELS[item.source]}
+                        </p>
 
-                        {/* PASSWORD CHECKER DETAILS */}
                         {item.category === "passwords" && (
-                          <div className="report-password-detail">
-                            <strong>Password checked:</strong>
-
-                            <div className="report-password-field">
-                              <span>••••••••••••</span>
-                              <span className="report-password-private">
-                                Hidden for security
-                              </span>
-                            </div>
-
-                            <p>
-                              <strong>Password strength:</strong>{" "}
-                              <span
-                                className={`report-finding ${getResultClass(item)}`}
-                              >
-                                {getResultLabel(item)}
-                              </span>
-                            </p>
-
-                            <small>
-                              The original password is not stored in the report
-                              and cannot be revealed.
-                            </small>
-                          </div>
+                          <p>
+                            Password strength:{" "}
+                            <span
+                              className={`report-finding ${getResultClass(item)}`}
+                            >
+                              {getResultLabel(item)}
+                            </span>
+                            . The password itself is not stored.
+                          </p>
                         )}
 
-                        {/* RISK SCORE FOR OTHER SECURITY CHECKS */}
                         {item.category !== "passwords" &&
                           typeof item.score === "number" && (
-                            <div>
-                              <strong>Risk score:</strong> {item.score}/100
-                            </div>
+                            <p>
+                              <strong>Risk score</strong> {item.score}/100
+                            </p>
                           )}
 
-                        {/* ADDITIONAL SCAN DETAILS */}
                         {item.notes?.length ? (
                           <ul>
                             {item.notes.map((note, index) => (
                               <li key={index}>{note}</li>
                             ))}
                           </ul>
-                        ) : (
-                          <p>No additional details recorded.</p>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -1023,18 +877,17 @@ function ReportsContent() {
 
                 <p>
                   {loading
-                    ? "Gathering website history, scans, and news activity…"
+                    ? "Gathering recent activity…"
                     : items.length === 0
-                      ? "Use Website Tracker, Email Scanner, Security Checker, or News — activity will appear here automatically."
-                      : "No activities match your selected filters."}
+                      ? "Scan emails, check security items, or use Website Tracker to start building this report."
+                      : "Try a different period or clear your search."}
                 </p>
               </div>
             )}
           </div>
 
           <p className="report-footnote">
-            Showing {shown.length} of {items.length} activities for{" "}
-            {periodLabel.toLowerCase()}.{" "}
+            {shown.length} of {items.length} · {periodLabel.toLowerCase()}
           </p>
         </section>
 
