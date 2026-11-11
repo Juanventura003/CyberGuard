@@ -17,6 +17,7 @@ const CyberAssistant = lazy(() => import("./pages/CyberAssistant"));
 const News = lazy(() => import("./pages/News"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 import { OrganizationPresenceProvider } from "./context/OrganizationPresenceContext";
 import { useAuth } from "./context/AuthContext";
@@ -122,6 +123,8 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
 
                 <Route path="/settings" element={<Settings />} />
+
+                <Route path="/reset-password" element={<ResetPassword />} />
 
                 {/* Unknown route */}
                 <Route

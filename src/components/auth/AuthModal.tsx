@@ -2,7 +2,11 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../lib/supabase";
+import "../../lib/passwordRecovery";
 import cyberGuardLogo from "../../assets/logo.png";
+
+type AuthMode = "login" | "signup" | "forgot";
 
 type AuthModalProps = {
   isOpen: boolean;
@@ -15,7 +19,7 @@ function AuthModal({
   onClose,
   startingMode = "login",
 }: AuthModalProps) {
-  const [mode, setMode] = useState<"login" | "signup">(startingMode);
+  const [mode, setMode] = useState<AuthMode>(startingMode);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,6 +28,7 @@ function AuthModal({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const { signIn, signUp } = useAuth();
@@ -33,7 +38,7 @@ function AuthModal({
     return null;
   }
 
-  const switchMode = (newMode: "login" | "signup") => {
+  const switchMode = (newMode: AuthMode) => {
     setMode(newMode);
     setFirstName("");
     setLastName("");
@@ -43,12 +48,35 @@ function AuthModal({
     setConfirmPassword("");
     setError(null);
     setSuccess(false);
+    setResetSent(false);
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
     setError(null);
+
+    if (mode === "forgot") {
+      const client = supabase;
+      if (!client) {
+        setError("Password reset is unavailable because Supabase is not configured.");
+        return;
+      }
+
+      setSubmitting(true);
+      const { error: resetError } = await client.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      setSubmitting(false);
+
+      if (resetError) {
+        setError(resetError.message);
+        return;
+      }
+
+      setResetSent(true);
+      return;
+    }
 
     if (mode === "signup" && password !== confirmPassword) {
       setError("Passwords don't match");
@@ -62,14 +90,14 @@ function AuthModal({
 
       setSubmitting(false);
 
-    if (error) {
+      if (error) {
         setError(error.message);
         return;
-    }
+      }
 
-    onClose();
-    navigate("/dashboard");
-    return;
+      onClose();
+      navigate("/dashboard");
+      return;
     }
 
     const { error } = await signUp(email, password, { username, firstName, lastName });
@@ -83,6 +111,38 @@ function AuthModal({
 
     setSuccess(true);
   };
+
+  const title =
+    mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Reset Password";
+
+  const subtitle =
+    mode === "login"
+      ? "Sign in to access your CyberGuard account."
+      : mode === "signup"
+        ? "Create an account to save your CyberGuard activity."
+        : "Enter your email and we'll send you a link to choose a new password.";
+
+  const submitLabel = submitting
+    ? mode === "login"
+      ? "Signing in..."
+      : mode === "signup"
+        ? "Creating account..."
+        : "Sending..."
+    : mode === "login"
+      ? "Sign In"
+      : mode === "signup"
+        ? "Sign Up"
+        : "Send reset link";
+
+  const switchPrompt =
+    mode === "login"
+      ? "Don't have an account?"
+      : mode === "signup"
+        ? "Already have an account?"
+        : "Remembered your password?";
+
+  const switchTarget: AuthMode = mode === "login" ? "signup" : "login";
+  const switchLabel = mode === "login" ? "Sign Up" : "Sign In";
 
   return (
     <div className="auth-modal-overlay">
@@ -100,18 +160,29 @@ function AuthModal({
             <img src={cyberGuardLogo} alt="CyberGuard logo" />
           </div>
 
-          <h2>
-            {mode === "login" ? "Sign In" : "Create Account"}
-          </h2>
+          <h2>{title}</h2>
 
-          <p>
-            {mode === "login"
-              ? "Sign in to access your CyberGuard account."
-              : "Create an account to save your CyberGuard activity."}
-          </p>
+          <p>{subtitle}</p>
         </div>
 
-        {success ? (
+        {resetSent ? (
+          <div className="auth-success">
+            <h3>Check your email</h3>
+
+            <p>
+              If an account exists for <strong>{email}</strong>, we sent a link
+              to reset your password. The link expires after a short time.
+            </p>
+
+            <button
+              className="auth-submit-button"
+              type="button"
+              onClick={() => switchMode("login")}
+            >
+              Back to Sign In
+            </button>
+          </div>
+        ) : success ? (
           <div className="auth-success">
             <h3>Check your email</h3>
 
@@ -184,17 +255,19 @@ function AuthModal({
               />
             </label>
 
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Enter your password"
-                minLength={mode === "signup" ? 6 : undefined}
-                required
-              />
-            </label>
+            {mode !== "forgot" && (
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter your password"
+                  minLength={mode === "signup" ? 6 : undefined}
+                  required
+                />
+              </label>
+            )}
 
             {mode === "signup" && (
               <label>
@@ -210,34 +283,27 @@ function AuthModal({
               </label>
             )}
 
+            {mode === "login" && (
+              <p className="auth-switch">
+                <button type="button" onClick={() => switchMode("forgot")}>
+                  Forgot password?
+                </button>
+              </p>
+            )}
+
             <button
               className="auth-submit-button"
               type="submit"
               disabled={submitting}
             >
-              {submitting
-                ? mode === "login"
-                  ? "Signing in..."
-                  : "Creating account..."
-                : mode === "login"
-                ? "Sign In"
-                : "Sign Up"}
+              {submitLabel}
             </button>
 
             <p className="auth-switch">
-              {mode === "login"
-                ? "Don't have an account?"
-                : "Already have an account?"}
+              {switchPrompt}
 
-              <button
-                type="button"
-                onClick={() =>
-                  switchMode(
-                    mode === "login" ? "signup" : "login"
-                  )
-                }
-              >
-                {mode === "login" ? "Sign Up" : "Sign In"}
+              <button type="button" onClick={() => switchMode(switchTarget)}>
+                {switchLabel}
               </button>
             </p>
           </form>
