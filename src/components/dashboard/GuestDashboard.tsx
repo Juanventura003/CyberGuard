@@ -202,7 +202,7 @@ function GuestDashboard() {
           </div>
 
           <p>
-            Ask cybersecurity questions and get help understandingthreats.
+            Ask cybersecurity questions and get help understanding threats.
           </p>
 
           <button

@@ -12,7 +12,7 @@ import {
   platformCatalogReply,
   type PlatformFeature,
 } from "./platformGuide";
-import type { AssistantMessage, AssistantReplyProvider } from "./types";
+import { SUGGESTED_PROMPTS, type AssistantMessage, type AssistantReplyProvider } from "./types";
 
 type ScoredTopic = {
   topic: KnowledgeTopic;
@@ -29,15 +29,22 @@ const OFFENSIVE_PATTERNS = [
   /\bhow (do|can|to) (i|you) hack\b/,
   /\bhack (into|someone|an? account)\b/,
   /\bcrack (a |the )?password\b/,
-  /\bsteal (passwords?|accounts?|data)\b/,
-  /\bbypass (2fa|mfa|authentication|security|login)\b/,
+  /\bsteal (passwords?|accounts?|data|credentials?)\b/,
+  /\bbypass (2fa|mfa|authentication|security|login|firewall)\b/,
   /\bmake (a )?virus\b/,
-  /\bcreate (malware|ransomware)\b/,
+  /\bcreate (malware|ransomware|a trojan)\b/,
+  /\bwrite (malware|a virus|an exploit)\b/,
   /\bdos attack\b/,
   /\bddos\b/,
   /\bsql injection\b/,
   /\bkeylogger\b/,
   /\bbrute ?force\b/,
+  /\bphishing kit\b/,
+  /\bsocial.?engineer (someone|people|a person)\b/,
+  /\bdisable (antivirus|defender|firewall)\b/,
+  /\bexploit (a |the )?(vulnerability|cve|zero.?day)\b/,
+  /\brce\b/,
+  /\bremote code execution\b/,
 ];
 
 const NAV_INTENTS = [
@@ -80,6 +87,18 @@ const RECOVERY_HINTS = [
   "been hacked",
   "account taken over",
   "someone got into",
+];
+
+const FOLLOW_UP_PATTERNS = [
+  /^(what|how) about (that|it|this|those|them)\b/,
+  /^tell me more\b/,
+  /^and then\b/,
+  /^what next\b/,
+  /^what should i do (next|now)\b/,
+  /^same for\b/,
+  /^more (please|detail|info|information)?$/,
+  /^(continue|go on|yes|yep|yeah)$/,
+  /^(that|it|this|those|them)\b.{0,40}$/,
 ];
 
 function normalize(text: string): string {
@@ -150,7 +169,7 @@ function scoreFeature(text: string, feature: PlatformFeature): number {
   let hits = 0;
 
   for (const keyword of feature.keywords) {
-    if (includesKeyword(text, keyword) || text.includes(keyword)) {
+    if (includesKeyword(text, keyword)) {
       score += keywordWeight(keyword);
       hits += 1;
     }
@@ -306,12 +325,60 @@ function wantsPlatformHelp(text: string): boolean {
     text.includes("platform") ||
     text.includes("sidebar") ||
     text.includes("menu") ||
-    text.includes("feature") ||
-    text.includes("tool")
+    /\b(features?|tools?)\b/.test(text)
   );
 }
 
-function matchPlatformReply(text: string): string | null {
+function isFollowUp(text: string): boolean {
+  return FOLLOW_UP_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/** Combine short follow-ups with the previous user question for better matching. */
+export function resolveUserQuery(messages: AssistantMessage[]): string {
+  const userMessages = messages.filter((message) => message.role === "user");
+  const last = userMessages[userMessages.length - 1]?.content ?? "";
+  const previous = userMessages[userMessages.length - 2]?.content;
+  const normalized = normalize(last);
+
+  if (!normalized) {
+    return "";
+  }
+
+  if (previous && isFollowUp(normalized)) {
+    return `${previous}\n${last}`;
+  }
+
+  return last;
+}
+
+function shouldPreferPlatform(
+  text: string,
+  best: ScoredFeature,
+  topicBestScore: number,
+): boolean {
+  const exactName = text.includes(best.feature.name.toLowerCase());
+
+  if (hasNavIntent(text) || exactName) {
+    return true;
+  }
+
+  // Strong feature match without a competing security topic.
+  if (best.score >= 8 && best.score >= topicBestScore + 2) {
+    return true;
+  }
+
+  // Explicit platform/help wording with a solid feature hit.
+  if (wantsPlatformHelp(text) && best.score >= 5 && best.score >= topicBestScore) {
+    return true;
+  }
+
+  return false;
+}
+
+function matchPlatformReply(
+  text: string,
+  topicBestScore: number,
+): string | null {
   const ranked = rankFeatures(text);
   if (ranked.length === 0) {
     if (
@@ -330,23 +397,18 @@ function matchPlatformReply(text: string): string | null {
   const best = ranked[0];
   const second = ranked[1];
 
-  const clearFeatureHit =
-    best.score >= 2 ||
-    hasNavIntent(text) ||
-    text.includes(best.feature.name.toLowerCase()) ||
-    wantsPlatformHelp(text) ||
-    (ranked.length === 1 && best.score >= 1);
+  if (!shouldPreferPlatform(text, best, topicBestScore)) {
+    return null;
+  }
 
-  // Strong navigation / feature question → send them to the page.
-  if (clearFeatureHit) {
-    if (
-      second &&
-      second.score >= best.score - 1 &&
-      second.feature.id !== best.feature.id &&
-      (hasNavIntent(text) || second.score >= 3)
-    ) {
-      const options = ranked.slice(0, 4);
-      return `I can send you to a few matching places in CyberGuard:
+  if (
+    second &&
+    second.score >= best.score - 1 &&
+    second.feature.id !== best.feature.id &&
+    (hasNavIntent(text) || second.score >= 3)
+  ) {
+    const options = ranked.slice(0, 4);
+    return `I can send you to a few matching places in CyberGuard:
 
 ${options
   .map(
@@ -356,12 +418,9 @@ ${options
   .join("\n")}
 
 Which one do you need?`;
-    }
-
-    return formatFeatureRedirect(best.feature);
   }
 
-  return null;
+  return formatFeatureRedirect(best.feature);
 }
 
 function withToolRedirects(topicId: string, reply: string): string {
@@ -379,12 +438,14 @@ function matchReply(userText: string): string {
     return OUT_OF_SCOPE_REPLY;
   }
 
-  const platformReply = matchPlatformReply(text);
+  const ranked = applyRecoveryBias(text, rankTopics(text));
+  const topicBestScore = ranked[0]?.score ?? 0;
+
+  const platformReply = matchPlatformReply(text, topicBestScore);
   if (platformReply) {
     return platformReply;
   }
 
-  const ranked = applyRecoveryBias(text, rankTopics(text));
   if (ranked.length === 0) {
     if (wantsPlatformHelp(text)) {
       return platformCatalogReply();
@@ -405,24 +466,78 @@ function matchReply(userText: string): string {
     return clarifyingReply(ranked);
   }
 
-  if (best.score < 1) {
-    return `${TOPIC_CATALOG_FALLBACK}\n\n${platformCatalogReply()}`;
-  }
-
   return withToolRedirects(
     best.topic.id,
     `${best.topic.reply}${relatedSuggestions(ranked, best.topic.id)}`,
   );
 }
 
+const TOPIC_FOLLOW_UPS: Record<string, string[]> = {
+  phishing: [
+    "What should I do if I think I clicked a bad link?",
+    "Where is the Email Scanner?",
+  ],
+  links: [
+    "How can I tell if an email is phishing?",
+    "Where can I track website risk?",
+  ],
+  websites: [
+    "How do I check if a link is safe?",
+    "Where is Device Scanner?",
+  ],
+  incident: [
+    "How can I tell if an email is phishing?",
+    "Where is the Email Scanner?",
+  ],
+  malware: [
+    "Where is Device Scanner?",
+    "Where is System Guardian?",
+  ],
+  "device-security": [
+    "Where is Device Scanner?",
+    "Where is System Guardian?",
+  ],
+  "work-security": [
+    "Where is Team Security?",
+    "Where is the Email Scanner?",
+  ],
+  "cyberguard-tools": [
+    "Where is the Email Scanner?",
+    "Where can I track website risk?",
+  ],
+};
+
+/** Contextual chips after the user has started chatting. */
+export function suggestionPromptsFor(userText: string): string[] {
+  const text = normalize(userText);
+  if (!text) {
+    return [...SUGGESTED_PROMPTS];
+  }
+
+  const ranked = applyRecoveryBias(text, rankTopics(text));
+  const best = ranked[0];
+  const prompts: string[] = [];
+
+  if (best) {
+    prompts.push(...(TOPIC_FOLLOW_UPS[best.topic.id] ?? []));
+    for (const entry of ranked.slice(1, 3)) {
+      prompts.push(`Tell me about ${entry.topic.title.toLowerCase()}`);
+    }
+  }
+
+  prompts.push("What tools does CyberGuard have?");
+
+  const unique = [...new Set(prompts)].filter(
+    (prompt) => normalize(prompt) !== text,
+  );
+
+  return unique.slice(0, 6);
+}
+
 export const localGuidedProvider: AssistantReplyProvider = {
   async getReply(messages) {
-    const lastUser = [...messages]
-      .reverse()
-      .find((m: AssistantMessage) => m.role === "user");
-
-    const content = lastUser?.content ?? "";
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    const content = resolveUserQuery(messages);
+    await new Promise((resolve) => setTimeout(resolve, 180));
     return matchReply(content);
   },
 };
