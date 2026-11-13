@@ -25,9 +25,15 @@ import {
   type ScanFinding,
   type SecurityScanEntry,
 } from "../../lib/scanActivity";
+import {
+  SAMPLE_ASSISTANT_QUESTIONS,
+  assistantQuestionPath,
+} from "../../lib/assistant";
 
 const SAMPLE_ASSISTANT_QUESTION =
-  "How can I tell if an email is phishing?";
+  SAMPLE_ASSISTANT_QUESTIONS[
+    Math.floor(Math.random() * SAMPLE_ASSISTANT_QUESTIONS.length)
+  ];
 
 const POLL_MS = 30_000;
 
@@ -497,9 +503,7 @@ function LoggedInDashboard() {
             className="dashboard-button"
             type="button"
             onClick={() =>
-              navigate(
-                `/cyber-assistant?q=${encodeURIComponent(SAMPLE_ASSISTANT_QUESTION)}`,
-              )
+              navigate(assistantQuestionPath(SAMPLE_ASSISTANT_QUESTION))
             }
           >
             Ask Cyber Assistant

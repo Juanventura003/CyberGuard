@@ -1393,6 +1393,20 @@ body {
   margin-top: 6px;
 }
 
+.tracker-assistant-link {
+  display: inline-block;
+  margin-top: 8px;
+
+  color: #4169e1;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tracker-assistant-link:hover {
+  color: #294db5;
+  text-decoration: underline;
+}
+
 /* Allow domain cells to shrink inside the tracker grid. */
 .tracker-domain,
 .tracker-domain > div {

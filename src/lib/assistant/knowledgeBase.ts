@@ -909,9 +909,13 @@ Private browsing reduces local leftovers; it does not hide activity from the net
 
 **Open these from the left sidebar**
 - [Dashboard](/dashboard) — home overview
+- [Team Security](/organization) — shared findings and team protection
 - [Website Tracker](/website-tracker) — site risk scores
 - [Email Scanner](/email-scanner) — phishing scans (paste or Gmail)
 - [Security Checker](/security-checker) — security checks
+- [Device Scanner](/device-scanner) — local device assessments
+- [System Guardian](/system-guardian) — live process and network monitoring
+- [News](/news) — recent cybersecurity articles
 - [Reports](/reports) — report summaries
 - [Settings](/settings) — preferences
 - Login / Sign up — buttons at the top of the sidebar
