@@ -586,7 +586,20 @@ def frontend_origins() -> list[str]:
 
 
 def is_allowed_frontend_return(return_to: str) -> bool:
-    return any(return_to.startswith(origin) for origin in frontend_origins())
+    try:
+        parsed = urlsplit(return_to)
+
+        if parsed.scheme not in ("http", "https"):
+            return False
+
+        if parsed.username or parsed.password:
+            return False
+
+        return bool(parsed.netloc) and (
+            f"{parsed.scheme}://{parsed.netloc}" in frontend_origins()
+        )
+    except ValueError:
+        return False
 
 
 app.add_middleware(
