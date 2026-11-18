@@ -211,6 +211,60 @@ const emailToReportItem = (entry: EmailScanEntry): ReportItem => ({
   source: "email_scanner",
 });
 
+function getDeviceReportFinding(
+  entry: SecurityScanEntry
+): Finding {
+  if (
+    entry.checkType !== "device" ||
+    !entry.title.toLowerCase().includes("device security scan")
+  ) {
+    return entry.finding;
+  }
+
+  const getStatus = (name: string) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = entry.detail.match(
+      new RegExp(`${escaped}:\\s*([^·]+)`, "i")
+    );
+    return match?.[1]?.trim().toLowerCase();
+  };
+
+  const isMac = entry.title.toLowerCase().includes("macos");
+
+  const firstStatus = isMac
+    ? getStatus("Gatekeeper")
+    : getStatus("Antivirus");
+
+  const secondStatus = isMac
+    ? getStatus("SIP")
+    : getStatus("Firewall");
+
+  const isProtected = (status?: string) =>
+    status === "protected";
+
+  const isUnprotected = (status?: string) =>
+    ["warning", "unprotected", "not protected", "disabled"].includes(
+      status ?? ""
+    );
+
+  if (isProtected(firstStatus) && isProtected(secondStatus)) {
+    return "safe";
+  }
+
+  if (isUnprotected(firstStatus) && isUnprotected(secondStatus)) {
+    return "high";
+  }
+
+  if (
+    (isProtected(firstStatus) && isUnprotected(secondStatus)) ||
+    (isUnprotected(firstStatus) && isProtected(secondStatus))
+  ) {
+    return "suspicious";
+  }
+
+  return "unverified";
+}
+
 const securityToReportItem = (entry: SecurityScanEntry): ReportItem => {
   const category = SECURITY_CATEGORY[entry.checkType];
   const isPassword = entry.checkType === "password";
@@ -220,7 +274,7 @@ const securityToReportItem = (entry: SecurityScanEntry): ReportItem => {
     category,
     title: entry.title,
     detail: isPassword ? "Password value not stored in report" : entry.detail,
-    finding: entry.finding,
+    finding: getDeviceReportFinding(entry),
     occurredAt: entry.occurredAt,
     source: securitySourceOf(entry.checkType),
     passwordStrength: isPassword ? passwordStrengthOf(entry) : undefined,
