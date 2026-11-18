@@ -99,36 +99,45 @@ function statusClass(status?: string) {
   return "neutral";
 }
 
-function deviceFindingFromResult(data: SecurityResult): ScanFinding {
-  const statuses = [
-    data.antivirus?.status,
-    data.firewall?.status,
-    data.threats?.status,
-    data.gatekeeper?.status,
-    data.sip?.status,
-    data.filevault?.status,
-    data.xprotect?.status,
-  ].filter(Boolean);
 
-  if (
-    statuses.some(
-      (status) =>
-        status === "warning" ||
-        status === "threats_found" ||
-        status === "completed_with_errors",
-    )
-  ) {
-    return "high";
-  }
-  if (statuses.some((status) => status === "unknown" || status === "not_scanned")) {
-    return "unverified";
-  }
-  if (
-    statuses.length > 0 &&
-    statuses.every((status) => status === "protected" || status === "clean")
-  ) {
+
+function deviceFindingFromResult(data: SecurityResult): ScanFinding {
+  const isMac = Boolean(data.gatekeeper && data.sip);
+
+  const firstStatus = isMac
+    ? data.gatekeeper?.status
+    : data.antivirus?.status;
+
+  const secondStatus = isMac
+    ? data.sip?.status
+    : data.firewall?.status;
+
+  const isProtected = (status?: string) =>
+    status?.toLowerCase() === "protected";
+
+  const isUnprotected = (status?: string) =>
+    [
+      "warning",
+      "unprotected",
+      "not_protected",
+      "disabled",
+    ].includes(status?.toLowerCase() ?? "");
+
+  if (isProtected(firstStatus) && isProtected(secondStatus)) {
     return "safe";
   }
+
+  if (isUnprotected(firstStatus) && isUnprotected(secondStatus)) {
+    return "high";
+  }
+
+  if (
+    (isProtected(firstStatus) && isUnprotected(secondStatus)) ||
+    (isUnprotected(firstStatus) && isProtected(secondStatus))
+  ) {
+    return "suspicious";
+  }
+
   return "unverified";
 }
 
@@ -251,11 +260,24 @@ function DeviceScanner() {
       setScanStatus("ready");
 
       const finding = deviceFindingFromResult(data);
-      const summary = [
-        `Antivirus: ${statusLabel(data.antivirus?.status)}`,
-        `Firewall: ${statusLabel(data.firewall?.status)}`,
-        `Threats: ${statusLabel(data.threats?.status)}`,
-      ].join(" · ");
+      
+      const isMacScan = Boolean(data.gatekeeper && data.sip);
+
+      const summary = isMacScan
+        ? [
+            `Gatekeeper: ${statusLabel(data.gatekeeper?.status)}`,
+            `SIP: ${statusLabel(data.sip?.status)}`,
+            `Firewall: ${statusLabel(data.firewall?.status)}`,
+            `FileVault: ${statusLabel(data.filevault?.status)}`,
+            `XProtect: ${statusLabel(data.xprotect?.status)}`,
+            `Threats: ${statusLabel(data.threats?.status)}`,
+          ].join(" · ")
+        : [
+            `Antivirus: ${statusLabel(data.antivirus?.status)}`,
+            `Firewall: ${statusLabel(data.firewall?.status)}`,
+            `Threats: ${statusLabel(data.threats?.status)}`,
+          ].join(" · ");
+
       recordSecurityScan(session?.user.id, {
         checkType: "device",
         title: `${operatingSystem || "Device"} security scan`,
