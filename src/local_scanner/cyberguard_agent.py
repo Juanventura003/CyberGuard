@@ -25,7 +25,7 @@ class CyberGuardAgent:
 
         tk.Label(
             root,
-            text="CyberGuard AI",
+            text="CyberGuard",
             font=("Segoe UI", 23, "bold"),
             fg="#FFFFFF",
             bg="#101827",
