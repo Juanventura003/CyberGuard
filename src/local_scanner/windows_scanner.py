@@ -1,6 +1,6 @@
-
 import json
 import subprocess
+
 
 
 def run_powershell(command, timeout=30):
@@ -16,6 +16,7 @@ def run_powershell(command, timeout=30):
         text=True,
         timeout=timeout,
         check=False,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
     if result.returncode != 0:
@@ -24,6 +25,7 @@ def run_powershell(command, timeout=30):
         )
 
     return result.stdout.strip()
+
 
 
 def check_antivirus():

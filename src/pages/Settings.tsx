@@ -12,6 +12,10 @@ import {
   type DesktopPermission,
 } from "../lib/alertNotifications";
 import ProfilePictureCard from "../components/ProfilePictureCard";
+import {
+  checkAgentHealth,
+  isAgentPaired,
+} from "../lib/localAgent";
 import "./Settings.css";
 
 const NOT_CONFIGURED = "Supabase is not configured, so this action is unavailable.";
@@ -736,6 +740,48 @@ function Settings() {
   const { setProfile } = useProfile();
   const [result, setResult] = useState<ProfileResult | null>(null);
 
+
+  const [agentStatus, setAgentStatus] = useState<
+    "checking" | "running" | "offline"
+  >("checking");
+
+  const [agentPaired, setAgentPaired] = useState(false);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+
+    let cancelled = false;
+
+    const checkAgent = async () => {
+      try {
+        const health = await checkAgentHealth();
+
+        if (!cancelled) {
+          setAgentStatus(
+            health.status === "ready" && health.supported
+              ? "running"
+              : "offline"
+          );
+          setAgentPaired(isAgentPaired());
+        }
+      } catch {
+        if (!cancelled) {
+          setAgentStatus("offline");
+          setAgentPaired(false);
+        }
+      }
+    };
+
+    void checkAgent();
+
+    const interval = window.setInterval(checkAgent, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [session?.user.id]);
+
   useEffect(() => {
     const client = supabase;
     if (!user || !client) return;
@@ -850,6 +896,64 @@ function Settings() {
       </section>
 
       {session?.access_token && <SecurityAlertsSettings accessToken={session.access_token} />}
+
+      <section className="settings-card">
+        <h2>CyberGuard Desktop Agent</h2>
+
+        <p className="settings-card-desc">
+          Install CyberGuard Agent on your Windows computer to enable
+          local device scanning and system security monitoring.
+        </p>
+
+        <div className="settings-form">
+          <div className="settings-toggle-row">
+            <div>
+              <span className="settings-toggle-label">
+                Desktop Agent
+              </span>
+              <span className="settings-toggle-state">
+                Optional Windows application
+              </span>
+            </div>
+
+            <span
+              style={{
+                color:
+                  agentStatus === "running"
+                    ? "#22c55e"
+                    : agentStatus === "offline"
+                      ? "#f87171"
+                      : "#94a3b8",
+                fontSize: "13px",
+                fontWeight: 600,
+              }}
+            >
+              {agentStatus === "checking"
+                ? "Checking..."
+                : agentStatus === "offline"
+                  ? "Agent Not Detected"
+                  : agentPaired
+                    ? "Agent Connected"
+                    : "Agent Running — Not Paired"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="settings-button"
+            disabled
+            title="Installer is awaiting security review"
+          >
+            Download CyberGuard Agent — Coming Soon
+          </button>
+
+          <p className="settings-card-desc">
+            The desktop agent is optional. You can continue using
+            CyberGuard without installing it. Downloads will become
+            available after the installer has been reviewed and tested.
+          </p>
+        </div>
+      </section>
 
       {!loadingProfile && !result?.error && profile && (
         <section className="settings-card">

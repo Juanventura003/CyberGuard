@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import AlertNotifier from "./components/AlertNotifier";
 import PageErrorBoundary from "./components/PageErrorBoundary";
 import Sidebar from "./components/Sidebar/Sidebar";
 import AuthModal from "./components/auth/AuthModal";
+import AgentInstallModal from "./components/AgentInstallModal";
 
 const Organization = lazy(() => import("./pages/Organization"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -30,6 +31,42 @@ function App() {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (loading || !session?.user.id) {
+      setAgentModalOpen(false);
+      return;
+    }
+
+    const storageKey = `cyberguard-agent-prompt-${session.user.id}`;
+
+    try {
+      if (sessionStorage.getItem(storageKey) === "dismissed") {
+        return;
+      }
+    } catch {
+      // Continue even if session storage is unavailable.
+    }
+
+    setAgentModalOpen(true);
+  }, [loading, session?.user.id]);
+
+  const closeAgentModal = () => {
+    setAgentModalOpen(false);
+
+    if (session?.user.id) {
+      try {
+        sessionStorage.setItem(
+          `cyberguard-agent-prompt-${session.user.id}`,
+          "dismissed"
+        );
+      } catch {
+        // Session storage may be unavailable.
+      }
+    }
+  };
 
   const openLogin = () => {
     setAuthMode("login");
@@ -142,6 +179,11 @@ function App() {
           isOpen={authModalOpen}
           onClose={() => setAuthModalOpen(false)}
           startingMode={authMode}
+        />
+
+        <AgentInstallModal
+          isOpen={agentModalOpen}
+          onClose={closeAgentModal}
         />
       </div>
     </OrganizationPresenceProvider>

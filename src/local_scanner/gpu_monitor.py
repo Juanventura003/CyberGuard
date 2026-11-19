@@ -101,7 +101,9 @@ def get_windows_gpu_usage():
             text=True,
             timeout=8,
             check=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
+
 
         usage = float(result.stdout.strip())
 

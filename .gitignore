@@ -42,3 +42,14 @@ src/backend/evaluation/
 src/backend/tests/
 extension/tests/
 .vercel
+
+# PyInstaller build files
+build/
+dist/
+
+# Inno Setup generated installer
+installer/output/
+installer/*.exe
+
+# Python packaging
+*.egg-info/

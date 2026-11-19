@@ -15,7 +15,7 @@ class CyberGuardAgent:
     def __init__(self, root):
         self.root = root
         self.root.title("CyberGuard Agent")
-        self.root.geometry("440x370")
+        self.root.geometry("440x420")
         self.root.resizable(False, False)
         self.root.configure(bg="#101827")
 
@@ -65,6 +65,14 @@ class CyberGuardAgent:
         )
         self.code_label.pack(pady=12)
 
+        self.copy_button = tk.Button(
+            root,
+            text="Copy Pairing Code",
+            command=self.copy_code,
+            width=25,
+        )
+        self.copy_button.pack(pady=5)
+
         tk.Button(
             root,
             text="Generate New Code",
@@ -91,6 +99,8 @@ class CyberGuardAgent:
             host="127.0.0.1",
             port=8765,
             log_level="warning",
+            log_config=None,
+            access_log=False,
         )
 
         self.server = uvicorn.Server(config)
@@ -121,6 +131,21 @@ class CyberGuardAgent:
             )
         else:
             self.root.after(300, self.check_server)
+
+    def copy_code(self):
+        if not self.pairing_code:
+            return
+
+        self.root.clipboard_clear()
+        self.root.clipboard_append(self.pairing_code)
+        self.root.update()
+
+        self.copy_button.config(text="Copied!")
+
+        self.root.after(
+            2000,
+            lambda: self.copy_button.config(text="Copy Pairing Code")
+        )
 
     def generate_code(self):
         self.pairing_code = create_pairing_code()

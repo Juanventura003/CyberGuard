@@ -241,6 +241,7 @@ def choose_folder(_=Depends(require_paired_session)):
             capture_output=True,
             text=True,
             timeout=120,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
 
         if result.returncode != 0:
