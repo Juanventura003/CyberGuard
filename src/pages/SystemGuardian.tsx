@@ -27,7 +27,11 @@ import "./SystemGuardian.css";
 import SecurityEventTimeline from "./SecurityEventTimeline";
 import ProcessNetworkActivity from "./ProcessNetworkActivity";
 
-const API_URL = "http://127.0.0.1:8765";
+import AgentPairing from "../components/AgentPairing";
+import {
+  agentFetch,
+  isAgentPaired,
+} from "../lib/localAgent";
 
 type SystemStats = {
   operating_system: string;
@@ -541,6 +545,7 @@ function ProcessFamilyTree({
 }
 
 function SystemGuardian() {
+  const [paired, setPaired] = useState(isAgentPaired());
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -596,6 +601,7 @@ const [applicationCheck, setApplicationCheck] =
   useState<ApplicationTerminationCheck | null>(null);
 
   useEffect(() => {
+    if (!paired) return;
     let active = true;
     let fetching = false;
 
@@ -605,7 +611,7 @@ const [applicationCheck, setApplicationCheck] =
       fetching = true;
 
       try {
-        const response = await fetch(`${API_URL}/system/stats`);
+        const response = await agentFetch("/system/stats");
 
         if (!response.ok) {
           throw new Error("Unable to retrieve system statistics.");
@@ -655,9 +661,10 @@ const [applicationCheck, setApplicationCheck] =
       active = false;
       window.clearInterval(interval);
     };
-  }, []);
+}, [paired]);
 
   useEffect(() => {
+    if (!paired) return;
     let active = true;
     let fetching = false;
 
@@ -667,9 +674,7 @@ const [applicationCheck, setApplicationCheck] =
       fetching = true;
 
       try {
-        const response = await fetch(
-          `${API_URL}/system/processes`
-        );
+        const response = await agentFetch("/system/processes");
 
         if (!response.ok) {
           throw new Error("Unable to retrieve processes.");
@@ -709,7 +714,7 @@ const [applicationCheck, setApplicationCheck] =
       active = false;
       window.clearInterval(interval);
     };
-  }, []);
+  }, [paired]);
 
   const filteredProcesses = processes
     .filter((process) => {
@@ -761,8 +766,8 @@ const [applicationCheck, setApplicationCheck] =
   setProcessError("");
 
   try {
-      const response = await fetch(
-        `${API_URL}/system/processes/${process.pid}`
+      const response = await agentFetch(
+        `/system/processes/${process.pid}`
       );
 
       if (!response.ok) {
@@ -807,8 +812,8 @@ const checkProcessTermination = async (
   }
 
   try {
-    const response = await fetch(
-      `${API_URL}/system/processes/termination-check`,
+    const response = await agentFetch(
+      "/system/processes/termination-check",
       {
         method: "POST",
         headers: {
@@ -859,8 +864,8 @@ const loadApplicationTerminationCheck = async () => {
   setApplicationCheck(null);
 
   try {
-    const response = await fetch(
-      `${API_URL}/system/processes/application-check`,
+    const response = await agentFetch(
+      "/system/processes/application-check",
       {
         method: "POST",
         headers: {
@@ -915,10 +920,10 @@ const confirmProcessTermination = async () => {
   try {
     const endpoint =
       terminationMode === "application"
-        ? `${API_URL}/system/processes/terminate-application`
-        : `${API_URL}/system/processes/terminate`;
+        ? "/system/processes/terminate-application"
+        : "/system/processes/terminate";
 
-    const response = await fetch(endpoint, {
+    const response = await agentFetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1009,6 +1014,16 @@ const confirmProcessTermination = async () => {
 
   return (
     <div className="system-guardian-page">
+
+      {!paired && (
+        <AgentPairing
+          onPaired={() => {
+            setPaired(true);
+            setError("");
+          }}
+        />
+      )}
+
       {/* HEADER */}
       <div className="guardian-topbar">
         <div className="guardian-title-group">
@@ -1034,7 +1049,9 @@ const confirmProcessTermination = async () => {
           }`}
         >
           <Activity size={14} />
-          {error
+          {!paired
+            ? "Pairing Required"
+            : error
             ? "Disconnected"
             : stats
             ? "Connected"
@@ -1046,7 +1063,7 @@ const confirmProcessTermination = async () => {
         <div className="guardian-error">{error}</div>
       )}
 
-      {stats && (
+      {paired && stats && (
         <>
           {/* DEVICE INFORMATION */}
           <div className="guardian-toolbar">

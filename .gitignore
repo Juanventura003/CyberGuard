@@ -41,3 +41,4 @@ src/backend/.cache/
 src/backend/evaluation/
 src/backend/tests/
 extension/tests/
+.vercel

@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import AgentPairing from "../components/AgentPairing";
+import {
+  agentFetch,
+  checkAgentHealth,
+  isAgentPaired,
+} from "../lib/localAgent";
 import {
   Monitor,
   ShieldCheck,
@@ -67,14 +73,6 @@ type MalwareResult = {
   scan_mode?: string;
   targets_count?: number;
 };
-
-type HealthResult = {
-  status: string;
-  operating_system: string;
-  supported: boolean;
-};
-
-const SCANNER_URL = "http://127.0.0.1:8765";
 
 function statusLabel(status?: string) {
   const labels: Record<string, string> = {
@@ -163,6 +161,7 @@ function folderDisplayName(folder?: string) {
 
 function DeviceScanner() {
   const { session } = useAuth();
+  const [paired, setPaired] = useState(isAgentPaired());
   const [operatingSystem, setOperatingSystem] = useState("Detecting...");
   const [scanStatus, setScanStatus] = useState<ScanStatus>("unavailable");
   const [scanResults, setScanResults] = useState<SecurityResult | null>(null);
@@ -193,21 +192,20 @@ function DeviceScanner() {
     }
   }, []);
 
-    useEffect(() => {
-      let active = true;
+      useEffect(() => {
+        if (!paired) {
+          setScanStatus("unavailable");
+          return;
+        }
 
-      const detectScanner = async () => {
+        let active = true;
+
+        const detectScanner = async () => {
         setScanStatus("checking");
         setError("");
 
         try {
-          const response = await fetch(`${SCANNER_URL}/health`);
-
-          if (!response.ok) {
-            throw new Error("Unable to connect to the local scanner.");
-          }
-
-          const data: HealthResult = await response.json();
+          const data = await checkAgentHealth();
 
           if (!data.supported) {
             throw new Error("This operating system is not supported.");
@@ -238,7 +236,7 @@ function DeviceScanner() {
       return () => {
         active = false;
       };
-    }, []);
+    }, [paired]);
 
   const checkDevice = async () => {
     if (scanStatus !== "ready") return;
@@ -247,7 +245,7 @@ function DeviceScanner() {
     setError("");
 
     try {
-      const response = await fetch(`${SCANNER_URL}/status`);
+      const response = await agentFetch("/status");
 
       if (!response.ok) {
         throw new Error("Unable to check device security.");
@@ -297,9 +295,7 @@ function DeviceScanner() {
     let active = true;
     const refresh = async () => {
       try {
-        const response = await fetch(
-          `${SCANNER_URL}/scan-malware/status`
-        );
+        const response = await agentFetch("/scan-malware/status");
         if (!response.ok) return;
         const data: MalwareResult = await response.json();
         if (active) setMalware(data);
@@ -373,7 +369,7 @@ function DeviceScanner() {
     setFolderPicking(true);
 
     try {
-      const response = await fetch(`${SCANNER_URL}/choose-folder`, {
+      const response = await agentFetch("/choose-folder", {
         method: "POST",
       });
 
@@ -403,7 +399,7 @@ function DeviceScanner() {
     setMalwareBusy(true);
     recordedMalwareKey.current = null;
     try {
-      const response = await fetch(`${SCANNER_URL}/scan-malware`, {
+      const response = await agentFetch("/scan-malware", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -427,7 +423,7 @@ function DeviceScanner() {
   const cancelMalwareScan = async () => {
     setMalwareError("");
     try {
-      const response = await fetch(`${SCANNER_URL}/scan-malware/cancel`, {
+      const response = await agentFetch("/scan-malware/cancel", {
         method: "POST",
       });
       if (!response.ok) throw new Error("Unable to cancel malware scan.");
@@ -482,6 +478,14 @@ const macSecurityChecks = [
 
   return (
     <div className="device-scanner-page">
+      {!paired && (
+        <AgentPairing
+          onPaired={() => {
+            setPaired(true);
+            setError("");
+          }}
+        />
+      )}
       <div className="device-scanner-header">
         <h1>Device Scanner</h1>
         <p>Monitor your device's security and protection status.</p>
@@ -501,7 +505,8 @@ const macSecurityChecks = [
           <span className={`device-ready ${scanStatus}`}>
             {scanStatus === "checking" && "Connecting..."}
             {scanStatus === "ready" && "Scanner Connected"}
-            {scanStatus === "unavailable" && "Not Connected"}
+            {scanStatus === "unavailable" &&
+              (paired ? "Not Connected" : "Pairing Required")}
             {scanStatus === "scanning" && "Checking..."}
           </span>
         </div>

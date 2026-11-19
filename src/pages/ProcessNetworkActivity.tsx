@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { agentFetch } from "../lib/localAgent";
 import {
   Network,
   Search,
@@ -9,8 +10,6 @@ import {
   Wifi,
   Radio,
 } from "lucide-react";
-
-const API_URL = "http://127.0.0.1:8765";
 
 type NetworkConnection = {
   pid: number;
@@ -288,8 +287,8 @@ export default function ProcessNetworkActivity({
       fetching = true;
 
       try {
-        const response = await fetch(
-          `${API_URL}/system/network-connections`
+        const response = await agentFetch(
+          "/system/network-connections"
         );
 
         if (!response.ok) {

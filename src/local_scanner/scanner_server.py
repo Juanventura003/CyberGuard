@@ -1,33 +1,37 @@
 import os
 import subprocess
 import threading
-from pathlib import Path
+import secrets
+import time
 import platform
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
+
 from windows_scanner import scan_windows
 from mac_scanner import scan_mac
 from malware_scanner import start_scan, scan_status, cancel_scan
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
 from system_guardian import (
     get_system_stats,
     get_running_processes,
     get_process_details,
 )
+
 from process_analysis import analyze_processes
 
-from pydantic import BaseModel
 from process_termination import (
     check_termination_eligibility,
     terminate_eligible_process,
     check_application_termination,
     terminate_application,
 )
-import time
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
 
 from security_timeline import (
     update_process_timeline,
@@ -41,17 +45,66 @@ app = FastAPI(title="CyberGuard Local Scanner")
 
 process_executor = ThreadPoolExecutor(max_workers=1)
 process_cache_lock = Lock()
+
 process_cache = {
     "data": None,
     "scanning": False,
     "last_updated": None,
 }
 
+ALLOWED_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://cyberguard-omega-sable.vercel.app",
+}
+
+PAIRING_CODE_LIFETIME = 300
+SESSION_LIFETIME = 8 * 60 * 60
+
+_pairing_lock = threading.Lock()
+_pairing_code = None
+_pairing_expires = 0
+_active_sessions = {}
+
+
+def create_pairing_code():
+    global _pairing_code, _pairing_expires
+
+    with _pairing_lock:
+        _pairing_code = secrets.token_urlsafe(16)
+        _pairing_expires = time.time() + PAIRING_CODE_LIFETIME
+        return _pairing_code
+
+
+def verify_pairing_code(code):
+    global _pairing_code, _pairing_expires
+
+    with _pairing_lock:
+        if (
+            not isinstance(code, str)
+            or _pairing_code is None
+            or time.time() >= _pairing_expires
+            or not secrets.compare_digest(code, _pairing_code)
+        ):
+            return None
+
+        _pairing_code = None
+        _pairing_expires = 0
+
+        token = secrets.token_urlsafe(32)
+        _active_sessions[token] = time.time() + SESSION_LIFETIME
+
+        return token
+
+
+class PairingRequest(BaseModel):
+    code: str
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=list(ALLOWED_ORIGINS),
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.add_middleware(
@@ -59,46 +112,98 @@ app.add_middleware(
     allowed_hosts=["127.0.0.1", "localhost"],
 )
 
-ALLOWED_ORIGINS = {
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-}
-
 def require_local_frontend(
     origin: str | None = Header(default=None),
 ):
     if origin not in ALLOWED_ORIGINS:
         raise HTTPException(
             status_code=403,
-            detail="Request must come from the CyberGuard frontend."
+            detail="Request must come from the CyberGuard frontend.",
         )
+
+    return True
+
+def require_paired_session(
+    authorization: str | None = Header(default=None),
+    _: bool = Depends(require_local_frontend),
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Device pairing required.",
+        )
+
+    token = authorization.removeprefix("Bearer ").strip()
+
+    with _pairing_lock:
+        expires = _active_sessions.get(token)
+
+        if expires is None or time.time() >= expires:
+            _active_sessions.pop(token, None)
+
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or expired session.",
+            )
+
+    return True
+
+@app.post("/pair")
+def pair_device(
+    request: PairingRequest,
+    _: bool = Depends(require_local_frontend),
+):
+    token = verify_pairing_code(request.code)
+
+    if token is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired pairing code.",
+        )
+
+    return {
+        "success": True,
+        "token": token,
+        "expires_in": SESSION_LIFETIME,
+    }
 
 @app.get("/health")
 def health(_=Depends(require_local_frontend)):
     system = platform.system()
+
     print("Detected operating system:", repr(system))
-    return {"status": "ready", "operating_system": system,
-            "supported": system in ("Windows", "Darwin")}
+
+    return {
+        "status": "ready",
+        "operating_system": system,
+        "supported": system in ("Windows", "Darwin"),
+    }
 
 @app.get("/status")
-def security_status(_=Depends(require_local_frontend)):
+def security_status(_=Depends(require_paired_session)):
     system = platform.system()
+
     if system == "Windows":
         return scan_windows()
+
     if system == "Darwin":
         return scan_mac()
-    raise HTTPException(status_code=501, detail=f"Unsupported operating system: {system}")
+
+    raise HTTPException(
+        status_code=501,
+        detail=f"Unsupported operating system: {system}",
+    )
 
 class ScanRequest(BaseModel):
     mode: str = "quick"
     folder: str = "downloads"
+
 class FolderRequest(BaseModel):
     path: str
 
 
 @app.post("/choose-folder")
-def choose_folder(_=Depends(require_local_frontend)):
-
+def choose_folder(_=Depends(require_paired_session)):
     system = platform.system()
 
     if system == "Windows":
@@ -130,6 +235,7 @@ def choose_folder(_=Depends(require_local_frontend)):
             $dialog.Dispose()
         }
         """
+
         result = subprocess.run(
             ["powershell", "-NoProfile", "-STA", "-Command", script],
             capture_output=True,
@@ -140,7 +246,7 @@ def choose_folder(_=Depends(require_local_frontend)):
         if result.returncode != 0:
             raise HTTPException(
                 status_code=500,
-                detail="Unable to open folder picker."
+                detail="Unable to open folder picker.",
             )
 
         selected = result.stdout.strip()
@@ -150,41 +256,48 @@ def choose_folder(_=Depends(require_local_frontend)):
             [
                 "osascript",
                 "-e",
-                'POSIX path of (choose folder with prompt "Select a folder to scan with CyberGuard")'
+                'POSIX path of (choose folder with prompt "Select a folder to scan with CyberGuard")',
             ],
             capture_output=True,
             text=True,
             timeout=120,
         )
 
-        selected = result.stdout.strip() if result.returncode == 0 else ""
+        selected = (
+            result.stdout.strip()
+            if result.returncode == 0
+            else ""
+        )
 
     else:
         raise HTTPException(
             status_code=501,
-            detail="Unsupported operating system."
+            detail="Unsupported operating system.",
         )
 
     if not selected:
-        return {"status": "cancelled", "path": None}
+        return {
+            "status": "cancelled",
+            "path": None,
+        }
 
     path = Path(selected).resolve()
 
     if not path.is_dir():
         raise HTTPException(
             status_code=400,
-            detail="Selected folder does not exist."
+            detail="Selected folder does not exist.",
         )
 
     return {
         "status": "selected",
-        "path": str(path)
+        "path": str(path),
     }
 
 @app.post("/scan-malware")
 def start_malware_scan(
     request: ScanRequest,
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     return start_scan(
         mode=request.mode,
@@ -192,22 +305,23 @@ def start_malware_scan(
     )
 
 @app.get("/scan-malware/status")
-def malware_scan_status(_=Depends(require_local_frontend)):
+def malware_scan_status(_=Depends(require_paired_session)):
     return scan_status()
 
 
 @app.post("/scan-malware/cancel")
-def cancel_malware_scan(_=Depends(require_local_frontend)):
+def cancel_malware_scan(_=Depends(require_paired_session)):
     return cancel_scan()
 
 @app.get("/system/stats")
-def system_stats(_=Depends(require_local_frontend)):
+def system_stats(_=Depends(require_paired_session)):
     try:
         return get_system_stats()
+
     except Exception:
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve system performance information."
+            detail="Unable to retrieve system performance information.",
         )
 
 def refresh_process_cache():
@@ -216,7 +330,7 @@ def refresh_process_cache():
 
         result = get_running_processes()
         analyzed = analyze_processes(result["processes"])
-        
+
         update_process_timeline(analyzed["processes"])
 
         with process_cache_lock:
@@ -238,7 +352,7 @@ def refresh_process_cache():
             process_cache["scanning"] = False
 
 @app.get("/system/processes")
-def system_processes(_=Depends(require_local_frontend)):
+def system_processes(_=Depends(require_paired_session)):
     with process_cache_lock:
         cached = process_cache["data"]
         last_updated = process_cache["last_updated"]
@@ -248,6 +362,7 @@ def system_processes(_=Depends(require_local_frontend)):
 
             try:
                 process_executor.submit(refresh_process_cache)
+
             except RuntimeError:
                 process_cache["scanning"] = False
 
@@ -276,17 +391,18 @@ def system_processes(_=Depends(require_local_frontend)):
 
 @app.get("/system/security-events")
 def system_security_events(
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     return get_security_events(limit=100)
 
 
 @app.get("/system/network-connections")
 def system_network_connections(
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     try:
         return get_process_network_connections()
+
     except Exception:
         import logging
         logging.exception("Network collection failed")
@@ -299,14 +415,14 @@ def system_network_connections(
 @app.get("/system/processes/{pid}")
 def system_process_details(
     pid: int,
-    _=Depends(require_local_frontend)
+    _=Depends(require_paired_session),
 ):
     result = get_process_details(pid)
 
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail="Process not found or access denied."
+            detail="Process not found or access denied.",
         )
 
     return result
@@ -318,18 +434,17 @@ class TerminationRequest(BaseModel):
 @app.post("/system/processes/termination-check")
 def system_check_process_termination(
     request: TerminationRequest,
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     return check_termination_eligibility(
         request.pid,
         request.create_time,
     )
 
-
 @app.post("/system/processes/terminate")
 def system_terminate_process(
     request: TerminationRequest,
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     result = terminate_eligible_process(
         request.pid,
@@ -347,18 +462,17 @@ def system_terminate_process(
 @app.post("/system/processes/application-check")
 def system_check_application_termination(
     request: TerminationRequest,
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     return check_application_termination(
         request.pid,
         request.create_time,
     )
 
-
 @app.post("/system/processes/terminate-application")
 def system_terminate_application(
     request: TerminationRequest,
-    _=Depends(require_local_frontend),
+    _=Depends(require_paired_session),
 ):
     result = terminate_application(
         request.pid,
@@ -375,4 +489,18 @@ def system_terminate_application(
     return result
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8765)
+    pairing_code = create_pairing_code()
+
+    print("\n" + "=" * 50)
+    print("CYBERGUARD DEVICE PAIRING")
+    print("=" * 50)
+    print("Enter this code on the CyberGuard website:")
+    print(pairing_code)
+    print("This code expires in 5 minutes.")
+    print("=" * 50 + "\n", flush=True)
+
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=8765,
+    )

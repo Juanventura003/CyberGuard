@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { agentFetch } from "../lib/localAgent";
 import {
   Clock3,
   AlertTriangle,
@@ -9,8 +10,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-
-const API_URL = "http://127.0.0.1:8765";
 
 type SecurityEvent = {
   id: number;
@@ -149,8 +148,8 @@ export default function SecurityEventTimeline() {
       fetching = true;
 
       try {
-        const response = await fetch(
-          `${API_URL}/system/security-events`
+        const response = await agentFetch(
+          "/system/security-events"
         );
 
         if (!response.ok) {
