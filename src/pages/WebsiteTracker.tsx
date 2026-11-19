@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Search, Globe2, X, Trash2 } from "lucide-react";
 import {
   deleteAllWebsiteHistory,
@@ -11,6 +12,7 @@ import WebsiteFindingDialog, {
 } from "../components/WebsiteFindingDialog";
 import { normalizeFindingDomain } from "../lib/organizationFindings";
 import { useAuth } from "../context/AuthContext";
+import { assistantQuestionPath } from "../lib/assistant";
 
 import { prepareHistoryDeletion } from "../lib/extensionBridge";
 import { mergeHistorySnapshot } from "../lib/websiteHistory";
@@ -703,6 +705,19 @@ function WebsiteTrackerContent() {
                     </details>
                   ) : (
                     <span>No explanation was saved for this visit.</span>
+                  )}
+                  {(website.riskLevel === "Suspicious" ||
+                    website.riskLevel === "High Risk") && (
+                    <Link
+                      className="tracker-assistant-link"
+                      to={assistantQuestionPath(
+                        website.riskLevel === "High Risk"
+                          ? "What should I do if I think I clicked a bad link?"
+                          : "How do I check if a link is safe?",
+                      )}
+                    >
+                      Ask Cyber Assistant
+                    </Link>
                   )}
                 </div>
 

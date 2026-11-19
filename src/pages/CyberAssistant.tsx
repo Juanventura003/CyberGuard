@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Bot, SendHorizontal } from "lucide-react";
+import { Bot, RotateCcw, SendHorizontal } from "lucide-react";
 
 import {
   SUGGESTED_PROMPTS,
   assistantProvider,
+  suggestionPromptsFor,
   type AssistantMessage,
 } from "../lib/assistant";
 
 import "./CyberAssistant.css";
+
+const STORAGE_KEY = "cyberguard-assistant-thread-v1";
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -19,7 +22,7 @@ const WELCOME: AssistantMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi — I am CyberGuard’s Cyber Assistant. Ask any cybersecurity question, or ask where to find something in the app (for example Email Scanner or Website Tracker). Pick a suggestion or type your own question.",
+    "Hi — I am CyberGuard’s Cyber Assistant. Ask any cybersecurity question, or ask where to find something in the app (for example Email Scanner, Device Scanner, or Website Tracker). Pick a suggestion or type your own question.",
 };
 
 const LINK_PATTERN = /\[([^\]]+)\]\((\/[a-z0-9\-/?=#]*)\)/gi;
@@ -92,15 +95,57 @@ function formatReply(content: string) {
   });
 }
 
+function loadStoredMessages(): AssistantMessage[] | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as AssistantMessage[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return null;
+    }
+    return parsed.filter(
+      (message) =>
+        message &&
+        typeof message.id === "string" &&
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string",
+    );
+  } catch {
+    return null;
+  }
+}
+
 function CyberAssistant() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [messages, setMessages] = useState<AssistantMessage[]>([WELCOME]);
+  const [messages, setMessages] = useState<AssistantMessage[]>(() => {
+    return loadStoredMessages() ?? [WELCOME];
+  });
   const [input, setInput] = useState("");
   const [isReplying, setIsReplying] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef(messages);
   const isReplyingRef = useRef(isReplying);
   const prefillHandled = useRef(false);
+
+  const lastUserText = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index].role === "user") {
+        return messages[index].content;
+      }
+    }
+    return "";
+  }, [messages]);
+
+  const suggestionPrompts = useMemo(() => {
+    if (!lastUserText) {
+      return [...SUGGESTED_PROMPTS];
+    }
+    return suggestionPromptsFor(lastUserText);
+  }, [lastUserText]);
+
+  const canClear = messages.length > 1 || messages[0]?.id !== "welcome";
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -113,6 +158,18 @@ function CyberAssistant() {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages, isReplying]);
+
+  useEffect(() => {
+    try {
+      if (messages.length <= 1 && messages[0]?.id === "welcome") {
+        sessionStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {
+      // Ignore quota / private-mode failures.
+    }
+  }, [messages]);
 
   async function sendMessage(rawText: string) {
     const text = rawText.trim();
@@ -171,9 +228,22 @@ function CyberAssistant() {
     prefillHandled.current = true;
     setSearchParams({}, { replace: true });
     void sendMessage(q);
-    // Prefill from dashboard deep-link once on mount.
+    // Prefill from dashboard / tool deep-link once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function clearChat() {
+    if (isReplyingRef.current) {
+      return;
+    }
+    setMessages([WELCOME]);
+    setInput("");
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -201,10 +271,26 @@ function CyberAssistant() {
             </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="assistant-clear"
+          onClick={clearChat}
+          disabled={!canClear || isReplying}
+          aria-label="Start a new chat"
+        >
+          <RotateCcw size={16} />
+          New chat
+        </button>
       </header>
 
       <div className="assistant-panel">
-        <div className="assistant-thread" ref={threadRef}>
+        <div
+          className="assistant-thread"
+          ref={threadRef}
+          aria-live="polite"
+          aria-relevant="additions"
+        >
           {messages.map((message) => (
             <div
               key={message.id}
@@ -235,7 +321,7 @@ function CyberAssistant() {
         </div>
 
         <div className="assistant-suggestions">
-          {SUGGESTED_PROMPTS.map((prompt) => (
+          {suggestionPrompts.map((prompt) => (
             <button
               key={prompt}
               type="button"

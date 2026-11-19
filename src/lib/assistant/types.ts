@@ -21,3 +21,15 @@ export const SUGGESTED_PROMPTS = [
   "Where can I track website risk?",
   "What tools does CyberGuard have?",
 ] as const;
+
+export const SAMPLE_ASSISTANT_QUESTIONS = [
+  "How can I tell if an email is phishing?",
+  "What should I do if I think I clicked a bad link?",
+  "How do I check if a link is safe?",
+  "Where is Device Scanner?",
+] as const;
+
+/** Build a Cyber Assistant deep-link that auto-asks a question. */
+export function assistantQuestionPath(question: string): string {
+  return `/cyber-assistant?q=${encodeURIComponent(question.trim())}`;
+}

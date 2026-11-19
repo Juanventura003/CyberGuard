@@ -108,9 +108,9 @@ Use the popup to control monitoring, floating notifications, and personal websit
 After extension changes, rebuild, reload the extension, and refresh website tabs. Restart the backend after backend changes. OpenPhish needs no API key; Google Web Risk uses `GOOGLE_WEB_RISK_API_KEY`.
 
 ### Cyber Assistant
-The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, and so on).
+The Cyber Assistant uses a local guided knowledge base for cybersecurity questions and can redirect you to app pages (Email Scanner, Website Tracker, Device Scanner, System Guardian, Team Security, News, and so on).
 
-Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like “Where is the Email Scanner?” or “How do I spot phishing?” — answers include clickable links to the right CyberGuard page.
+Open **Cyber Assistant** in the sidebar (`/cyber-assistant`). Try questions like “Where is the Email Scanner?” or “How do I spot phishing?” — answers include clickable links to the right CyberGuard page. Email Scanner and Website Tracker can also deep-link risky findings into the assistant with `?q=…`.
 
 ### CyberTech News
 

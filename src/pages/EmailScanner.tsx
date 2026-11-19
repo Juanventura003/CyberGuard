@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { assistantQuestionPath } from "../lib/assistant";
 
 import {
   startGmailConnect,
@@ -641,6 +642,18 @@ export default function EmailScanner() {
                 scanner: { source: "email_scanner", verdict: r.classification, score: r.risk_score, reasons: r.explanation },
               }}
             />
+          )}
+          {(r.classification === "PHISHING" || r.classification === "SUSPICIOUS") && (
+            <Link
+              className="es-btn secondary"
+              to={assistantQuestionPath(
+                r.classification === "PHISHING"
+                  ? "What should I do if I think I got a phishing email?"
+                  : "How can I tell if an email is phishing?",
+              )}
+            >
+              Ask Cyber Assistant
+            </Link>
           )}
         </div>
         {canMove(r) && moveErrors[r.id] && <p className="es-trash-error">{moveErrors[r.id]}</p>}
