@@ -24,11 +24,10 @@
     {
       "matches": [
         "http://localhost:5173/*",
-        "http://127.0.0.1:5173/*"
+        "http://127.0.0.1:5173/*",
+        "https://cyberguard-omega-sable.vercel.app/*"
       ],
-      "js": [
-        "content.js"
-      ],
+      "js": ["content.js"],
       "run_at": "document_idle"
     },
     {
@@ -36,9 +35,7 @@
         "http://*/*",
         "https://*/*"
       ],
-      "js": [
-        "banner.js"
-      ],
+      "js": ["banner.js"],
       "run_at": "document_idle"
     }
   ],

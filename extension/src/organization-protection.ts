@@ -11,7 +11,7 @@ export const ORGANIZATION_RULE_START = 1_000_000;
 const KEY = "organizationProtection";
 const EXPIRY_ALARM = "organization-access-expiry";
 let expiryTimer: ReturnType<typeof setTimeout> | undefined;
-const API = "http://127.0.0.1:8000/api/protection";
+const API = "https://cyberguard-p67l.onrender.com/api/protection";
 const WARNING_QUEUE_KEY = "organizationWarningQueue";
 type WarningEvent = {
   event_id: string;

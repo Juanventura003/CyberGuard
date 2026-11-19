@@ -192,7 +192,7 @@ declare const chrome: {
 	};
 };
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://cyberguard-p67l.onrender.com";
 const BANNER_KEY = "bannerEnabled";
 const MONITORING_KEY = "monitoringEnabled";
 const ACTIVITY_KEY = "websiteActivity";
@@ -388,7 +388,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 			const origin = new URL(
 				_sender.url ?? _sender.tab?.url ?? "https://invalid.example",
 			).origin;
-			if (!["http://localhost:5173", "http://127.0.0.1:5173"].includes(origin))
+			if (![
+				"http://localhost:5173",
+				"http://127.0.0.1:5173",
+				"https://cyberguard-omega-sable.vercel.app"
+				].includes(origin))
 				throw new Error("Untrusted organization request.");
 			sendResponse(await handleProtection(message));
 			return;
@@ -420,7 +424,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 			if (_sender.tab) {
 				const origin = new URL(_sender.url ?? _sender.tab.url ?? "").origin;
 				if (
-					!["http://localhost:5173", "http://127.0.0.1:5173"].includes(origin)
+					![
+						"http://localhost:5173",
+						"http://127.0.0.1:5173",
+						"https://cyberguard-omega-sable.vercel.app"
+						].includes(origin)
 				)
 					throw new Error("Untrusted blocking request.");
 			}
@@ -606,20 +614,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		}
 
 		if (message.type === "openDashboard") {
-			const tabs = await chrome.tabs.query({
-				active: false,
-				currentWindow: false,
-			});
-			const dashboardOrigin =
-				tabs
-					.map((tab) => tab.url)
-					.find((url) => url?.startsWith("http://127.0.0.1:5173"))
-					?.split("/")
-					.slice(0, 3)
-					.join("/") ?? "http://localhost:5173";
 			await chrome.tabs.create({
-				url: `${dashboardOrigin}/website-tracker?extension=connect`,
+				url: "https://cyberguard-omega-sable.vercel.app/website-tracker?extension=connect",
 			});
+
 			sendResponse({ ok: true });
 			return;
 		}
@@ -1034,8 +1032,14 @@ const NOTIFIED_SITES_KEY = "riskNotificationsShown";
 const SAME_VISIT_MS = 15_000;
 const NOTIFICATION_PREFIX = "cyberguard-site:";
 /** Open CyberGuard tabs that should show an in-app card for risky visits. */
-const CYBERGUARD_APP_URLS = ["http://localhost:5173/*", "http://127.0.0.1:5173/*"];
-const DASHBOARD_URL = "http://localhost:5173/website-tracker";
+const CYBERGUARD_APP_URLS = [
+  "http://localhost:5173/*",
+  "http://127.0.0.1:5173/*",
+  "https://cyberguard-omega-sable.vercel.app/*"
+];
+
+const DASHBOARD_URL =
+  "https://cyberguard-omega-sable.vercel.app/website-tracker";
 
 const RISK_LABELS: Record<string, { title: string; level: string }> = {
 	HIGH_RISK: { title: "⚠️ Dangerous website", level: "High risk" },
