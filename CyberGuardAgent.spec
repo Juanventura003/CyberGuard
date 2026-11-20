@@ -22,6 +22,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='CyberGuardAgent',
+    icon='icons/CyberGuardAgent.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

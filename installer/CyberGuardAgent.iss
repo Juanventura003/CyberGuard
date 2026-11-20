@@ -7,7 +7,7 @@
 AppId={{B84E7A10-DA52-4F92-98A4-0B27491F0C6D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-AppPublisher=CyberGuard AI
+AppPublisher=CyberGuard
 DefaultDirName={localappdata}\Programs\CyberGuard Agent
 DefaultGroupName=CyberGuard Agent
 OutputDir=..\installer\output

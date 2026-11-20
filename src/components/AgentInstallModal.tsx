@@ -97,10 +97,16 @@ useEffect(() => {
         ) : (
           <button
             className="agent-install-download"
-            disabled
-            title="Installer download coming soon"
+            onClick={() => {
+              const link = document.createElement("a");
+              link.href = "/downloads/CyberGuardSetup.exe";
+              link.download = "CyberGuardSetup.exe";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
           >
-            Download Agent — Coming Soon
+            Download CyberGuard Agent
           </button>
         )}
 

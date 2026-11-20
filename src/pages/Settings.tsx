@@ -941,16 +941,22 @@ function Settings() {
           <button
             type="button"
             className="settings-button"
-            disabled
-            title="Installer is awaiting security review"
+            onClick={() => {
+              const link = document.createElement("a");
+              link.href = "/downloads/CyberGuardSetup.exe";
+              link.download = "CyberGuardSetup.exe";
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
           >
-            Download CyberGuard Agent — Coming Soon
+            Download CyberGuard Agent
           </button>
 
           <p className="settings-card-desc">
-            The desktop agent is optional. You can continue using
-            CyberGuard without installing it. Downloads will become
-            available after the installer has been reviewed and tested.
+            The desktop agent is optional. Download the Windows installer
+            to enable local device scanning and system security monitoring.
+            You can continue using CyberGuard without installing it.
           </p>
         </div>
       </section>
